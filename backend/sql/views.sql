@@ -1,0 +1,3 @@
+-- Vues PostgREST — documentation uniquement
+-- Les vues sont déjà créées en base par Ludovic
+-- v_localisation, v_animal_last_loc, v_periode_animal_suivi
