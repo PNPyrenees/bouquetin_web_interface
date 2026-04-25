@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <title>PNP-SIG — Bouquetins</title>
+
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@8.2.0/ol.css">
+  <script src="https://cdn.jsdelivr.net/npm/ol@8.2.0/dist/ol.js"></script>
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+
+
+  <link rel="stylesheet" href="assets/css/map.css">
+</head>
+
+<body>
+
+  <div id="loginScreen">
+    <div class="login-box">
+      <h2>PNP-SIG</h2>
+      <p>Suivi GPS des bouquetins ibériques</p>
+      <form id="loginForm">
+        <label for="username">Identifiant</label>
+        <input type="text" id="username" placeholder="" autocomplete="username">
+        <label for="password">Mot de passe</label>
+        <input type="password" id="password" autocomplete="current-password">
+        <button type="submit">Se connecter</button>
+        <div id="loginError"></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="mapScreen">
+    <div id="map"></div>
+    <div id="status"></div>
+    <div id="popup"></div>
+  </div>
+
+  <script type="module" src="assets/js/app.js"></script>
+
+</body>
+
+</html>
