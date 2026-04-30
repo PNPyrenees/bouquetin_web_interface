@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [0.3.0] — 2026-04-30
+## [0.3.0] - 2026-04-30
 
 ### Added
 - Documentation technique complète (README.md, docs/api/endpoints.md)
@@ -21,7 +21,7 @@
 
 ---
 
-## [0.2.0] — 2026-04-29
+## [0.2.0] - 2026-04-29
 
 ### Added
 - Header double bande : navigation blanc + bandeau vert "Plateforme de suivi des bouquetins"
@@ -37,7 +37,7 @@
 
 ---
 
-## [0.1.0] — 2026-04-24
+## [0.1.0] - 2026-04-24
 
 ### Added
 - Structure initiale du projet (frontend / backend / tests / docs)
