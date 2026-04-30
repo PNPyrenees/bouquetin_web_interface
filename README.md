@@ -16,7 +16,7 @@ Cette interface permet aux agents du Parc National des Pyrénées de :
 - **Frontend** : HTML5 / CSS3 / JavaScript ES6+
 - **Cartographie** : OpenLayers
 - **API** : PostgREST (base PostgreSQL/PostGIS)
-- **Base de données** : PostgreSQL + PostGIS — schema `bouquetin`
+- **Base de données** : PostgreSQL + PostGIS - schema `bouquetin`
 
 ## Structure du projet
 

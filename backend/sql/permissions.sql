@@ -1,2 +1,2 @@
--- Permissions PostgreSQL — documentation uniquement
+-- Permissions PostgreSQL - documentation uniquement
 -- Rôles déjà configurés en base : pnp_bqt_reader, pnp_bqt_writer, anon, authenticator

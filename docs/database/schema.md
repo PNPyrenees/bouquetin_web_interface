@@ -1,6 +1,6 @@
-# Database Schema — bouquetin
+# Database Schema - bouquetin
 
-PostgreSQL / PostGIS — Schema `bouquetin`
+PostgreSQL / PostGIS - Schema `bouquetin`
 
 ---
 
@@ -39,5 +39,5 @@ PostgreSQL / PostGIS — Schema `bouquetin`
 
 ## Scripts de synchronisation
 
-- `lotek2db` — colliers Lotek → [github.com/PNPyrenees/lotek_data_sync](https://github.com/PNPyrenees/lotek_data_sync)
-- `vectronic2db` — colliers VecTronic → [github.com/PNPyrenees/vectronic2db](https://github.com/PNPyrenees/vectronic2db)
+- `lotek2db` - colliers Lotek → [github.com/PNPyrenees/lotek_data_sync](https://github.com/PNPyrenees/lotek_data_sync)
+- `vectronic2db` - colliers VecTronic → [github.com/PNPyrenees/vectronic2db](https://github.com/PNPyrenees/vectronic2db)
