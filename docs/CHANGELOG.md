@@ -21,8 +21,6 @@
 ## [0.3.0] - 2026-04-30
 
 ### Added
-- Documentation technique complète (README.md, docs/api/endpoints.md)
-- PDF documentation architecture et technologies (PNP_SIG_Documentation V1.pdf) en attente
 - Captures de tests API Postman et carte OpenLayers (docs/conception/)
 - Maquettes prototype interface d'accueil (en attente validation PNP)
 
