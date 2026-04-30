@@ -1,2 +1,2 @@
--- Permissions PostgreSQL — documentation uniquement
+-- Permissions PostgreSQL - documentation uniquement
 -- Rôles déjà configurés en base : role_lecture, role_ecriture, anon, role_authenticator

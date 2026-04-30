@@ -1,4 +1,4 @@
-# API Endpoints — PostgREST
+# API Endpoints - PostgREST
 
 Base URL : `https://your-postgrest-api.fr`
 
