@@ -44,6 +44,3 @@ Modifier l'URL de l'API dans `frontend/assets/js/config.js` :
 export const API_URL = 'https://votre-api-postgrest.fr';
 ```
 
-## Auteur
-
-Emmanuel Yeo — Stagiaire Parc National des Pyrénées — 2026
