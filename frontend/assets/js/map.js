@@ -1,14 +1,10 @@
 import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93 } from './config.js';
-
 let map;
 let gpsSource;
 let popupOverlay;
-
 export function initMap(targetId, popupId) {
-
   proj4.defs('EPSG:2154', LAMBERT93);
   ol.proj.proj4.register(proj4);
-
   gpsSource = new ol.source.Vector();
   const gpsLayer = new ol.layer.Vector({
     source: gpsSource,
@@ -20,14 +16,12 @@ export function initMap(targetId, popupId) {
       })
     })
   });
-
   const popupEl = document.getElementById(popupId);
   popupOverlay = new ol.Overlay({
     element: popupEl,
     positioning: 'bottom-center',
     offset: [0, -10]
   });
-
   map = new ol.Map({
     target: targetId,
     layers: [
@@ -43,11 +37,9 @@ export function initMap(targetId, popupId) {
       new ol.control.ScaleLine({ units: 'metric' })
     ])
   });
-
   map.on('pointermove', evt => {
     map.getViewport().style.cursor = map.hasFeatureAtPixel(evt.pixel) ? 'pointer' : '';
   });
-
   map.on('singleclick', evt => {
     let hit = false;
     map.forEachFeatureAtPixel(evt.pixel, feature => {
@@ -57,36 +49,28 @@ export function initMap(targetId, popupId) {
     });
     if (!hit) popupEl.style.display = 'none';
   });
-
   return map;
 }
-
 export function renderPoints(locations) {
   gpsSource.clear();
-
   locations.forEach(loc => {
     if (!loc.geom?.coordinates) return;
-
     const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
     const coord  = ol.proj.fromLonLat(wgs84);
-
     const feature = new ol.Feature({
       geometry: new ol.geom.Point(coord),
       ...loc
     });
     gpsSource.addFeature(feature);
   });
-
   if (gpsSource.getFeatures().length > 0) {
     map.getView().fit(gpsSource.getExtent(), {
       padding: [40, 40, 40, 40],
       maxZoom: MAX_ZOOM
     });
   }
-
   return gpsSource.getFeatures().length;
 }
-
 function showPopup(feature, coordinate, popupEl) {
   const p = feature.getProperties();
   popupEl.innerHTML = `
@@ -100,7 +84,6 @@ function showPopup(feature, coordinate, popupEl) {
   popupOverlay.setPosition(coordinate);
   popupEl.style.display = 'block';
 }
-
 export function clearMap() {
   gpsSource.clear();
 }

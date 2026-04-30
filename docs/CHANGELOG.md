@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [0.3.1] - 2026-04-30
+
+### Added
+- Nouveau panneau latéral (Sidebar) avec accordéon de filtres avancés (Période, Sexe, Classe d'âge, Gestionnaire, Translocation, Programmation GPS, Qualité GPS, Filtre spatial)
+- Menu déroulant personnalisé pour la sélection des individus avec chargement dynamique via l'API
+- Nouvelles icônes pour la navigation principale (Carte, Individus, Rapports)
+- Script de basculement (toggle) pour l'affichage/masquage de la sidebar
+
+### Fixed
+- Alignement vertical des éléments entre la bande blanche et la bande verte
+
+### Changed
+- Refonte visuelle du header selon la maquette finale (icons, typographie Bebas Neue)
+- Amélioration de la navigation : liens centrés avec icônes
+- Préparation de la gestion des rôles : masquage par défaut du bouton "+ Ajouter" et de la session admin (display:none pour pilotage via JWT)
+- Optimisation du bandeau vert : image bouquetin (bqt_header.png) redimensionnée et contenue, filtres rapides avec style semi-transparent blanc
+- Mise à jour des couleurs et espacements pour une meilleure cohérence "nature/faune"
+
 ## [0.3.0] - 2026-04-30
 
 ### Added

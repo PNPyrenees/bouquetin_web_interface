@@ -1,20 +1,58 @@
-import { login, fetchLocations } from './api.js';
-import { initMap, renderPoints } from './map.js';
+import { login, fetchAnimals } from './api.js';
 import { ROLES } from './config.js';
-
 const DEV_MODE = true;
 async function startApp(token) {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('mapScreen').style.display = 'block';
-  initMap('map', 'popup');
-  const status = document.getElementById('status');
-  status.textContent = 'Chargement des données...';
-  const locations = await fetchLocations(token);
-  const count = renderPoints(locations);
-  status.textContent = `✓ ${count} positions chargées`;
-  setTimeout(() => status.style.display = 'none', 3000);
+  console.log('App démarrée avec token');
+  const dropdownList = document.getElementById('selectIndividu');
+  const dropdownBtn = document.getElementById('btnIndividu');
+  if (dropdownList && dropdownBtn) {
+    console.log('Dropdown elements trouvés');
+    dropdownBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownList.classList.toggle('show');
+    });
+    dropdownBtn.addEventListener('input', (e) => {
+      const val = e.target.value.toLowerCase();
+      dropdownList.classList.add('show');
+      const items = dropdownList.querySelectorAll('.dropdown-item');
+      items.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(val) ? 'block' : 'none';
+      });
+    });
+    document.addEventListener('click', (e) => {
+      if (!dropdownList.contains(e.target) && e.target !== dropdownBtn) {
+        dropdownList.classList.remove('show');
+      }
+    });
+    const firstItem = dropdownList.querySelector('.dropdown-item');
+    if (firstItem) {
+      firstItem.addEventListener('click', () => {
+        dropdownBtn.value = '';
+        dropdownBtn.placeholder = '- Tous les individus -';
+        dropdownList.classList.remove('show');
+      });
+    }
+  }
+  try {
+    const animals = await fetchAnimals(token);
+    if (dropdownList && dropdownBtn) {
+      animals.forEach(ani => {
+        const li = document.createElement('li');
+        li.className = 'dropdown-item';
+        li.textContent = ani.ani_nom;
+        li.dataset.value = ani.ani_id;
+        li.addEventListener('click', () => {
+          dropdownBtn.value = ani.ani_nom;
+          dropdownList.classList.remove('show');
+        });
+        dropdownList.appendChild(li);
+      });
+    }
+  } catch (err) {
+    console.error('Erreur chargement individus:', err);
+  }
 }
-
 if (DEV_MODE) {
   login(ROLES.READER, 'appBQT!6465').then(token => startApp(token));
 } else {

@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,50 +7,51 @@
   <title>Plateforme de suivi des bouquetins</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Bebas+Neue&display=swap"
+    rel="stylesheet">
   <link rel="stylesheet" href="assets/css/main.css">
 </head>
-
 <body>
-
   <header id="header">
-
     <div class="header-top">
       <div class="header-top-left">
         <img src="assets/img/logo-parc.svg" alt="Logo Parc National des Pyrénées" class="logo-parc">
       </div>
-
       <nav class="header-nav" id="mainNav">
-        <a href="#" class="nav-link active">Carte</a>
-        <a href="#" class="nav-link">Individus</a>
-        <a href="#" class="nav-link">Rapports/statistiques</a>
-        <a href="#" class="nav-link nav-link-add">+ Ajouter</a>
-      </nav>
-
-      <div class="header-top-right">
-        <div class="user-chip" id="userChip">
-          <span class="user-avatar">AD</span>
-          <span class="user-name">Session</span>
-          <span class="user-badge">ADMIN</span>
+        <a href="#" class="nav-link active">
+          <img src="assets/img/pointeur-de-localisation.png" alt="" class="nav-icon">
+          Carte
+        </a>
+        <a href="#" class="nav-link">
+          <img src="assets/img/animaux-domestiques.png" alt="" class="nav-icon">
+          Individus
+        </a>
+        <a href="#" class="nav-link">
+          <img src="assets/img/rapport.png" alt="" class="nav-icon">
+          Rapports/statistiques
+        </a>
+        <a href="#" id="btnAjouter" class="nav-link nav-link-add" style="display: none;">+ Ajouter</a>
+        <div class="user-chip" id="userChip" style="display: none;">
+          CONNEXION
         </div>
+      </nav>
+      <div class="header-top-right">
       </div>
     </div>
-
     <div class="header-bottom">
       <div class="header-bottom-left">
-        <div class="sync-info">
-          <span class="sync-label">DERNIÈRE SYNCHRONISATION</span>
-          <span class="sync-date" id="lastSync">24/04/2026 - 08:00</span>
-        </div>
       </div>
-
       <div class="header-bottom-center">
         <div class="filter-group">
           <div class="filter-block">
             <label class="filter-label">Individu</label>
-            <select class="filter-select" id="selectIndividu">
-              <option>- Tous les individus -</option>
-            </select>
+            <div class="custom-dropdown">
+              <input type="text" class="filter-select" id="btnIndividu" placeholder="- Tous les individus -"
+                autocomplete="off">
+              <ul class="dropdown-list" id="selectIndividu">
+                <li class="dropdown-item" data-value="">- Tous les individus -</li>
+              </ul>
+            </div>
           </div>
           <div class="filter-block">
             <label class="filter-label">Saisons</label>
@@ -61,7 +61,6 @@
           </div>
         </div>
       </div>
-
       <div class="header-bottom-right">
         <div class="header-separator"></div>
         <div class="platform-title">
@@ -69,13 +68,109 @@
             <span class="platform-line1">PLATEFORME</span>
             <span class="platform-line2">DE SUIVI DES BOUQUETINS</span>
           </span>
-          <img src="assets/img/noun-alpine-ibex-3634051.svg" alt="Icône bouquetin" class="ibex-icon">
+          <img src="assets/img/bqt_header.png" alt="Bouquetin" class="platform-img">
         </div>
       </div>
     </div>
-
   </header>
-
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-content">
+      <div class="sidebar-header">FILTRES DE RECHERCHES</div>
+      <div class="accordion">
+        <details open>
+          <summary>Période</summary>
+          <div class="details-content">
+            <div class="input-group">
+              <label>Du</label>
+              <input type="date" class="sidebar-input">
+            </div>
+            <div class="input-group">
+              <label>Au</label>
+              <input type="date" class="sidebar-input">
+            </div>
+          </div>
+        </details>
+        <details>
+          <summary>Sexe</summary>
+          <div class="details-content">
+            <label class="checkbox-label"><input type="checkbox"> Mâle</label>
+            <label class="checkbox-label"><input type="checkbox"> Femelle</label>
+          </div>
+        </details>
+        <details>
+          <summary>Classe d'âge</summary>
+          <div class="details-content">
+            <select class="sidebar-select">
+              <option>Toutes</option>
+            </select>
+          </div>
+        </details>
+        <details>
+          <summary>Gestionnaire</summary>
+          <div class="details-content">
+            <label class="checkbox-label"><input type="checkbox"> PNP</label>
+            <label class="checkbox-label"><input type="checkbox"> PNRPA</label>
+          </div>
+        </details>
+        <details>
+          <summary>Translocation</summary>
+          <div class="details-content">
+            <label class="checkbox-label"><input type="checkbox"> Individus transloqués</label>
+            <label class="checkbox-label"><input type="checkbox"> Non transloqués</label>
+          </div>
+        </details>
+        <details>
+          <summary>Programmation GPS</summary>
+          <div class="details-content">
+            <select class="sidebar-select">
+              <option>Toutes</option>
+            </select>
+          </div>
+        </details>
+        <details>
+          <summary>Qualité GPS</summary>
+          <div class="details-content">
+            <label class="checkbox-label"><input type="checkbox"> Exclure positions aberrantes</label>
+            <div class="range-group">
+              <label>DOP max: <span id="dopVal">10</span></label>
+              <input type="range" min="0" max="20" step="1" value="10"
+                oninput="document.getElementById('dopVal').textContent = this.value">
+            </div>
+          </div>
+        </details>
+        <details>
+          <summary>Filtre spatial</summary>
+          <div class="details-content">
+            <button class="btn-spatial">Activer la sélection</button>
+          </div>
+        </details>
+      </div>
+      <div class="sidebar-footer">
+        <div class="filter-count">0 filtres actifs</div>
+        <button class="btn-apply">Appliquer les filtres</button>
+        <button class="btn-reset">Réinitialiser</button>
+      </div>
+    </div>
+    <button class="sidebar-toggle" id="sidebarToggle" title="Masquer/Afficher les filtres">‹</button>
+  </aside>
+  <div id="loginScreen" style="display:none"></div>
+  <div id="mapScreen" style="display:block"></div>
+  <script>
+    document.getElementById('sidebarToggle').addEventListener('click', function () {
+      const sidebar = document.getElementById('sidebar');
+      const headerBottom = document.querySelector('.header-bottom');
+      sidebar.classList.toggle('collapsed');
+      if (sidebar.classList.contains('collapsed')) {
+        this.textContent = '›';
+        if (headerBottom) headerBottom.style.marginLeft = '0';
+      } else {
+        this.textContent = '‹';
+        if (headerBottom) headerBottom.style.marginLeft = '330px';
+      }
+    });
+  </script>
+  <div id="status"></div>
+  <div id="popup"></div>
+  <script type="module" src="assets/js/app.js"></script>
 </body>
-
 </html>
