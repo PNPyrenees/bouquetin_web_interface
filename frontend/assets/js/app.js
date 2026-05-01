@@ -67,7 +67,11 @@ async function startApp(token) {
 }
 
 if (DEV_MODE) {
+<<<<<<< HEAD
   login(ROLES.READER, DEV_PASSWORD).then(token => startApp(token));
+=======
+  login(ROLES.READER, 'adminpasword').then(token => startApp(token));
+>>>>>>> f8337da844bcbd3dad0926e602553328b5c98dfd
 } else {
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -84,4 +88,7 @@ if (DEV_MODE) {
     }
   });
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> f8337da844bcbd3dad0926e602553328b5c98dfd
