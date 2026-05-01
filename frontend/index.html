@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +12,7 @@
     rel="stylesheet">
   <link rel="stylesheet" href="assets/css/main.css">
 </head>
+
 <body>
   <header id="header">
     <div class="header-top">
@@ -41,7 +43,7 @@
     <div class="header-bottom">
       <div class="header-bottom-left">
       </div>
-      <div class="header-bottom-center">
+      <!-- <div class="header-bottom-center">
         <div class="filter-group">
           <div class="filter-block">
             <label class="filter-label">Individu</label>
@@ -60,7 +62,7 @@
             </select>
           </div>
         </div>
-      </div>
+      </div> -->
       <div class="header-bottom-right">
         <div class="header-separator"></div>
         <div class="platform-title">
@@ -88,6 +90,13 @@
               <label>Au</label>
               <input type="date" class="sidebar-input">
             </div>
+          </div>
+        </details>
+        <details open>
+          <summary>Individu</summary>
+          <div class="details-content">
+            <input type="text" id="searchIndividu" placeholder="Rechercher..." class="sidebar-input">
+            <div id="listeIndividus"></div>
           </div>
         </details>
         <details>
@@ -144,6 +153,16 @@
             <button class="btn-spatial">Activer la sélection</button>
           </div>
         </details>
+
+        <details>
+          <summary>Saison</summary>
+          <div class="details-content">
+            <label class="checkbox-label"><input type="checkbox"> Rude</label>
+            <label class="checkbox-label"><input type="checkbox"> Hiver</label>
+            <label class="checkbox-label"><input type="checkbox"> Printemps</label>
+            <label class="checkbox-label"><input type="checkbox"> Été</label>
+          </div>
+        </details>
       </div>
       <div class="sidebar-footer">
         <div class="filter-count">0 filtres actifs</div>
@@ -173,4 +192,5 @@
   <div id="popup"></div>
   <script type="module" src="assets/js/app.js"></script>
 </body>
+
 </html>
