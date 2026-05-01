@@ -54,7 +54,7 @@ async function startApp(token) {
   }
 }
 if (DEV_MODE) {
-  login(ROLES.READER, 'appBQT!6465').then(token => startApp(token));
+  login(ROLES.READER, 'adminpasword').then(token => startApp(token));
 } else {
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
