@@ -66,12 +66,21 @@ async function startApp(token) {
   }
 }
 
+document.getElementById('sidebarToggle').addEventListener('click', function () {
+  const sidebar = document.getElementById('sidebar');
+  const headerBottom = document.querySelector('.header-bottom');
+  sidebar.classList.toggle('collapsed');
+  if (sidebar.classList.contains('collapsed')) {
+    this.textContent = '›';
+    if (headerBottom) headerBottom.style.marginLeft = '0';
+  } else {
+    this.textContent = '‹';
+    if (headerBottom) headerBottom.style.marginLeft = '330px';
+  }
+});
+
 if (DEV_MODE) {
-<<<<<<< HEAD
   login(ROLES.READER, DEV_PASSWORD).then(token => startApp(token));
-=======
-  login(ROLES.READER, 'adminpasword').then(token => startApp(token));
->>>>>>> f8337da844bcbd3dad0926e602553328b5c98dfd
 } else {
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -88,7 +97,3 @@ if (DEV_MODE) {
     }
   });
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> f8337da844bcbd3dad0926e602553328b5c98dfd
