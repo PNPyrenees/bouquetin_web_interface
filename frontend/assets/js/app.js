@@ -1,60 +1,73 @@
 import { login, fetchAnimals } from './api.js';
-import { ROLES } from './config.js';
+import { ROLES, DEV_PASSWORD } from './config.js';
+
 const DEV_MODE = true;
+
 async function startApp(token) {
-  console.log('App démarrée avec token');
-  const dropdownList = document.getElementById('selectIndividu');
-  const dropdownBtn = document.getElementById('btnIndividu');
-  if (dropdownList && dropdownBtn) {
-    console.log('Dropdown elements trouvés');
-    dropdownBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdownList.classList.toggle('show');
-    });
-    dropdownBtn.addEventListener('input', (e) => {
-      const val = e.target.value.toLowerCase();
-      dropdownList.classList.add('show');
-      const items = dropdownList.querySelectorAll('.dropdown-item');
-      items.forEach(item => {
-        const text = item.textContent.toLowerCase();
-        item.style.display = text.includes(val) ? 'block' : 'none';
-      });
-    });
-    document.addEventListener('click', (e) => {
-      if (!dropdownList.contains(e.target) && e.target !== dropdownBtn) {
-        dropdownList.classList.remove('show');
-      }
-    });
-    const firstItem = dropdownList.querySelector('.dropdown-item');
-    if (firstItem) {
-      firstItem.addEventListener('click', () => {
-        dropdownBtn.value = '';
-        dropdownBtn.placeholder = '- Tous les individus -';
-        dropdownList.classList.remove('show');
-      });
-    }
-  }
   try {
     const animals = await fetchAnimals(token);
-    if (dropdownList && dropdownBtn) {
+    const listeIndividus = document.getElementById('listeIndividus');
+    const searchIndividu = document.getElementById('searchIndividu');
+
+    if (listeIndividus) {
+      // Grouper par première lettre
+
       animals.forEach(ani => {
-        const li = document.createElement('li');
-        li.className = 'dropdown-item';
-        li.textContent = ani.ani_nom;
-        li.dataset.value = ani.ani_id;
-        li.addEventListener('click', () => {
-          dropdownBtn.value = ani.ani_nom;
-          dropdownList.classList.remove('show');
+        const label = document.createElement('label');
+        label.className = 'checkbox-label';
+        label.innerHTML = `<input type="checkbox" value="${ani.ani_id}"> ${ani.ani_nom}`;
+        listeIndividus.appendChild(label);
+      });
+      // Limiter la hauteur avec scroll
+      listeIndividus.style.maxHeight = '200px';
+      listeIndividus.style.overflowY = 'auto';
+    }
+
+    // Filtre de recherche
+    if (searchIndividu && listeIndividus) {
+      searchIndividu.addEventListener('input', (e) => {
+        const val = e.target.value.toLowerCase().trim();
+
+        if (val === 0) {
+          // Réinitialiser — fermer tous les groupes, tout afficher
+          listeIndividus.querySelectorAll('details').forEach(details => {
+            details.removeAttribute('open');
+            details.style.display = 'block';
+            details.querySelectorAll('.checkbox-label').forEach(label => {
+              label.style.display = 'flex';
+            });
+          });
+          return;
+        }
+
+        // Mode recherche — afficher directement les noms sans les lettres
+        listeIndividus.querySelectorAll('details').forEach(details => {
+          let hasMatch = false;
+
+          details.querySelectorAll('.checkbox-label').forEach(label => {
+            const match = label.textContent.toLowerCase().includes(val);
+            label.style.display = match ? 'flex' : 'none';
+            if (match) hasMatch = true;
+          });
+
+          if (hasMatch) {
+            details.setAttribute('open', '');
+            details.style.display = 'block';
+            details.querySelector('summary').style.display = 'none';
+          } else {
+            details.style.display = 'none';
+          }
         });
-        dropdownList.appendChild(li);
       });
     }
+
   } catch (err) {
     console.error('Erreur chargement individus:', err);
   }
 }
+
 if (DEV_MODE) {
-  login(ROLES.READER, 'appBQT!6465').then(token => startApp(token));
+  login(ROLES.READER, DEV_PASSWORD).then(token => startApp(token));
 } else {
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -71,3 +84,4 @@ if (DEV_MODE) {
     }
   });
 }
+
