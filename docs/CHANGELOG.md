@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.4.0] — 2026-05-01
+
+### Added
+- Barre de filtres latérale (sidebar) avec effet masquer/afficher
+- Sections accordéon : Période, Sexe, Classe d'âge, Gestionnaire, Translocation, Programmation GPS, Qualité GPS, Filtre spatial
+- Section Individu : liste de cases à cocher alimentée par l'API avec champ de recherche en temps réel
+- Section Saison : cases à cocher (Rude, Hiver, Printemps, Été)
+- Compteur de filtres actifs + boutons Appliquer / Réinitialiser
+
+### Changed
+- Filtres Individu et Saisons retirés de la bande verte
+- Bande verte épurée : uniquement dernière synchronisation + titre plateforme
+
 ## [0.3.1] - 2026-04-30
 
 ### Added
