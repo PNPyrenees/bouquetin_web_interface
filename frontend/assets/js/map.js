@@ -2,6 +2,8 @@ import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93 } from './config.js';
 let map;
 let gpsSource;
 let popupOverlay;
+let basemaps = [];
+
 export function initMap(targetId, popupId) {
   proj4.defs('EPSG:2154', LAMBERT93);
   ol.proj.proj4.register(proj4);
@@ -16,6 +18,29 @@ export function initMap(targetId, popupId) {
       })
     })
   });
+
+  // Définition des fonds de carte
+  basemaps = [
+    new ol.layer.Tile({
+      source: new ol.source.OSM(),
+      visible: true
+    }),
+    new ol.layer.Tile({
+      source: new ol.source.XYZ({
+        url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+        attributions: '© IGN Géoportail'
+      }),
+      visible: false
+    }),
+    new ol.layer.Tile({
+      source: new ol.source.XYZ({
+        url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+        attributions: '© IGN Géoportail'
+      }),
+      visible: false
+    })
+  ];
+
   const popupEl = document.getElementById(popupId);
   popupOverlay = new ol.Overlay({
     element: popupEl,
@@ -25,7 +50,7 @@ export function initMap(targetId, popupId) {
   map = new ol.Map({
     target: targetId,
     layers: [
-      new ol.layer.Tile({ source: new ol.source.OSM() }),
+      ...basemaps,
       gpsLayer
     ],
     overlays: [popupOverlay],
@@ -56,30 +81,27 @@ export function renderPoints(locations) {
   locations.forEach(loc => {
     if (!loc.geom?.coordinates) return;
     const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
-    const coord  = ol.proj.fromLonLat(wgs84);
+    const coord = ol.proj.fromLonLat(wgs84);
     const feature = new ol.Feature({
       geometry: new ol.geom.Point(coord),
       ...loc
     });
     gpsSource.addFeature(feature);
   });
-  if (gpsSource.getFeatures().length > 0) {
-    map.getView().fit(gpsSource.getExtent(), {
-      padding: [40, 40, 40, 40],
-      maxZoom: MAX_ZOOM
-    });
-  }
   return gpsSource.getFeatures().length;
 }
 function showPopup(feature, coordinate, popupEl) {
   const p = feature.getProperties();
+  const dateStr = p.loc_datetime_utc ? p.loc_datetime_utc.replace('T', ' ').slice(0, 16) : p.loc_date_utc ? p.loc_date_utc.replace('T', ' ').slice(0, 16) : '—';
+
   popupEl.innerHTML = `
-    <h4>${p.ani_nom || '—'}</h4>
-    <p><b>Population :</b> ${p.ani_pop_rattach || '—'}</p>
-    <p><b>Date UTC :</b> ${p.loc_datetime_utc ? p.loc_datetime_utc.replace('T', ' ') : '—'}</p>
-    <p><b>Altitude :</b> ${p.loc_altitude_capteur != null ? p.loc_altitude_capteur + ' m' : '—'}</p>
-    <p><b>Température :</b> ${p.loc_temperature_capteur != null ? p.loc_temperature_capteur + ' °C' : '—'}</p>
-    <p><b>DOP :</b> ${p.loc_dop || '—'}</p>
+    <div class="popup-content">
+      <strong>${p.ani_nom || '—'}</strong>
+      <div class="popup-info">
+        <span>Date et heure UTC :</span>
+        <div class="date-value">${dateStr}</div>
+      </div>
+    </div>
   `;
   popupOverlay.setPosition(coordinate);
   popupEl.style.display = 'block';
@@ -87,3 +109,12 @@ function showPopup(feature, coordinate, popupEl) {
 export function clearMap() {
   gpsSource.clear();
 }
+export function updateMapSize() {
+  if (map) map.updateSize();
+}
+export function switchBasemap(index) {
+  basemaps.forEach((layer, i) => {
+    layer.setVisible(i === index);
+  });
+}
+

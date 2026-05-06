@@ -10,6 +10,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Bebas+Neue&display=swap"
     rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@8.2.0/ol.css">
+  <script src="https://cdn.jsdelivr.net/npm/ol@8.2.0/dist/ol.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
   <link rel="stylesheet" href="assets/css/main.css">
 </head>
 
@@ -18,6 +21,8 @@
     <div class="header-top">
       <div class="header-top-left">
         <img src="assets/img/logo-parc.svg" alt="Logo Parc National des Pyrénées" class="logo-parc">
+        <img src="assets/img/bqt_header.png" alt="Bouquetin" class="logo-bqt">
+        <h1 class="header-title">Suivi des bouquetins ibériques</h1>
       </div>
       <nav class="header-nav" id="mainNav">
         <a href="#" class="nav-link active">
@@ -33,44 +38,10 @@
           Rapports/statistiques
         </a>
         <a href="#" id="btnAjouter" class="nav-link nav-link-add" style="display: none;">+ Ajouter</a>
-        <div class="user-chip" id="userChip" style="display: none;">
-          CONNEXION
-        </div>
       </nav>
       <div class="header-top-right">
-      </div>
-    </div>
-    <div class="header-bottom">
-      <div class="header-bottom-left">
-      </div>
-      <!-- <div class="header-bottom-center">
-        <div class="filter-group">
-          <div class="filter-block">
-            <label class="filter-label">Individu</label>
-            <div class="custom-dropdown">
-              <input type="text" class="filter-select" id="btnIndividu" placeholder="- Tous les individus -"
-                autocomplete="off">
-              <ul class="dropdown-list" id="selectIndividu">
-                <li class="dropdown-item" data-value="">- Tous les individus -</li>
-              </ul>
-            </div>
-          </div>
-          <div class="filter-block">
-            <label class="filter-label">Saisons</label>
-            <select class="filter-select" id="selectSaison">
-              <option>- Toutes les saisons -</option>
-            </select>
-          </div>
-        </div>
-      </div> -->
-      <div class="header-bottom-right">
-        <div class="header-separator"></div>
-        <div class="platform-title">
-          <span class="platform-title-text">
-            <span class="platform-line1">PLATEFORME</span>
-            <span class="platform-line2">DE SUIVI DES BOUQUETINS</span>
-          </span>
-          <img src="assets/img/bqt_header.png" alt="Bouquetin" class="platform-img">
+        <div class="user-chip" id="userChip" style="display: none;">
+          CONNEXION
         </div>
       </div>
     </div>
@@ -79,20 +50,40 @@
     <div class="sidebar-content">
       <div class="sidebar-header">FILTRES DE RECHERCHES</div>
       <div class="accordion">
-        <details open>
+
+        <div id="filtresActifs" class="filtres-actifs" style="display:none">
+          <div class="filtres-actifs-label">
+            filtres selectionnées
+            <a id="btnReinitialiser">Réinitialiser</a>
+          </div>
+          <div id="badgesFiltres"></div>
+        </div>
+
+        <details id="detailsPeriode" open>
           <summary>Période</summary>
           <div class="details-content">
             <div class="input-group">
               <label>Du</label>
-              <input type="date" class="sidebar-input">
+              <input type="date" class="sidebar-input" id="dateFrom">
             </div>
             <div class="input-group">
               <label>Au</label>
-              <input type="date" class="sidebar-input">
+              <input type="date" class="sidebar-input" id="dateTo">
             </div>
           </div>
         </details>
-        <details open>
+
+                <details>
+          <summary>Saison</summary>
+          <div class="details-content">
+            <label class="checkbox-label"><input type="checkbox" id="checkRude"> Rude</label>
+            <label class="checkbox-label"><input type="checkbox" id="checkHiver"> Hiver</label>
+            <label class="checkbox-label"><input type="checkbox" id="checkPrintemps"> Printemps</label>
+            <label class="checkbox-label"><input type="checkbox" id="checkEte"> Été</label>
+          </div>
+        </details>
+        
+        <details id="detailsIndividu">
           <summary>Individu</summary>
           <div class="details-content">
             <input type="text" id="searchIndividu" placeholder="Rechercher..." class="sidebar-input">
@@ -102,30 +93,42 @@
         <details>
           <summary>Sexe</summary>
           <div class="details-content">
-            <label class="checkbox-label"><input type="checkbox"> Mâle</label>
-            <label class="checkbox-label"><input type="checkbox"> Femelle</label>
+            <select id="selectSexe" class="sidebar-select">
+              <option value="">Tous</option>
+              <option value="M">Mâle</option>
+              <option value="F">Femelle</option>
+            </select>
           </div>
         </details>
         <details>
           <summary>Classe d'âge</summary>
           <div class="details-content">
-            <select class="sidebar-select">
-              <option>Toutes</option>
+            <select id="selectClasseAge" class="sidebar-select">
+              <option value="">Toutes les classes</option>
+              <option value="Cabri">Cabri</option>
+              <option value="Eterlou">Éterlou</option>
+              <option value="Adulte">Adulte</option>
             </select>
           </div>
         </details>
         <details>
           <summary>Gestionnaire</summary>
           <div class="details-content">
-            <label class="checkbox-label"><input type="checkbox"> PNP</label>
-            <label class="checkbox-label"><input type="checkbox"> PNRPA</label>
+            <select id="selectGestionnaire" class="sidebar-select">
+              <option value="">Tous</option>
+              <option value="PNP">PNP</option>
+              <option value="PNRPA">PNRPA</option>
+            </select>
           </div>
         </details>
         <details>
           <summary>Translocation</summary>
           <div class="details-content">
-            <label class="checkbox-label"><input type="checkbox"> Individus transloqués</label>
-            <label class="checkbox-label"><input type="checkbox"> Non transloqués</label>
+            <select id="selectTranslocation" class="sidebar-select">
+              <option value="">Tous</option>
+              <option value="transloque">Individus transloqués</option>
+              <option value="non_transloque">Non transloqués</option>
+            </select>
           </div>
         </details>
         <details>
@@ -139,44 +142,57 @@
         <details>
           <summary>Qualité GPS</summary>
           <div class="details-content">
-            <label class="checkbox-label"><input type="checkbox"> Exclure positions aberrantes</label>
-            <div class="range-group">
-              <label>DOP max: <span id="dopVal">10</span></label>
-              <input type="range" min="0" max="20" step="1" value="10"
-                oninput="document.getElementById('dopVal').textContent = this.value">
-            </div>
+            <label class="checkbox-label"><input type="checkbox" id="checkAberrantes">Inclure les outliers</label>
+
           </div>
         </details>
         <details>
           <summary>Filtre spatial</summary>
           <div class="details-content">
-            <button class="btn-spatial">Activer la sélection</button>
-          </div>
-        </details>
-
-        <details>
-          <summary>Saison</summary>
-          <div class="details-content">
-            <label class="checkbox-label"><input type="checkbox"> Rude</label>
-            <label class="checkbox-label"><input type="checkbox"> Hiver</label>
-            <label class="checkbox-label"><input type="checkbox"> Printemps</label>
-            <label class="checkbox-label"><input type="checkbox"> Été</label>
+            <button class="btn-spatial">Dessiner un périmètre </button>
           </div>
         </details>
       </div>
       <div class="sidebar-footer">
         <div class="filter-count">0 filtres actifs</div>
-        <button class="btn-apply">Appliquer les filtres</button>
-        <button class="btn-reset">Réinitialiser</button>
+        <button class="btn-apply" id="btnApplyFilters">Appliquer les filtres</button>
       </div>
     </div>
-    <button class="sidebar-toggle" id="sidebarToggle" title="Masquer/Afficher les filtres">‹</button>
+    <button class="sidebar-toggle" id="sidebarToggle" title="Masquer/Afficher les filtres">
+      <span class="toggle-text">Panneau filtres</span>
+      <span class="toggle-icon">‹</span>
+    </button>
   </aside>
   <div id="loginScreen" style="display:none"></div>
-  <div id="mapScreen" style="display:block"></div>
-
-  <div id="status"></div>
-  <div id="popup"></div>
+  <div class="map-toolbar">
+    <div class="toolbar-left">
+      <button id="btnPositions" class="pill-btn active">Positions</button>
+      <button id="btnTrajectoire" class="pill-btn">Trajectoire</button>
+    </div>
+    <div class="toolbar-right">
+      <span class="count-text">Positions affichées : <span id="positionsCount">0</span></span>
+    </div>
+  </div>
+  <div id="mapScreen" style="display:block">
+    <div id="mapLoading" style="display:none">
+      <div class="map-loading-spinner"></div>
+      <span>Chargement des données...</span>
+    </div>
+    <div id="map"></div>
+    <div id="popup"></div>
+    <div class="layers-control">
+      <button id="btnLayers" class="layers-btn" title="Changer de fond de carte">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </button>
+      <div id="layersPanel" class="layers-panel" style="display:none">
+        <label><input type="radio" name="basemap" value="0" checked> OSM Standard</label>
+        <label><input type="radio" name="basemap" value="1"> IGN Topographique</label>
+        <label><input type="radio" name="basemap" value="2"> IGN Photo aérienne</label>
+      </div>
+    </div>
+  </div>
   <script type="module" src="assets/js/app.js"></script>
 </body>
 
