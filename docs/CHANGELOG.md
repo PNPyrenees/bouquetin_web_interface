@@ -1,6 +1,63 @@
 # CHANGELOG
 
-## [0.4.0] — 2026-05-01
+## [0.6.0] - 2026-05-06
+
+### Added
+- Filtre "Individus suivis uniquement" (case à cocher) dans la section Individu
+- Chargement initial en mode "Tous" - actifs + inactifs affichés par défaut
+- Masquage automatique des animaux sans géométrie GPS dans la liste individus
+- Overlay de chargement sur la carte + verrouillage sidebar pendant les requêtes
+- Mise à jour synchronisée de la liste individus lors de l'application des filtres sexe/gestionnaire
+- Fonction `fetchLastLocationsInactifs()` - une requête par animal inactif via `Promise.all()`
+- Variable globale `activeIds` pour identifier les animaux avec collier actif
+- **Removed**: Lien "Voir la trajectoire →" dans le popup
+
+### Changed
+- Chargement initial basé sur `v_animal_last_loc` (actifs) + `v_localisation` (inactifs)
+- Filtre `loc_anomalie` corrigé : `is.false` → `not.is.true` (couvre NULL et false)
+- Filtre outlier retiré de `fetchLastLocations()` - colonne absente de `v_animal_last_loc`
+- Application automatique des filtres sexe/gestionnaire désactivée - uniquement au clic Appliquer
+- Comparaison `ani_id` corrigée : `===` → `String() === String()`
+
+### Fixed
+- Animaux sans géométrie (Alto, Yao...) masqués dans la liste des filtres
+- Réaffichage incorrect des animaux sans géométrie lors de la recherche et réinitialisation
+- Filtre "Individus suivis" ne masquait pas correctement les inactifs après application d'autres filtres
+
+### Investigated
+- Petite lenteur du chargement mode "Tous" - causée par ~230 requêtes individuelles sur v_localisation
+- Comportement loc_anomalie/loc_outlier validé avec Ludovic
+
+## [0.5.0] - 2026-05-05
+
+### API (api.js)
+- **Fixed**: Correction du filtre `loc_anomalie` (`is.false` → `not.is.true`)
+- **Fixed**: Correction du champ filtre gestionnaire (`gestionnaire` → `ani_gestionnaire`)
+- **Fixed**: Correction de la comparaison `ani_id` via conversion en String (`String() === String()`)
+- **Added**: Ajout du champ `ani_gestionnaire` dans `fetchAnimals()`
+- **Added**: Nouvelle fonction `fetchLastLocations()` pour la vue `v_animal_last_loc`
+- **Added**: Filtrage conditionnel des outliers selon le paramètre `include_outliers`
+- **Removed**: Suppression du champ `loc_outlier` de `fetchLastLocations()` (absent de la vue)
+
+### Carte (map.js)
+- **Changed**: Intégration d'OpenLayers déplacée dans `index.html`
+- **Changed**: Popup simplifié (nom animal + date UTC)
+- **Added**: Lien "Voir la trajectoire →" dans le popup
+- **Added**: Overlay de chargement
+- **Removed**: Suppression du zoom automatique
+
+### Interface (app.js)
+- **Changed**: Chargement initial via `v_animal_last_loc` (52 animaux actifs)
+- **Added**: Coloration bronze des animaux inactifs
+- **Added**: Filtrage automatique de la carte sur changement de sexe ou gestionnaire
+- **Changed**: Centralisation de la logique via `applyFilters()`
+- **Added**: Fonction `reinitialiserTousLesFiltres()` avec réactualisation de la carte
+- **Added**: Gestion des modes Positions vs Trajectoire
+
+---
+
+
+## [0.4.0] - 2026-05-01
 
 ### Added
 - Barre de filtres latérale (sidebar) avec effet masquer/afficher
