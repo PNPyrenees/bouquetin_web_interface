@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.7.0] - 2026-05-07
+
+### Added
+- Nouveau filtre **Population** dans la sidebar sous forme de menu déroulant (`select`)
+- Système de badge automatique lors de la sélection d'une population
+- Filtrage croisé : la liste des individus se met à jour selon la population sélectionnée
+- Support du paramètre `ani_pop_rattach` dans les appels API
+- Ajout du champ `ani_pop_rattach` dans la récupération initiale des animaux (`fetchAnimals`)
+
+### Changed
+- Refonte de la fonction `filtrerIndividusParPopulation()` pour une intégration fluide avec la sidebar
+- Mise à jour de `applyFilters()` pour intégrer la logique de filtrage par population (côté client et serveur)
+- Réinitialisation globale incluant désormais le menu de population
+
+
 ## [0.6.0] - 2026-05-06
 
 ### Added

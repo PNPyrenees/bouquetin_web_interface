@@ -21,7 +21,7 @@
 *   **Description** : Récupère la liste complète des bouquetins triée par nom.
 *   **Méthode** : `GET`
 *   **Endpoint** : `/t_animal`
-*   **Paramètres** : `select=ani_id,ani_nom,ani_sexe,ani_gestionnaire&order=ani_nom`
+*   **Paramètres** : `select=ani_id,ani_nom,ani_sexe,ani_gestionnaire,ani_pop_rattach&order=ani_nom`
 
 ### **Fiche Individu**
 *   **Description** : Récupère les données d'un individu spécifique par son ID.
@@ -58,6 +58,7 @@ Appliquez ces filtres sur `/v_localisation` ou `/v_animal_last_loc` :
 *   **Géo-référencement** : `geom=not.is.null` (Indispensable pour l'affichage carte)
 *   **Sexe** : `ani_sexe=eq.M` ou `ani_sexe=eq.F`
 *   **Gestionnaire** : `ani_gestionnaire=eq.PNP` ou `ani_gestionnaire=eq.PNRPA`
+*   **Population** : `ani_pop_rattach=eq.Aspe` (Sélection unique)
 
 ---
 
