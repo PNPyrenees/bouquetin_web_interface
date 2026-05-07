@@ -66,6 +66,7 @@ async function startApp(token) {
           label.dataset.classe = getClasse(age);
           label.dataset.sexe = ani.ani_sexe || '';
           label.dataset.gestionnaire = ani.ani_gestionnaire || '';
+          label.dataset.population = ani.ani_pop_rattach || '';
 
           label.innerHTML = `<input type="checkbox" value="${ani.ani_id}"> ${ani.ani_nom}`;
 
@@ -197,7 +198,7 @@ function initSidebarBadges(token) {
   }
 
   // Selects
-  ['selectSexe', 'selectGestionnaire', 'selectTranslocation', 'selectClasseAge'].forEach(id => {
+  ['selectSexe', 'selectGestionnaire', 'selectTranslocation', 'selectClasseAge', 'selectPopulation'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('change', () => {
@@ -206,14 +207,10 @@ function initSidebarBadges(token) {
         const label = el.options[el.selectedIndex].text;
         ajouterBadge(label, () => {
           el.value = '';
-          if (id === 'selectClasseAge') filtrerIndividusParClasse('');
-          if (id === 'selectSexe') filtrerIndividusParSexe('');
-          if (id === 'selectGestionnaire') filtrerIndividusParGestionnaire('');
+          filtrerListeIndividus();
         }, id);
       }
-      if (id === 'selectClasseAge') filtrerIndividusParClasse(el.value);
-      if (id === 'selectSexe') filtrerIndividusParSexe(el.value);
-      if (id === 'selectGestionnaire') filtrerIndividusParGestionnaire(el.value);
+      filtrerListeIndividus();
     });
   });
 
@@ -274,6 +271,7 @@ async function applyFilters(token) {
     date_to: document.getElementById('dateTo').value,
     sexe: document.getElementById('selectSexe').value,
     gestionnaire: document.getElementById('selectGestionnaire').value,
+    population: document.getElementById('selectPopulation').value,
     include_outliers: document.getElementById('checkAberrantes')?.checked || false
   };
 
@@ -294,6 +292,7 @@ async function applyFilters(token) {
         ani_id: selectedIds,
         sexe: filters.sexe,
         gestionnaire: filters.gestionnaire,
+        population: filters.population,
         include_outliers: filters.include_outliers
       };
 
@@ -309,6 +308,12 @@ async function applyFilters(token) {
           locations = locations.filter(l => {
             const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
             return ani && ani.ani_gestionnaire === filters.gestionnaire;
+          });
+        }
+        if (filters.population) {
+          locations = locations.filter(l => {
+            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
+            return ani && ani.ani_pop_rattach === filters.population;
           });
         }
       } else {
@@ -335,8 +340,24 @@ async function applyFilters(token) {
             return ani && ani.ani_gestionnaire === filters.gestionnaire;
           });
         }
+        if (filters.population) {
+          actifsFiltered = actifsFiltered.filter(l => {
+            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
+            return ani && ani.ani_pop_rattach === filters.population;
+          });
+        }
         const seen = new Set(actifsFiltered.map(l => l.ani_id));
-        locations = [...actifsFiltered, ...inactifs.filter(l => !seen.has(l.ani_id))];
+
+        // Filtrer aussi les inactifs par population côté client si nécessaire
+        let inactifsFiltered = inactifs;
+        if (filters.population) {
+          inactifsFiltered = inactifsFiltered.filter(l => {
+            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
+            return ani && ani.ani_pop_rattach === filters.population;
+          });
+        }
+
+        locations = [...actifsFiltered, ...inactifsFiltered.filter(l => !seen.has(l.ani_id))];
       }
     } else {
       locations = await fetchLocations(token, filters);
@@ -346,26 +367,7 @@ async function applyFilters(token) {
     document.getElementById('positionsCount').textContent = count;
 
     // Mettre à jour la liste des individus selon les filtres actifs
-    const sexeActif = filters.sexe;
-    const gestionnaireActif = filters.gestionnaire;
-    const suivisSeulementList = document.getElementById('checkSuivis')?.checked || false;
-
-    document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-      if (label.dataset.sansGeom === 'true') {
-        label.style.display = 'none';
-        return;
-      }
-      const checkbox = label.querySelector('input');
-      const ani = animals.find(a => String(a.ani_id) === String(checkbox?.value));
-      if (!ani) return;
-
-      // Vérifier chaque filtre actif
-      const matchSexe = !sexeActif || ani.ani_sexe === sexeActif;
-      const matchGestionnaire = !gestionnaireActif || ani.ani_gestionnaire === gestionnaireActif;
-      const matchSuivis = !suivisSeulementList || activeIds.has(ani.ani_id);
-
-      label.style.display = (matchSexe && matchGestionnaire && matchSuivis) ? 'flex' : 'none';
-    });
+    filtrerListeIndividus();
 
   } catch (err) {
     console.error('Erreur filtrage:', err);
@@ -449,54 +451,37 @@ function initBasemapSelector() {
   }
 }
 
-function filtrerIndividusParClasse(classe) {
-  const labels = document.querySelectorAll('#listeIndividus .checkbox-label');
-  labels.forEach(label => {
-    // Ne jamais réafficher les animaux sans géométrie
-    if (label.dataset.sansGeom === 'true') {
-      label.style.display = 'none';
-      return;
-    }
+function filtrerListeIndividus() {
+  const sexe = document.getElementById('selectSexe')?.value;
+  const gestionnaire = document.getElementById('selectGestionnaire')?.value;
+  const population = document.getElementById('selectPopulation')?.value;
+  const classe = document.getElementById('selectClasseAge')?.value;
+  const suivisSeulement = document.getElementById('checkSuivis')?.checked || false;
 
-    if (!classe || label.dataset.classe === classe) {
-      label.style.display = 'flex';
-    } else {
-      label.style.display = 'none';
-    }
-  });
-}
-
-function filtrerIndividusParSexe(sexe) {
   document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-    // Ne jamais réafficher les animaux sans géométrie
     if (label.dataset.sansGeom === 'true') {
       label.style.display = 'none';
       return;
     }
+    const checkbox = label.querySelector('input');
+    const ani = animals.find(a => String(a.ani_id) === String(checkbox?.value));
+    if (!ani) return;
 
-    if (!sexe || label.dataset.sexe === sexe) {
-      label.style.display = 'flex';
-    } else {
-      label.style.display = 'none';
-    }
+    const matchSexe = !sexe || ani.ani_sexe === sexe;
+    const matchGestionnaire = !gestionnaire || ani.ani_gestionnaire === gestionnaire;
+    const matchPopulation = !population || ani.ani_pop_rattach === population;
+    const matchClasse = !classe || label.dataset.classe === classe;
+    const matchSuivis = !suivisSeulement || activeIds.has(ani.ani_id);
+
+    label.style.display = (matchSexe && matchGestionnaire && matchPopulation && matchClasse && matchSuivis) ? 'flex' : 'none';
   });
 }
 
-function filtrerIndividusParGestionnaire(gestionnaire) {
-  document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-    // Ne jamais réafficher les animaux sans géométrie
-    if (label.dataset.sansGeom === 'true') {
-      label.style.display = 'none';
-      return;
-    }
-
-    if (!gestionnaire || label.dataset.gestionnaire === gestionnaire) {
-      label.style.display = 'flex';
-    } else {
-      label.style.display = 'none';
-    }
-  });
-}
+// Supprimé: fonctions individuelles devenues obsolètes car centralisées dans filtrerListeIndividus
+function filtrerIndividusParClasse(classe) { filtrerListeIndividus(); }
+function filtrerIndividusParSexe(sexe) { filtrerListeIndividus(); }
+function filtrerIndividusParGestionnaire(gestionnaire) { filtrerListeIndividus(); }
+function filtrerIndividusParPopulation(population) { filtrerListeIndividus(); }
 
 function getClasse(age) {
   if (age <= 1) return 'Cabri';
@@ -560,13 +545,11 @@ async function reinitialiserTousLesFiltres() {
     const checkOutliers = document.getElementById('checkAberrantes');
     if (checkOutliers) checkOutliers.checked = false;
 
-    ['selectSexe', 'selectGestionnaire', 'selectTranslocation', 'selectClasseAge'].forEach(id => {
+    ['selectSexe', 'selectGestionnaire', 'selectTranslocation', 'selectClasseAge', 'selectPopulation'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
-    filtrerIndividusParClasse('');
-    filtrerIndividusParSexe('');
-    filtrerIndividusParGestionnaire('');
+    filtrerListeIndividus();
 
     ['checkRude', 'checkHiver', 'checkPrintemps', 'checkEte'].forEach(id => {
       const el = document.getElementById(id);
