@@ -31,6 +31,7 @@ export async function fetchLocations(token, filters = {}) {
   // Attributs animal
   if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
   if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
+  if (filters.population) params.append('ani_pop_rattach', `eq.${filters.population}`);
 
   // Qualité GPS — si inclure_outliers coché, on retire tous les filtres qualité
   if (!filters.include_outliers) {
@@ -54,7 +55,7 @@ export async function fetchLocations(token, filters = {}) {
 
 export async function fetchAnimals(token) {
   const res = await fetch(
-    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_annee_naissance,ani_sexe,ani_gestionnaire&order=ani_nom`,
+    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_annee_naissance,ani_sexe,ani_gestionnaire,ani_pop_rattach&order=ani_nom`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -104,10 +105,11 @@ export async function fetchLastLocationsInactifs(token, filters = {}) {
 
   const sexeParam = filters.sexe ? `&ani_sexe=eq.${filters.sexe}` : '';
   const gestionnaireParam = filters.gestionnaire ? `&ani_gestionnaire=eq.${filters.gestionnaire}` : '';
+  const populationParam = filters.population ? `&ani_pop_rattach=eq.${filters.population}` : '';
 
   const promises = inactifsIds.map(ani_id =>
     fetch(
-      `${API_URL}/v_localisation?ani_id=eq.${ani_id}&geom=not.is.null${qualiteParams}${sexeParam}${gestionnaireParam}&order=loc_datetime_utc.desc&limit=1`,
+      `${API_URL}/v_localisation?ani_id=eq.${ani_id}&geom=not.is.null${qualiteParams}${sexeParam}${gestionnaireParam}${populationParam}&order=loc_datetime_utc.desc&limit=1`,
       {
         headers: {
           'Authorization': `Bearer ${token}`,
