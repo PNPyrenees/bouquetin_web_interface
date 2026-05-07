@@ -73,7 +73,7 @@
           </div>
         </details>
 
-                <details>
+        <details>
           <summary>Saison</summary>
           <div class="details-content">
             <label class="checkbox-label"><input type="checkbox" id="checkRude"> Rude</label>
@@ -82,7 +82,7 @@
             <label class="checkbox-label"><input type="checkbox" id="checkEte"> Été</label>
           </div>
         </details>
-        
+
         <details id="detailsIndividu">
           <summary>Individu</summary>
           <div class="details-content">
@@ -97,6 +97,23 @@
               <option value="">Tous</option>
               <option value="M">Mâle</option>
               <option value="F">Femelle</option>
+            </select>
+          </div>
+        </details>
+        <details>
+          <summary>Population</summary>
+          <div class="details-content">
+            <select id="selectPopulation" class="sidebar-select">
+              <option value="">Toutes les populations</option>
+              <option value="Aspe">Aspe</option>
+              <option value="Aure">Aure</option>
+              <option value="Beas">Beas</option>
+              <option value="Cagateille">Cagateille</option>
+              <option value="Cauterets">Cauterets</option>
+              <option value="Gedre">Gedre</option>
+              <option value="Ossese">Ossese</option>
+              <option value="PNRPA_Massat">PNRPA Massat</option>
+              <option value="Soulcem">Soulcem</option>
             </select>
           </div>
         </details>
@@ -183,7 +200,7 @@
     <div class="layers-control">
       <button id="btnLayers" class="layers-btn" title="Changer de fond de carte">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
         </svg>
       </button>
       <div id="layersPanel" class="layers-panel" style="display:none">
