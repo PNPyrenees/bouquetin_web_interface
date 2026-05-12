@@ -18,19 +18,19 @@
 - Système de rendu des **Trajectoires** avec traits arrondis et flèches directionnelles par segment
 - Moteur de coloration multi-mode intégrant Individu, Date (gradient), Saison, Sexe et Gestionnaire
 - Filtre **Population** ajouté dans la sidebar et branché à l'API
-- Fonction `enrichirLocations()` — complète les métadonnées (`ani_sexe`, `ani_gestionnaire`, `ani_pop_rattach`) côté client
+- Fonction `enrichirLocations()` - complète les métadonnées (`ani_sexe`, `ani_gestionnaire`, `ani_pop_rattach`) côté client
 - Zoom adaptatif selon le nombre d'individus sélectionnés
 
 ### Changed
 - Optimisation du filtrage de la liste d'individus via l'utilisation des attributs `dataset`
-- `checkSuivis` — ne recharge plus la carte automatiquement, requiert un clic sur "Appliquer"
+- `checkSuivis` - ne recharge plus la carte automatiquement, requiert un clic sur "Appliquer"
 - `clearTrajectoire()` appelé au retour en mode Positions
-- Mode Trajectoire — efface et recharge à chaque application de filtre
+- Mode Trajectoire - efface et recharge à chaque application de filtre
 - Compteur positions mis à jour correctement sans doublon
 
 ### Fixed
-- Couleurs incorrectes en mode Sexe/Gestionnaire — champs absents de la vue API corrigés via `enrichirLocations()`
-- Points intermédiaires masqués en mode Trajectoire — seuls départ et arrivée sont marqués
+- Couleurs incorrectes en mode Sexe/Gestionnaire - champs absents de la vue API corrigés via `enrichirLocations()`
+- Points intermédiaires masqués en mode Trajectoire - seuls départ et arrivée sont marqués
 - Seuil des flèches directionnelles ajusté (dist < 1500) pour éviter la surcharge visuelle
 
 ## [0.7.0] - 2026-05-07
