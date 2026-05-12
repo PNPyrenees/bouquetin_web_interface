@@ -1,11 +1,41 @@
 # CHANGELOG
 
+## [0.8.0] - 2026-05-12
+
+### Added
+- Nouveau système de **Légende dynamique** sur la carte, contextuel au mode couleur choisi
+- Contrôle d'affichage de la légende (bouton minimiser/agrandir)
+
+### Changed
+- Refonte des modes couleurs : suppression du mode "Défaut", remplacé par le mode "Individu" actif par défaut
+- Déplacement du sélecteur de couches (basemaps) en bas à gauche de la carte
+- Uniformisation du style de la légende (bords droits, style "Old School" sans arrondis)
+- Mise à jour de la barre d'outils couleur : espacement et séparateur visuel améliorés dans `main.css`
+
+## [0.7.1] - 2026-05-11
+
+### Added
+- Système de rendu des **Trajectoires** avec traits arrondis et flèches directionnelles par segment
+- Moteur de coloration multi-mode intégrant Individu, Date (gradient), Saison, Sexe et Gestionnaire
+- Filtre **Population** ajouté dans la sidebar et branché à l'API
+- Fonction `enrichirLocations()` — complète les métadonnées (`ani_sexe`, `ani_gestionnaire`, `ani_pop_rattach`) côté client
+- Zoom adaptatif selon le nombre d'individus sélectionnés
+
+### Changed
+- Optimisation du filtrage de la liste d'individus via l'utilisation des attributs `dataset`
+- `checkSuivis` — ne recharge plus la carte automatiquement, requiert un clic sur "Appliquer"
+- `clearTrajectoire()` appelé au retour en mode Positions
+- Mode Trajectoire — efface et recharge à chaque application de filtre
+- Compteur positions mis à jour correctement sans doublon
+
+### Fixed
+- Couleurs incorrectes en mode Sexe/Gestionnaire — champs absents de la vue API corrigés via `enrichirLocations()`
+- Points intermédiaires masqués en mode Trajectoire — seuls départ et arrivée sont marqués
+- Seuil des flèches directionnelles ajusté (dist < 1500) pour éviter la surcharge visuelle
+
 ## [0.7.0] - 2026-05-07
 
 ### Added
-- Nouveau filtre **Population** dans la sidebar sous forme de menu déroulant (`select`)
-- Système de badge automatique lors de la sélection d'une population
-- Filtrage croisé : la liste des individus se met à jour selon la population sélectionnée
 - Support du paramètre `ani_pop_rattach` dans les appels API
 - Ajout du champ `ani_pop_rattach` dans la récupération initiale des animaux (`fetchAnimals`)
 
