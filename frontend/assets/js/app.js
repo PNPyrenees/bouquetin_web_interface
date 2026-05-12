@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocations, fetchLastLocationsInactifs } from './api.js';
 import { ROLES, DEV_PASSWORD } from './config.js';
-import { initMap, renderPoints, clearMap, updateMapSize, switchBasemap } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 
 const DEV_MODE = true;
 
@@ -13,6 +13,23 @@ let animals = [];
 let activeIds = new Set();
 let currentToken = null;
 const anneeActuelle = new Date().getFullYear();
+
+/**
+ * Enrichit les positions avec les métadonnées de l'animal (sexe, gestionnaire, population)
+ * @param {Array} locations - Liste des positions à enrichir
+ * @returns {Array} - Liste des positions enrichies
+ */
+function enrichirLocations(locations) {
+  return locations.map(loc => {
+    const ani = animals.find(a => String(a.ani_id) === String(loc.ani_id));
+    return {
+      ...loc,
+      ani_sexe: loc.ani_sexe || ani?.ani_sexe || null,
+      ani_gestionnaire: loc.ani_gestionnaire || ani?.ani_gestionnaire || null,
+      ani_pop_rattach: loc.ani_pop_rattach || ani?.ani_pop_rattach || null
+    };
+  });
+}
 
 /**
  * Point d'entrée principal de l'application après connexion
@@ -38,8 +55,10 @@ async function startApp(token) {
     ]);
     const actifsIds = new Set(actifs.map(l => l.ani_id));
     const locations = [...actifs, ...inactifs.filter(l => !actifsIds.has(l.ani_id))];
-    const count = renderPoints(locations);
+    const locationsEnrichies = enrichirLocations(locations);
+    const count = renderPoints(locationsEnrichies);
     document.getElementById('positionsCount').textContent = count;
+    mettreAJourLegende();
 
     activeIds = new Set(actifs.map(l => l.ani_id));
 
@@ -109,6 +128,19 @@ async function startApp(token) {
       // Écouteur pour mettre à jour la liste des individus (masquer inactifs si coché)
       document.getElementById('checkSuivis')?.addEventListener('change', (e) => {
         const suivisSeulement = e.target.checked;
+
+        // Gestion du badge
+        if (suivisSeulement) {
+          ajouterBadge('Individus suivis uniquement', () => {
+            const cb = document.getElementById('checkSuivis');
+            if (cb) cb.checked = false;
+            filtrerListeIndividus();
+          }, 'checkSuivis');
+        } else {
+          supprimerBadgeById('checkSuivis');
+        }
+
+        // Mise à jour de la liste des individus
         document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
           if (label.dataset.sansGeom === 'true') {
             label.style.display = 'none';
@@ -122,7 +154,6 @@ async function startApp(token) {
             label.style.display = 'flex';
           }
         });
-        applyFilters(token);
       });
     }
 
@@ -151,12 +182,58 @@ async function startApp(token) {
       btnPos.addEventListener('click', () => {
         btnPos.classList.add('active');
         btnTraj.classList.remove('active');
+        clearTrajectoire();
+        applyFilters(currentToken);
       });
       btnTraj.addEventListener('click', () => {
+        const selectedIds = Array.from(document.querySelectorAll('#listeIndividus input:checked')).map(cb => cb.value);
+        const dateFrom = document.getElementById('dateFrom').value;
+        const dateTo = document.getElementById('dateTo').value;
+
+        // Vérification individu sélectionné
+        if (selectedIds.length === 0) {
+          showToast('Sélectionnez un individu pour afficher sa trajectoire');
+          hideMapLoading();
+          unlockSidebar();
+          return; // Reste en mode Positions
+        }
+
+        // Bascule en mode Trajectoire
         btnTraj.classList.add('active');
         btnPos.classList.remove('active');
+        applyFilters(currentToken);
+
+        if (selectedIds.length > 0) {
+          setTimeout(() => {
+            const extent = getGpsSource().getExtent();
+            if (!extent || ol.extent.isEmpty(extent)) return;
+
+            if (selectedIds.length === 1) {
+              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 14, duration: 400 });
+            } else if (selectedIds.length > 1) {
+              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 12, duration: 400 });
+            }
+          }, 800);
+        }
       });
     }
+
+    document.getElementById('checkAll')?.addEventListener('change', (e) => {
+      const checked = e.target.checked;
+      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+        if (label.style.display === 'none') return;
+        const checkbox = label.querySelector('input');
+        if (!checkbox) return;
+        checkbox.checked = checked;
+        if (checked) {
+          ajouterBadge(checkbox.closest('label').textContent.trim(), () => {
+            checkbox.checked = false;
+          }, `ani-${checkbox.value}`);
+        } else {
+          supprimerBadgeById(`ani-${checkbox.value}`);
+        }
+      });
+    });
 
   } catch (err) {
     console.error('Erreur chargement individus:', err);
@@ -214,18 +291,7 @@ function initSidebarBadges(token) {
     });
   });
 
-  // Écouteur statut collier (checkbox injectée dynamiquement)
-  document.addEventListener('change', (e) => {
-    if (e.target.id === 'checkSuivis') {
-      applyFilters(token);
-    }
-  });
 
-  // Dates change listeners
-  ['dateFrom', 'dateTo'].forEach(id => {
-    const el = document.getElementById(id);
-    // Supprimé: signalerFiltresModifies
-  });
 
   // Saisons checkboxes
   ['checkRude', 'checkHiver', 'checkPrintemps', 'checkEte'].forEach(id => {
@@ -253,6 +319,22 @@ function initSidebarBadges(token) {
   if (btnApply) {
     btnApply.addEventListener('click', () => applyFilters(token));
   }
+
+  document.querySelectorAll('input[name="modeCouleur"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      applyFilters(currentToken);
+      mettreAJourLegende();
+    });
+  });
+
+  // Toggle affichage légende
+  document.getElementById('btnLegende')?.addEventListener('click', function () {
+    const contenu = document.getElementById('legendeContenu');
+    if (!contenu) return;
+    const isVisible = contenu.style.display !== 'none';
+    contenu.style.display = isVisible ? 'none' : 'block';
+    this.textContent = isVisible ? '+' : '−';
+  });
 }
 
 /**
@@ -359,12 +441,78 @@ async function applyFilters(token) {
 
         locations = [...actifsFiltered, ...inactifsFiltered.filter(l => !seen.has(l.ani_id))];
       }
-    } else {
-      locations = await fetchLocations(token, filters);
-    }
+      locations = enrichirLocations(locations);
+      clearMapPoints();
+      const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+      const count = renderPoints(locations, true, false, modeCouleur);
+      document.getElementById('positionsCount').textContent = count;
+      mettreAJourLegende();
 
-    const count = renderPoints(locations);
-    document.getElementById('positionsCount').textContent = count;
+      const extent = getGpsSource().getExtent();
+      if (selectedIds.length === 1 && locations.length > 0) {
+        // 1 individu → zoom vers son point
+        const loc = locations[0];
+        const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
+        if (geom?.coordinates) {
+          const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
+          const coord = ol.proj.fromLonLat(wgs84);
+          getMap().getView().animate({ center: coord, zoom: 13, duration: 400 });
+        }
+      } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
+        // Plusieurs points → zoom adaptatif pour tous les voir
+        getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 13, duration: 400 });
+      }
+    } else {
+      // Mode Trajectoire — on ne vide pas les points existants
+      if (filters.date_from && filters.date_to) {
+        // Avec période → une seule requête, toutes les positions sur la plage
+        const trajFilters = {
+          ...filters,
+          limit: 999999
+        };
+        locations = await fetchLocations(token, trajFilters);
+      } else {
+        // Sans période → 100 dernières positions PAR individu sélectionné
+        if (selectedIds.length === 0) {
+          showToast('Sélectionnez un individu pour afficher sa trajectoire');
+          hideMapLoading();
+          unlockSidebar();
+          if (btnApply) {
+            btnApply.disabled = false;
+            btnApply.textContent = 'Appliquer les filtres';
+          }
+          return;
+        }
+
+        const promises = selectedIds.map(id =>
+          fetchLocations(token, {
+            ...filters,
+            ani_id: [id],
+            limit: 50
+          })
+        );
+        const results = await Promise.all(promises);
+        locations = results.flat();
+      }
+      locations = enrichirLocations(locations);
+      clearMapPoints();
+      clearTrajectoire();
+      const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+      const count = renderPoints(locations, true, true, modeCouleur);
+      renderTrajectoire(locations, modeCouleur);
+      document.getElementById('positionsCount').textContent = count;
+      mettreAJourLegende();
+
+      setTimeout(() => {
+        const extent = getGpsSource().getExtent();
+        if (!extent || ol.extent.isEmpty(extent)) return;
+        if (selectedIds.length === 1) {
+          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 14, duration: 400 });
+        } else if (selectedIds.length > 1) {
+          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 12, duration: 400 });
+        }
+      }, 300);
+    }
 
     // Mettre à jour la liste des individus selon les filtres actifs
     filtrerListeIndividus();
@@ -379,7 +527,9 @@ async function applyFilters(token) {
       btnApply.disabled = false;
       btnApply.textContent = 'Appliquer les filtres';
     }
+
   }
+
 }
 
 function showMapLoading() {
@@ -464,14 +614,20 @@ function filtrerListeIndividus() {
       return;
     }
     const checkbox = label.querySelector('input');
-    const ani = animals.find(a => String(a.ani_id) === String(checkbox?.value));
-    if (!ani) return;
+    const aniId = checkbox?.value;
+    if (!aniId) return;
 
-    const matchSexe = !sexe || ani.ani_sexe === sexe;
-    const matchGestionnaire = !gestionnaire || ani.ani_gestionnaire === gestionnaire;
-    const matchPopulation = !population || ani.ani_pop_rattach === population;
-    const matchClasse = !classe || label.dataset.classe === classe;
-    const matchSuivis = !suivisSeulement || activeIds.has(ani.ani_id);
+    // Récupération des filtres depuis le dataset (alimenté dans startApp)
+    const aniSexe = label.dataset.sexe || '';
+    const aniGestionnaire = label.dataset.gestionnaire || '';
+    const aniPopulation = label.dataset.population || '';
+    const aniClasse = label.dataset.classe || '';
+
+    const matchSexe = !sexe || aniSexe === sexe;
+    const matchGestionnaire = !gestionnaire || aniGestionnaire === gestionnaire;
+    const matchPopulation = !population || aniPopulation === population;
+    const matchClasse = !classe || aniClasse === classe;
+    const matchSuivis = !suivisSeulement || activeIds.has(Number(aniId));
 
     label.style.display = (matchSexe && matchGestionnaire && matchPopulation && matchClasse && matchSuivis) ? 'flex' : 'none';
   });
@@ -571,18 +727,24 @@ async function reinitialiserTousLesFiltres() {
 
     // Réactualiser la carte (Tous par défaut)
     if (currentToken) {
-      const checkSuivis = document.getElementById('checkSuivis');
-      if (checkSuivis) checkSuivis.checked = false;
 
       try {
+        const checkSuivis = document.getElementById('checkSuivis');
+        if (checkSuivis) checkSuivis.checked = false;
+        supprimerBadgeById('checkSuivis');
+
         const [actifs, inactifs] = await Promise.all([
           fetchLastLocations(currentToken),
           fetchLastLocationsInactifs(currentToken, { ani_id: animals.map(a => a.ani_id) })
         ]);
         const actifsIds = new Set(actifs.map(l => l.ani_id));
         const locations = [...actifs, ...inactifs.filter(l => !actifsIds.has(l.ani_id))];
-        renderPoints(locations);
+        const locationsEnrichies = enrichirLocations(locations);
+        clearMapPoints();
+        clearTrajectoire();
+        renderPoints(locationsEnrichies, false);
         document.getElementById('positionsCount').textContent = locations.length;
+        mettreAJourLegende();
       } catch (err) {
         console.error('Erreur reset map:', err);
       }
@@ -634,10 +796,101 @@ if (DEV_MODE) {
   });
 }
 
+/**
+ * Met à jour dynamiquement le contenu de la légende selon le mode actif
+ */
+function mettreAJourLegende() {
+  const contenu = document.getElementById('legendeContenu');
+  if (!contenu) return;
+
+  const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+  const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+
+  // Couleur de la pastille selon le mode
+  let couleurPastille = '#2D6A4F';
+  let legendeCouleur = '';
+
+  switch (modeCouleur) {
+    case 'sexe':
+      legendeCouleur = `
+        <div class="legende-section-titre">Sexe</div>
+        <div class="legende-item"><div class="legende-pastille" style="background:#3A86FF"></div><span>Mâle</span></div>
+        <div class="legende-item"><div class="legende-pastille" style="background:#FF006E"></div><span>Femelle</span></div>
+        <div class="legende-item"><div class="legende-pastille" style="background:#888888"></div><span>Inconnu</span></div>
+      `;
+      break;
+    case 'gestionnaire':
+      legendeCouleur = `
+        <div class="legende-section-titre">Gestionnaire</div>
+        <div class="legende-item"><div class="legende-pastille" style="background:#2D6A4F"></div><span>PNP</span></div>
+        <div class="legende-item"><div class="legende-pastille" style="background:#E07B39"></div><span>PNRPA</span></div>
+      `;
+      break;
+    case 'saison':
+      legendeCouleur = `
+        <div class="legende-section-titre">Saison</div>
+        <div class="legende-item"><div class="legende-pastille" style="background:#3A86FF"></div><span>Hiver (déc-fév)</span></div>
+        <div class="legende-item"><div class="legende-pastille" style="background:#06D6A0"></div><span>Printemps (mar-mai)</span></div>
+        <div class="legende-item"><div class="legende-pastille" style="background:#FFBE0B"></div><span>Été (juin-août)</span></div>
+        <div class="legende-item"><div class="legende-pastille" style="background:#FB5607"></div><span>Rude (sep-nov)</span></div>
+      `;
+      break;
+    case 'date':
+      legendeCouleur = `
+        <div class="legende-section-titre">Date</div>
+        <div style="width:100%;height:10px;border-radius:4px;background:linear-gradient(to right,#FFBE0B,#FB5607,#9B2335,#8338EC);margin:4px 0"></div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:#888">
+          <span>Ancien</span><span>Récent</span>
+        </div>
+      `;
+      break;
+    default:
+      legendeCouleur = ''; // Individu — pas de légende couleur
+      break;
+  }
+
+  contenu.innerHTML = `
+    ${isTrajectoire ? `
+      <div class="legende-section-titre">Trajectoire</div>
+      <div class="legende-item">
+        <div class="legende-pastille-creux"></div>
+        <span>Point de départ</span>
+      </div>
+      <div class="legende-item">
+        <div class="legende-pastille" style="background:${couleurPastille}"></div>
+        <span>Dernière position</span>
+      </div>
+      <div class="legende-item">
+        <span style="font-size:14px;color:${couleurPastille}">→</span>
+        <span>Direction</span>
+      </div>
+    ` : `
+      <div class="legende-section-titre">Positions</div>
+      <div class="legende-item">
+        <div class="legende-pastille" style="background:${couleurPastille}"></div>
+        <span>Dernière position</span>
+      </div>
+    `}
+    ${legendeCouleur}
+  `;
+}
+
 function showGlobalLoading() {
   showMapLoading();
 }
 
 function hideGlobalLoading() {
   hideMapLoading();
+}
+
+function showToast(message) {
+  let toast = document.getElementById('toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
 }

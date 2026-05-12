@@ -87,6 +87,9 @@
           <summary>Individu</summary>
           <div class="details-content">
             <input type="text" id="searchIndividu" placeholder="Rechercher..." class="sidebar-input">
+            <label class="checkbox-label" id="checkTousIndividus">
+              <input type="checkbox" id="checkAll"> Tout cocher
+            </label>
             <div id="listeIndividus"></div>
           </div>
         </details>
@@ -185,6 +188,14 @@
     <div class="toolbar-left">
       <button id="btnPositions" class="pill-btn active">Positions</button>
       <button id="btnTrajectoire" class="pill-btn">Trajectoire</button>
+      <div class="toolbar-couleur">
+        <span class="toolbar-label">Couleur :</span>
+        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="individu" checked> Individu</label>
+        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="date"> Date</label>
+        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="saison"> Saison</label>
+        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="sexe"> Sexe</label>
+        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="gestionnaire"> Gestionnaire</label>
+      </div>
     </div>
     <div class="toolbar-right">
       <span class="count-text">Positions affichées : <span id="positionsCount">0</span></span>
@@ -197,16 +208,23 @@
     </div>
     <div id="map"></div>
     <div id="popup"></div>
-    <div class="layers-control">
-      <button id="btnLayers" class="layers-btn" title="Changer de fond de carte">
+    <div id="legendePanel" class="legende-panel">
+      <div class="legende-header">
+        <span>Légende</span>
+        <button id="btnLegende">−</button>
+      </div>
+      <div id="legendeContenu" class="legende-contenu"></div>
+    </div>
+    <div id="mapLayersWrapper">
+      <button id="btnLayers" class="btn-layers-bottom">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
           <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
         </svg>
       </button>
-      <div id="layersPanel" class="layers-panel" style="display:none">
-        <label><input type="radio" name="basemap" value="0" checked> OSM Standard</label>
-        <label><input type="radio" name="basemap" value="1"> IGN Topographique</label>
-        <label><input type="radio" name="basemap" value="2"> IGN Photo aérienne</label>
+      <div id="layersPanel" class="layers-panel-bottom" style="display:none">
+        <label class="layer-option"><input type="radio" name="basemap" value="0" checked> SCAN25 IGN</label>
+        <label class="layer-option"><input type="radio" name="basemap" value="1"> OpenTopoMap</label>
+        <label class="layer-option"><input type="radio" name="basemap" value="2"> OSM</label>
       </div>
     </div>
   </div>
