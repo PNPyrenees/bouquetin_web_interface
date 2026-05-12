@@ -1,6 +1,6 @@
 export const API_URL = 'https://votre-serveur-postgrest:port';
 
-export const DEFAULT_LIMIT = 200;
+export const DEFAULT_LIMIT = 300;
 export const DEFAULT_CENTER = [-0.15, 42.9];
 export const DEFAULT_ZOOM = 9;
 export const MAX_ZOOM = 18;
