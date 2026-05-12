@@ -23,14 +23,14 @@ function enrichirLocations(locations) {
 
 **Appeler systématiquement avant tout rendu sur la carte.**
 
-### Filtre Population — nouveau paramètre API
+### Filtre Population - nouveau paramètre API
 GET /v_localisation?ani_pop_rattach=eq.Cauterets
 GET /v_localisation?ani_pop_rattach=eq.Cagateille
 
 Valeurs disponibles : Aspe, Aure, Beas, Cagateille, Cauterets, Gedre, 
 Ossese, PNRPA_Massat, Soulcem
 
-### Mode Trajectoire — logique des requêtes
+### Mode Trajectoire - logique des requêtes
 
 **Sans période :**
 Une requête par individu sélectionné via Promise.all() :
