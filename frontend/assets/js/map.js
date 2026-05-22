@@ -1,4 +1,5 @@
 import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93 } from './config.js';
+
 let map;
 let gpsSource;
 let trajectoireSource;
@@ -14,6 +15,9 @@ const couleursIndividus = new Map();
 let _dateMin = null;
 let _dateMax = null;
 
+/**
+ * Analyse les données avant rendu pour initialiser les échelles de couleurs.
+ */
 function preparerCouleurs(locations) {
   couleursIndividus.clear();
   const ids = [...new Set(locations.map(l => l.ani_id))];
@@ -22,12 +26,35 @@ function preparerCouleurs(locations) {
   });
 
   const dates = locations
-    .map(l => new Date(l.loc_datetime_utc || l.loc_date_utc))
+    .map(l => new Date(l.loc_datetime_local || l.loc_date_local))
     .filter(d => !isNaN(d));
-  _dateMin = Math.min(...dates);
-  _dateMax = Math.max(...dates);
+  _dateMin = dates.length > 0 ? Math.min(...dates) : null;
+  _dateMax = dates.length > 0 ? Math.max(...dates) : null;
 }
 
+/**
+ * Calcule une couleur sur un gradient multi-étapes.
+ */
+function getGradientColor(ratio) {
+  const colors = [
+    [255, 190, 11],  // Ancien : Jaune
+    [251, 86, 7],    // Orange
+    [155, 35, 53],   // Rouge
+    [131, 56, 236]   // Récent : Violet
+  ];
+  const idx = Math.min(Math.floor(ratio * (colors.length - 1)), colors.length - 2);
+  const localRatio = (ratio - idx / (colors.length - 1)) * (colors.length - 1);
+  const c1 = colors[idx];
+  const c2 = colors[idx + 1];
+  const r = Math.round(c1[0] + localRatio * (c2[0] - c1[0]));
+  const g = Math.round(c1[1] + localRatio * (c2[1] - c1[1]));
+  const b = Math.round(c1[2] + localRatio * (c2[2] - c1[2]));
+  return `rgb(${r},${g},${b})`;
+}
+
+/**
+ * Retourne la couleur d'un point selon le mode de coloration.
+ */
 function getCouleur(loc, mode) {
   switch (mode) {
     case 'individu':
@@ -36,22 +63,16 @@ function getCouleur(loc, mode) {
 
     case 'date': {
       if (!_dateMin || !_dateMax || _dateMin === _dateMax) return '#2D6A4F';
-      const t = (new Date(loc.loc_datetime_utc || loc.loc_date_utc) - _dateMin) / (_dateMax - _dateMin);
-      const palette = [[255,190,11],[251,86,7],[155,35,53],[131,56,236]];
-      const seg = t * (palette.length - 1);
-      const i = Math.min(Math.floor(seg), palette.length - 2);
-      const f = seg - i;
-      const r = Math.round(palette[i][0] + f * (palette[i+1][0] - palette[i][0]));
-      const g = Math.round(palette[i][1] + f * (palette[i+1][1] - palette[i][1]));
-      const b = Math.round(palette[i][2] + f * (palette[i+1][2] - palette[i][2]));
-      return `rgb(${r},${g},${b})`;
+      const cur = new Date(loc.loc_datetime_local || loc.loc_date_local).getTime();
+      const ratio = (cur - _dateMin) / (_dateMax - _dateMin);
+      return getGradientColor(ratio);
     }
 
     case 'saison': {
-      const mois = new Date(loc.loc_datetime_utc || loc.loc_date_utc).getMonth() + 1;
-      if ([12,1,2].includes(mois)) return '#3A86FF';
-      if ([3,4,5].includes(mois)) return '#06D6A0';
-      if ([6,7,8].includes(mois)) return '#FFBE0B';
+      const mois = new Date(loc.loc_datetime_local || loc.loc_date_local).getMonth() + 1;
+      if ([12, 1, 2].includes(mois)) return '#3A86FF';
+      if ([3, 4, 5].includes(mois)) return '#06D6A0';
+      if ([6, 7, 8].includes(mois)) return '#FFBE0B';
       return '#FB5607';
     }
 
@@ -64,14 +85,24 @@ function getCouleur(loc, mode) {
       if (loc.ani_gestionnaire === 'PNP') return '#2D6A4F';
       if (loc.ani_gestionnaire === 'PNRPA') return '#E07B39';
       return '#aaaaaa';
-
   }
 }
 
+/**
+ * Initialise la carte et ses couches de base.
+ * @param {string} targetId - ID de l'élément HTML contenant la carte
+ * @param {string} popupId - ID de l'élément HTML servant de popup
+ */
 export function initMap(targetId, popupId) {
+  // Définition de la projection Lambert-93 (France) via Proj4
   proj4.defs('EPSG:2154', LAMBERT93);
   ol.proj.proj4.register(proj4);
+
+  // Initialisation des sources vectorielles (données géométriques)
   gpsSource = new ol.source.Vector();
+  trajectoireSource = new ol.source.Vector();
+
+  // Création de la couche des points GPS
   const gpsLayer = new ol.layer.Vector({
     source: gpsSource,
     style: new ol.style.Style({
@@ -83,22 +114,21 @@ export function initMap(targetId, popupId) {
     })
   });
 
-  trajectoireSource = new ol.source.Vector();
+  // Création de la couche des lignes (trajectoires)
   const trajectoireLayer = new ol.layer.Vector({
-    source: trajectoireSource,
-    zIndex: 2
+    source: trajectoireSource
   });
-
-
 
   // Définition des fonds de carte
   basemaps = [
-    // OSM — fond par défaut (fiable)
+    // SCAN25 IGN (via Géoportail)
     new ol.layer.Tile({
-      source: new ol.source.OSM(),
+      source: new ol.source.XYZ({
+        url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+        attributions: '© IGN Géoportail'
+      }),
       visible: true
     }),
-
     // OpenTopoMap
     new ol.layer.Tile({
       source: new ol.source.XYZ({
@@ -107,23 +137,22 @@ export function initMap(targetId, popupId) {
       }),
       visible: false
     }),
-
-    // IGN Plan V2 — accès public sans clé
+    // OpenStreetMap
     new ol.layer.Tile({
-      source: new ol.source.XYZ({
-        url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
-        attributions: '© IGN Géoportail'
-      }),
+      source: new ol.source.OSM(),
       visible: false
     })
   ];
 
+  // Préparation du popup (Overlay)
   const popupEl = document.getElementById(popupId);
   popupOverlay = new ol.Overlay({
     element: popupEl,
     positioning: 'bottom-center',
     offset: [0, -10]
   });
+
+  // Création de l'objet Map principal
   map = new ol.Map({
     target: targetId,
     layers: [
@@ -140,9 +169,13 @@ export function initMap(targetId, popupId) {
       new ol.control.ScaleLine({ units: 'metric' })
     ])
   });
+
+  // Changement du curseur au survol d'un point
   map.on('pointermove', evt => {
     map.getViewport().style.cursor = map.hasFeatureAtPixel(evt.pixel) ? 'pointer' : '';
   });
+
+  // Gestion du clic pour afficher le popup
   map.on('singleclick', evt => {
     let hit = false;
     map.forEachFeatureAtPixel(evt.pixel, feature => {
@@ -152,48 +185,72 @@ export function initMap(targetId, popupId) {
     });
     if (!hit) popupEl.style.display = 'none';
   });
+
+  // Observateur de redimensionnement robuste pour synchroniser OpenLayers avec les dimensions réelles du DOM
+  if (window.ResizeObserver) {
+    const resizeObserver = new ResizeObserver(() => {
+      if (map) {
+        map.updateSize();
+      }
+    });
+    const mapEl = document.getElementById(targetId);
+    if (mapEl) {
+      resizeObserver.observe(mapEl);
+    }
+  }
+
+  setTimeout(() => map.updateSize(), 100);
+  setTimeout(() => map.updateSize(), 300);
+  setTimeout(() => map.updateSize(), 600);
+
   return map;
 }
-export function renderPoints(locations, clearBefore = true, modeTrajectoire = false, modeCouleur = 'defaut') {
+
+/**
+ * Dessine les points GPS sur la carte.
+ * @param {Array} locations - Liste des positions (Lambert-93)
+ * @param {boolean} clearBefore - Si vrai, efface les points existants
+ * @param {boolean} modeTrajectoire - Si vrai, applique le style spécifique trajectoire
+ * @param {string} modeCouleur - Mode de coloration actif
+ */
+export function renderPoints(locations, clearBefore = true, modeTrajectoire = false, modeCouleur = 'individu') {
   if (clearBefore) gpsSource.clear();
+
   preparerCouleurs(locations);
 
-  // Identifier première et dernière position par individu
+  // Identification du premier et du dernier point pour chaque animal
   const premiereParIndividu = {};
   const derniereParIndividu = {};
   locations.forEach(loc => {
-    const date = new Date(loc.loc_datetime_utc || loc.loc_date_utc);
+    const date = new Date(loc.loc_datetime_local || loc.loc_date_local);
     if (!premiereParIndividu[loc.ani_id] || date < new Date(premiereParIndividu[loc.ani_id].date)) {
-      premiereParIndividu[loc.ani_id] = { date: loc.loc_datetime_utc || loc.loc_date_utc, loc };
+      premiereParIndividu[loc.ani_id] = { date: loc.loc_datetime_local || loc.loc_date_local, loc };
     }
     if (!derniereParIndividu[loc.ani_id] || date > new Date(derniereParIndividu[loc.ani_id].date)) {
-      derniereParIndividu[loc.ani_id] = { date: loc.loc_datetime_utc || loc.loc_date_utc, loc };
+      derniereParIndividu[loc.ani_id] = { date: loc.loc_datetime_local || loc.loc_date_local, loc };
     }
   });
 
   locations.forEach(loc => {
     if (!loc.geom?.coordinates) return;
-    const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
-    if (!geom?.coordinates) return;
-    const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
+
+    const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
     const coord = ol.proj.fromLonLat(wgs84);
 
     const estDernier = modeTrajectoire &&
-      derniereParIndividu[loc.ani_id]?.date === (loc.loc_datetime_utc || loc.loc_date_utc);
+      derniereParIndividu[loc.ani_id]?.date === (loc.loc_datetime_local || loc.loc_date_local);
     const estPremier = modeTrajectoire &&
-      premiereParIndividu[loc.ani_id]?.date === (loc.loc_datetime_utc || loc.loc_date_utc);
-
-    // En mode Trajectoire — ignorer les points intermédiaires
-    if (modeTrajectoire && !estDernier && !estPremier) return;
+      premiereParIndividu[loc.ani_id]?.date === (loc.loc_datetime_local || loc.loc_date_local);
 
     const feature = new ol.Feature({
       geometry: new ol.geom.Point(coord),
       ...loc
     });
 
+    const couleur = getCouleur(loc, modeCouleur);
+
     if (modeTrajectoire && estPremier && !estDernier) {
-      // Point de départ — cercle creux blanc bordure colorée
-      const couleur = getCouleur(loc, modeCouleur);
+      // Point de départ — cercle creux
       feature.setStyle(new ol.style.Style({
         image: new ol.style.Circle({
           radius: 6,
@@ -202,8 +259,7 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
         })
       }));
     } else if (modeTrajectoire && estDernier) {
-      // Dernière position — cercle plein coloré
-      const couleur = getCouleur(loc, modeCouleur);
+      // Dernière position — cercle plein plus grand
       feature.setStyle(new ol.style.Style({
         image: new ol.style.Circle({
           radius: 8,
@@ -211,9 +267,17 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
           stroke: new ol.style.Stroke({ color: 'white', width: 2.5 })
         })
       }));
-    } else if (!modeTrajectoire) {
-      // Mode Positions — appliquer couleur selon le mode
-      const couleur = getCouleur(loc, modeCouleur);
+    } else if (modeTrajectoire) {
+      // Points intermédiaires — petit cercle discret
+      feature.setStyle(new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 4,
+          fill: new ol.style.Fill({ color: couleur }),
+          stroke: new ol.style.Stroke({ color: 'white', width: 1 })
+        })
+      }));
+    } else {
+      // Mode Positions classique
       feature.setStyle(new ol.style.Style({
         image: new ol.style.Circle({
           radius: 6,
@@ -228,11 +292,28 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
 
   return gpsSource.getFeatures().length;
 }
+
+/**
+ * Affiche le popup d'information au-dessus d'un point cliqué.
+ */
 function showPopup(feature, coordinate, popupEl) {
   const p = feature.getProperties();
-  const dateStr = p.loc_datetime_utc ? p.loc_datetime_utc.replace('T', ' ').slice(0, 16) : p.loc_date_utc ? p.loc_date_utc.replace('T', ' ').slice(0, 16) : '—';
+  const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
 
-  popupEl.innerHTML = `
+  const dateStr = p.loc_datetime_local
+    ? p.loc_datetime_local.replace('T', ' ').slice(0, 16)
+    : p.loc_date_local
+      ? p.loc_date_local.replace('T', ' ').slice(0, 16)
+      : '—';
+
+  popupEl.innerHTML = isTrajectoire ? `
+    <div class="popup-content">
+      <strong>${p.ani_nom || '—'}</strong>
+      <div class="popup-info">
+        <span>${dateStr}</span>
+      </div>
+    </div>
+  ` : `
     <div class="popup-content">
       <strong>${p.ani_nom || '—'}</strong>
       <div class="popup-info">
@@ -241,53 +322,35 @@ function showPopup(feature, coordinate, popupEl) {
       </div>
     </div>
   `;
+
   popupOverlay.setPosition(coordinate);
   popupEl.style.display = 'block';
-
-  // Zoom vers le point cliqué
   map.getView().animate({ center: coordinate, zoom: 13, duration: 400 });
 }
-export function clearMap() {
-  gpsSource.clear();
-}
-export function updateMapSize() {
-  if (map) map.updateSize();
-}
-export function switchBasemap(index) {
-  basemaps.forEach((layer, i) => {
-    layer.setVisible(i === index);
-  });
 
-}
-
-export function getMap() { return map; }
-export function getGpsSource() { return gpsSource; }
-
-export function clearMapPoints() {
-  gpsSource.clear();
-}
-
-export function renderTrajectoire(locations, modeCouleur = 'defaut') {
+/**
+ * Dessine les lignes reliant les points GPS pour former une trajectoire.
+ */
+export function renderTrajectoire(locations, modeCouleur = 'individu') {
   trajectoireSource.clear();
   preparerCouleurs(locations);
 
+  // Groupement des points par individu
   const parIndividu = {};
   locations.forEach(loc => {
     if (!loc.geom?.coordinates) return;
-    const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
-    if (!geom?.coordinates) return;
     if (!parIndividu[loc.ani_id]) parIndividu[loc.ani_id] = [];
-    const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
+
+    const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
     const coord = ol.proj.fromLonLat(wgs84);
     parIndividu[loc.ani_id].push({ coord, loc });
   });
 
   Object.entries(parIndividu).forEach(([ani_id, points]) => {
     if (points.length < 2) return;
-    points.sort((a, b) => new Date(a.loc.loc_datetime_utc) - new Date(b.loc.loc_datetime_utc));
-    const coords = points.map(p => p.coord);
 
-    // Couleur du trait — basée sur le premier point de l'individu
+    points.sort((a, b) => new Date(a.loc.loc_datetime_local) - new Date(b.loc.loc_datetime_local));
+    const coords = points.map(p => p.coord);
     const couleur = getCouleur(points[0].loc, modeCouleur);
 
     const ligne = new ol.Feature({ geometry: new ol.geom.LineString(coords) });
@@ -301,29 +364,26 @@ export function renderTrajectoire(locations, modeCouleur = 'defaut') {
     }));
     trajectoireSource.addFeature(ligne);
 
-    // Flèches directionnelles
+    // Ajout de flèches directionnelles sur les segments assez longs
     for (let i = 0; i < coords.length - 1; i++) {
       const coordA = coords[i];
       const coordB = coords[i + 1];
       const dx = coordB[0] - coordA[0];
       const dy = coordB[1] - coordA[1];
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 1500) continue;
 
-      // Pour mode date — couleur par segment selon la date du point
-      const couleurFleche = modeCouleur === 'date'
-        ? getCouleur(points[i].loc, modeCouleur)
-        : couleur;
+      if (dist < 1500) continue;
 
       const rotation = Math.atan2(dy, dx) - Math.PI / 2;
       const midpoint = [(coordA[0] + coordB[0]) / 2, (coordA[1] + coordB[1]) / 2];
+
       const fleche = new ol.Feature({ geometry: new ol.geom.Point(midpoint) });
       fleche.setStyle(new ol.style.Style({
         image: new ol.style.RegularShape({
           points: 3,
           radius: 6,
           rotation: -rotation,
-          fill: new ol.style.Fill({ color: couleurFleche }),
+          fill: new ol.style.Fill({ color: couleur }),
           stroke: new ol.style.Stroke({ color: 'white', width: 1 }),
           rotateWithView: false
         })
@@ -333,8 +393,34 @@ export function renderTrajectoire(locations, modeCouleur = 'defaut') {
   });
 }
 
+// --- Fonctions utilitaires d'export ---
+
+export function clearMap() {
+  gpsSource.clear();
+  trajectoireSource.clear();
+}
+
+export function clearMapPoints() {
+  gpsSource.clear();
+}
+
 export function clearTrajectoire() {
   if (trajectoireSource) trajectoireSource.clear();
 }
 
+export function updateMapSize() {
+  if (map) map.updateSize();
+}
 
+/**
+ * Alterne entre les différents fonds de carte disponibles.
+ * @param {number} index - Index de la couche dans le tableau basemaps
+ */
+export function switchBasemap(index) {
+  basemaps.forEach((layer, i) => {
+    layer.setVisible(i === index);
+  });
+}
+
+export function getMap() { return map; }
+export function getGpsSource() { return gpsSource; }
