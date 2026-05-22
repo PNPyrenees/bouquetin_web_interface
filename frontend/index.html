@@ -13,7 +13,9 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@8.2.0/ol.css">
   <script src="https://cdn.jsdelivr.net/npm/ol@8.2.0/dist/ol.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
-  <link rel="stylesheet" href="assets/css/main.css">
+  <link rel="stylesheet" href="assets/css/main.css?v=1.1.0">
+  <link rel="stylesheet" href="assets/css/map.css?v=1.1.0">
+  <link rel="stylesheet" href="assets/css/panel.css?v=1.1.0">
 </head>
 
 <body>
@@ -83,6 +85,24 @@
           </div>
         </details>
 
+        <details>
+          <summary>Population</summary>
+          <div class="details-content">
+            <select id="selectPopulation" class="sidebar-select">
+              <option value="">Toutes les populations</option>
+              <option value="Aspe">Aspe</option>
+              <option value="Aure">Aure</option>
+              <option value="Beas">Beas</option>
+              <option value="Cagateille">Cagateille</option>
+              <option value="Cauterets">Cauterets</option>
+              <option value="Gedre">Gedre</option>
+              <option value="Ossese">Ossese</option>
+              <option value="PNRPA_Massat">PNRPA Massat</option>
+              <option value="Soulcem">Soulcem</option>
+            </select>
+          </div>
+        </details>
+
         <details id="detailsIndividu">
           <summary>Individu</summary>
           <div class="details-content">
@@ -103,23 +123,7 @@
             </select>
           </div>
         </details>
-        <details>
-          <summary>Population</summary>
-          <div class="details-content">
-            <select id="selectPopulation" class="sidebar-select">
-              <option value="">Toutes les populations</option>
-              <option value="Aspe">Aspe</option>
-              <option value="Aure">Aure</option>
-              <option value="Beas">Beas</option>
-              <option value="Cagateille">Cagateille</option>
-              <option value="Cauterets">Cauterets</option>
-              <option value="Gedre">Gedre</option>
-              <option value="Ossese">Ossese</option>
-              <option value="PNRPA_Massat">PNRPA Massat</option>
-              <option value="Soulcem">Soulcem</option>
-            </select>
-          </div>
-        </details>
+
         <details>
           <summary>Classe d'âge</summary>
           <div class="details-content">
@@ -154,8 +158,14 @@
         <details>
           <summary>Programmation GPS</summary>
           <div class="details-content">
-            <select class="sidebar-select">
-              <option>Toutes</option>
+            <select id="selectProgrammation" class="sidebar-select">
+              <option value="">Toutes</option>
+              <option value="1">12 locs/j (180s)</option>
+              <option value="2">24 locs/j (70s)</option>
+              <option value="6">6 locs/j(90s)</option>
+              <option value="3" style="color:#aaaaaa;">4 locs/j (90s)</option>
+              <option value="4" style="color:#aaaaaa;">12 locs/j (120s)</option>
+              <option value="5" style="color:#aaaaaa;">6 locs/j (90s)</option>
             </select>
           </div>
         </details>
@@ -179,7 +189,7 @@
       </div>
     </div>
     <button class="sidebar-toggle" id="sidebarToggle" title="Masquer/Afficher les filtres">
-      <span class="toggle-text">Panneau filtres</span>
+      <!-- <span class="toggle-text">Panneau filtres</span> -->
       <span class="toggle-icon">‹</span>
     </button>
   </aside>
@@ -189,7 +199,7 @@
       <button id="btnPositions" class="pill-btn active">Positions</button>
       <button id="btnTrajectoire" class="pill-btn">Trajectoire</button>
       <div class="toolbar-couleur">
-        <span class="toolbar-label">Couleur :</span>
+        <span class="toolbar-label">Symbologie:</span>
         <label class="radio-couleur"><input type="radio" name="modeCouleur" value="individu" checked> Individu</label>
         <label class="radio-couleur"><input type="radio" name="modeCouleur" value="date"> Date</label>
         <label class="radio-couleur"><input type="radio" name="modeCouleur" value="saison"> Saison</label>
@@ -207,6 +217,24 @@
       <span>Chargement des données...</span>
     </div>
     <div id="map"></div>
+    <div id="mapLayersWrapper">
+      <button id="btnLayers" class="btn-layers-bottom">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+        </svg>
+      </button>
+      <div id="layersModal" class="layers-modal" style="display:none">
+        <div class="layers-modal-content">
+          <div class="layers-modal-header">
+            <span>Fonds de carte</span>
+            <button class="layers-modal-close" id="layersModalClose">×</button>
+          </div>
+          <div class="layers-modal-grid" id="layersGrid">
+            <!-- Vignettes dynamiques -->
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="popup"></div>
     <div id="legendePanel" class="legende-panel">
       <div class="legende-header">
@@ -215,20 +243,36 @@
       </div>
       <div id="legendeContenu" class="legende-contenu"></div>
     </div>
-    <div id="mapLayersWrapper">
-      <button id="btnLayers" class="btn-layers-bottom">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-        </svg>
+    <div id="panneau-attributaire" class="panneau-attributaire" style="display:none">
+      <button class="panneau-toggle" id="panneauToggle" title="Masquer/Afficher le panneau">
+        <span class="toggle-text">Données</span>
+        <span class="toggle-icon">›</span>
       </button>
-      <div id="layersPanel" class="layers-panel-bottom" style="display:none">
-        <label class="layer-option"><input type="radio" name="basemap" value="0" checked> SCAN25 IGN</label>
-        <label class="layer-option"><input type="radio" name="basemap" value="1"> OpenTopoMap</label>
-        <label class="layer-option"><input type="radio" name="basemap" value="2"> OSM</label>
+      <div class="panneau-header">
+        <div class="panneau-tabs">
+          <button class="panneau-tab active" id="tabDonnees">Données</button>
+          <button class="panneau-tab" id="tabIndividus">Individus observés</button>
+        </div>
+        <button class="panneau-close" id="panneauClose">×</button>
+      </div>
+      <div class="panneau-body" id="panneauBody">
+        <!-- Contenu dynamique -->
       </div>
     </div>
   </div>
-  <script type="module" src="assets/js/app.js"></script>
+  <aside class="sidebar-right" id="sidebarRight">
+    <button class="sidebar-right-toggle" id="sidebarRightToggle" title="Masquer/Afficher le panneau">
+      <span class="toggle-text">Données</span>
+      <span class="toggle-icon">›</span>
+    </button>
+    <div class="sidebar-right-resizer" id="sidebarRightResizer"></div>
+    <div class="sidebar-right-content">
+      <div class="sidebar-right-body" id="sidebarRightBody">
+        <!-- Contenu dynamique -->
+      </div>
+    </div>
+  </aside>
+  <script type="module" src="assets/js/app.js?v=1.1.0"></script>
 </body>
 
 </html>
