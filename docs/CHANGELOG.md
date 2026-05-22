@@ -29,7 +29,7 @@
 ### Fixed
 - Toggle sidebar droite non fonctionnel si une erreur survenait avant `initSidebarBadges()`
 - Boutons de pagination dans le mauvais ordre à cause d'un `insertBefore` sur un élément pas encore dans le DOM
-- Carte coupée ou mal dimensionnée sur petit écran — `ResizeObserver` ajouté dans `map.js` pour appeler `map.updateSize()` à chaque redimensionnement du conteneur `#map`
+- Carte coupée ou mal dimensionnée sur petit écran - `ResizeObserver` ajouté dans `map.js` pour appeler `map.updateSize()` à chaque redimensionnement du conteneur `#map`
 
 ### UI/UX
 - En-têtes du tableau avec fond vert et texte blanc, filtres blancs intégrés sous chaque titre
