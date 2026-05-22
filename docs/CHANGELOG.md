@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## [0.9.0] - 2026-05-13 au 22
+
+### Added
+- **Panneau données (sidebar droite)** - nouveau module `panel.js` complet :
+  - Tableau attributaire avec 11 colonnes configurables (4 actives par défaut : Individu, ID, Sexe, Date/Heure locale)
+  - Dropdown "Filtres colonnes" pour afficher/masquer les colonnes (Population, Altitude, Temp., DOP, Nb sat., Pos. Abe., Constructeur)
+  - Tri par colonne au clic sur l'en-tête avec icônes ▲▼ (actif/inactif)
+  - Filtres textuels par colonne en temps réel, fusionnés dans la même cellule que le titre
+  - Pagination avec sélecteur de taille de page (25 / 50 / Tous)
+  - En-têtes de tableau épinglés en haut (`position: sticky`) pendant le défilement
+- **Sélecteur de fonds de carte** (`initBasemapSelector`) avec modal et vignettes : SCAN25 IGN (clé `ign_scan_ws` à demander), OpenTopoMap, OpenStreetMap
+- **Sidebar droite redimensionnable** par glisser depuis le bord gauche, avec snap-close en dessous de 150px
+- **Filtre Programmation GPS** dans `applyFilters()` et `filtrerListeIndividus()` - map `ani_id → prog_id` chargée au démarrage via `fetchProgrammations()`
+- **Toast de notification** (`showToast`) pour les erreurs de sélection (trajectoire sans individu, outliers sans période)
+- **`fetchLastLocationsParPeriode()`** - une position par animal sur une plage de dates (mode Positions avec période)
+- **`fetchAnimalIdsParPeriode()`** - IDs distincts ayant des données sur une période, pour filtrer la liste d'individus sans recharger la carte
+- **`fetchProgrammations()`** - lecture de `cor_animal_capteur` pour le filtre de programmation GPS
+
+### Changed
+- `initSidebarRight()` extrait avant le bloc `try` de `startApp()` - le toggle de la sidebar droite est garanti même en cas d'erreur API
+- Mode Positions avec période : utilise désormais `fetchLastLocationsParPeriode` (une position par animal) au lieu de `fetchLocations` (toutes les positions)
+- `mettreAJourListeParDate()` utilise `fetchAnimalIdsParPeriode()` (une seule requête) pour filtrer la liste d'individus par période
+- `rendrePagination()` refactorisé via `DocumentFragment` (suppression du bug `insertBefore`)
+- Structure HTML de `initPanneau()` : sous-titre de comptage supprimé, toolbar réduit au bouton "Filtres colonnes"
+- En-têtes du tableau : deux lignes fusionnées en une seule (`<th>` avec `.th-label` + `.th-filter`), fond blanc conservé
+
+### Fixed
+- Toggle sidebar droite non fonctionnel si une erreur survenait avant `initSidebarBadges()`
+- Boutons de pagination dans le mauvais ordre à cause d'un `insertBefore` sur un élément pas encore dans le DOM
+- Carte coupée ou mal dimensionnée sur petit écran — `ResizeObserver` ajouté dans `map.js` pour appeler `map.updateSize()` à chaque redimensionnement du conteneur `#map`
+
+### UI/UX
+- En-têtes du tableau avec fond vert et texte blanc, filtres blancs intégrés sous chaque titre
+- Icônes de tri ▲▼ grises par défaut, actif en vert vif (`var(--color-primary-hover)`)
+- `.panel-table-wrapper` avec `min-height: 0` et `overflow: auto` pour un scroll interne correct dans la flexbox
+- **Media queries responsive** ajoutées dans `main.css` pour adapter la mise en page sur petits écrans (sidebar, toolbar, header)
+
 ## [0.8.0] - 2026-05-12
 
 ### Added
