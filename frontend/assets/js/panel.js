@@ -6,17 +6,11 @@
 
 // Définition de toutes les colonnes disponibles
 const colonnesDisponibles = [
-  { key: 'ani_nom',               label: 'Individu',          defaut: true  },
-  { key: 'ani_id',                label: 'ID',                defaut: true  },
-  { key: 'ani_sexe',              label: 'Sexe',              defaut: true  },
-  { key: 'loc_datetime_local',    label: 'Date/Heure locale', defaut: true  },
-  { key: 'ani_pop_rattach',       label: 'Population',        defaut: false },
-  { key: 'loc_altitude_capteur',  label: 'Altitude (m)',      defaut: false },
-  { key: 'loc_temperature_capteur', label: 'Temp. (°C)',      defaut: false },
-  { key: 'loc_dop',               label: 'DOP',               defaut: false },
-  { key: 'loc_nb_satellites',     label: 'Nb sat.',           defaut: false },
-  { key: 'loc_anomalie',          label: 'Pos. Abe.',         defaut: false },
-  { key: 'capt_constructeur',     label: 'Constructeur',      defaut: false }
+  { key: 'ani_id', label: 'ID', defaut: true },
+  { key: 'loc_datetime_local', label: 'Dernière position', defaut: true },
+  { key: 'loc_altitude_capteur', label: 'Altitude (m)', defaut: true },
+  { key: 'loc_temperature_capteur', label: 'Temp. (°C)', defaut: true },
+  { key: 'loc_dop', label: 'DOP', defaut: false }
 ];
 
 let colonnesActives = colonnesDisponibles
@@ -30,6 +24,27 @@ let lignesParPage = 25;
 
 let colonneTriee = null;
 let sensTriee = 'asc';
+let panneauFermeManuel = false;
+
+const colonnesIndividus = [
+  { key: 'ani_nom', label: 'Individu', defaut: true },
+  { key: 'ani_id', label: 'ID', defaut: true },
+  { key: 'ani_sexe', label: 'Sexe', defaut: true },
+  { key: 'ani_pop_rattach', label: 'Population', defaut: true },
+  { key: 'ani_gestionnaire', label: 'Gestionnaire', defaut: true },
+  { key: 'ani_annee_naissance', label: 'Année naissance', defaut: false },
+  { key: 'ani_code', label: 'Code', defaut: false },
+  { key: 'ani_date_relache', label: 'Date lâcher', defaut: false },
+  { key: 'ani_date_mort', label: 'Date mort', defaut: false }
+];
+
+let colonnesIndividusActives = colonnesIndividus.filter(c => c.defaut).map(c => c.key);
+let donneesIndividus = [];
+let donneesIndividusFiltrees = [];
+let pageCouranteIndividus = 1;
+let lignesParPageIndividus = 25;
+let colonneTrieeIndividus = null;
+let sensTrieeIndividus = 'asc';
 
 /**
  * Initialise la structure HTML du panneau données dans #sidebarRightBody
@@ -45,48 +60,176 @@ export function initPanneau() {
   sidebarRightBody.style.overflow = 'hidden';
 
   sidebarRightBody.innerHTML = `
-    <div class="panel-toolbar">
-      <div style="position:relative; margin-left:auto;">
-        <button class="panel-btn-filtres" id="panelBtnFiltres">
-          <img src="assets/img/filtre_horizontal.png" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"> Filtres colonnes
-        </button>
-        <div class="panel-colonnes-dropdown" id="panelColonnesDropdown" style="display:none">
-          <div class="panel-colonnes-header">
-            <span>Colonnes visibles</span>
-            <button class="panel-colonnes-reset" id="panelColonnesReset">Réinitialiser</button>
+    <div class="panel-tabs">
+      <button class="panel-tab active" id="tabDonnees">Données</button>
+      <button class="panel-tab" id="tabIndividus">Individus observés</button>
+    </div>
+    <div class="panel-tab-content" id="panelContentDonnees">
+      <div class="panel-toolbar">
+        <div style="position:relative; margin-left:auto;">
+          <button class="panel-btn-filtres" id="panelBtnFiltres">
+            <img src="assets/img/filtre_horizontal.png" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"> Filtres colonnes
+          </button>
+          <div class="panel-colonnes-dropdown" id="panelColonnesDropdown" style="display:none">
+            <div class="panel-colonnes-header">
+              <span>Colonnes visibles</span>
+              <button class="panel-colonnes-reset" id="panelColonnesReset">Réinitialiser</button>
+            </div>
+            ${colonnesDisponibles.map(c => `
+              <label class="panel-colonnes-item">
+                <input type="checkbox" value="${c.key}" ${c.defaut ? 'checked' : ''}>
+                ${c.label}
+              </label>
+            `).join('')}
           </div>
-          ${colonnesDisponibles.map(c => `
-            <label class="panel-colonnes-item">
-              <input type="checkbox" value="${c.key}" ${c.defaut ? 'checked' : ''}>
-              ${c.label}
-            </label>
-          `).join('')}
+        </div>
+      </div>
+      <div class="panel-table-wrapper">
+        <table class="panel-table">
+          <thead id="panelTableHead"></thead>
+          <tbody id="panelTableBody"></tbody>
+        </table>
+      </div>
+      <div class="panel-pagination" id="panelPagination">
+        <div class="panel-pagesize-container">
+          <select id="panelPageSizeSelect" class="panel-pagesize-select">
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+            <option value="all">Tous</option>
+          </select>
+          <span class="panel-pagesize-label">données / page</span>
+        </div>
+        <div class="panel-pagination-controls" id="panelPaginationControls">
+          <span class="panel-page-info" id="panelPageInfo">Page 1 sur 0</span>
         </div>
       </div>
     </div>
-    <div class="panel-table-wrapper">
-      <table class="panel-table">
-        <thead id="panelTableHead"></thead>
-        <tbody id="panelTableBody"></tbody>
-      </table>
-    </div>
-    <div class="panel-pagination" id="panelPagination">
-      <div class="panel-pagesize-container">
-        <select id="panelPageSizeSelect" class="panel-pagesize-select">
-          <option value="25" selected>25</option>
-          <option value="50">50</option>
-          <option value="all">Tous</option>
-        </select>
-        <span class="panel-pagesize-label">données / page</span>
+    <div class="panel-tab-content" id="panelContentIndividus" style="display:none">
+      <div class="panel-toolbar">
+        <div style="position:relative; margin-left:auto;">
+          <button class="panel-btn-filtres" id="panelBtnFiltresIndividus">
+            <img src="assets/img/filtre_horizontal.png" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"> Filtres colonnes
+          </button>
+          <div class="panel-colonnes-dropdown" id="panelIndividusDropdown" style="display:none">
+            <div class="panel-colonnes-header">
+              <span>Colonnes visibles</span>
+              <button class="panel-colonnes-reset" id="panelIndividusReset">Réinitialiser</button>
+            </div>
+            ${colonnesIndividus.map(c => `
+              <label class="panel-colonnes-item">
+                <input type="checkbox" value="${c.key}" ${c.defaut ? 'checked' : ''}>
+                ${c.label}
+              </label>
+            `).join('')}
+          </div>
+        </div>
       </div>
-      <div class="panel-pagination-controls" id="panelPaginationControls">
-        <span class="panel-page-info" id="panelPageInfo">Page 1 sur 0</span>
+      <div class="panel-table-wrapper">
+        <table class="panel-table panel-table-individus">
+          <thead id="panelIndividusHead"></thead>
+          <tbody id="panelIndividusBody"></tbody>
+        </table>
+      </div>
+      <div class="panel-pagination" id="panelIndividusPagination">
+        <div class="panel-pagesize-container">
+          <select id="panelIndividusPageSizeSelect" class="panel-pagesize-select">
+            <option value="25" selected>25</option>
+            <option value="50">50</option>
+            <option value="all">Tous</option>
+          </select>
+          <span class="panel-pagesize-label">données / page</span>
+        </div>
+        <div class="panel-pagination-controls" id="panelIndividusPaginationControls">
+          <span class="panel-page-info" id="panelIndividusPageInfo">Page 1 sur 0</span>
+        </div>
       </div>
     </div>
   `;
 
   mettreAJourColonnes();
   initFiltresColonnes();
+
+  // Dropdown filtres colonnes individus
+  const btnFiltresIndividus = document.getElementById('panelBtnFiltresIndividus');
+  const dropdownIndividus = document.getElementById('panelIndividusDropdown');
+
+  btnFiltresIndividus?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    dropdownIndividus.style.display = dropdownIndividus.style.display === 'none' ? 'block' : 'none';
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!dropdownIndividus?.contains(e.target) && e.target !== btnFiltresIndividus) {
+      if (dropdownIndividus) dropdownIndividus.style.display = 'none';
+    }
+  });
+
+  dropdownIndividus?.addEventListener('change', (e) => {
+    const key = e.target.value;
+    if (e.target.checked) {
+      if (!colonnesIndividusActives.includes(key)) colonnesIndividusActives.push(key);
+    } else {
+      colonnesIndividusActives = colonnesIndividusActives.filter(k => k !== key);
+    }
+    mettreAJourColonnesIndividus();
+    rendrePageIndividus();
+  });
+
+  document.getElementById('panelIndividusReset')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    colonnesIndividusActives = colonnesIndividus.filter(c => c.defaut).map(c => c.key);
+    dropdownIndividus?.querySelectorAll('input[type=checkbox]').forEach(cb => {
+      cb.checked = colonnesIndividusActives.includes(cb.value);
+    });
+    mettreAJourColonnesIndividus();
+    rendrePageIndividus();
+  });
+
+  // Filtres par colonne individus
+  document.addEventListener('input', (e) => {
+    if (!e.target.classList.contains('panel-individu-filter')) return;
+    const filtres = {};
+    document.querySelectorAll('.panel-individu-filter').forEach(input => {
+      const col = input.dataset.col;
+      const val = input.value.trim().toLowerCase();
+      if (val) filtres[col] = val;
+    });
+    donneesIndividusFiltrees = donneesIndividus.filter(ani => {
+      return Object.entries(filtres).every(([col, val]) => {
+        const cellVal = formaterValeurIndividu(col, ani[col]);
+        return String(cellVal).toLowerCase().includes(val);
+      });
+    });
+    trierIndividus();
+    pageCouranteIndividus = 1;
+    reconstruireSelectPageSizeIndividus(donneesIndividusFiltrees.length);
+    rendrePageIndividus();
+  });
+
+  document.getElementById('panelIndividusPageSizeSelect')?.addEventListener('change', (e) => {
+    lignesParPageIndividus = e.target.value;
+    pageCouranteIndividus = 1;
+    rendrePageIndividus();
+  });
+
+  mettreAJourColonnesIndividus();
+
+  const tabDonnees = sidebarRightBody.querySelector('#tabDonnees');
+  const tabIndividus = sidebarRightBody.querySelector('#tabIndividus');
+
+  tabDonnees?.addEventListener('click', () => {
+    tabDonnees.classList.add('active');
+    tabIndividus?.classList.remove('active');
+    document.getElementById('panelContentDonnees').style.display = 'flex';
+    document.getElementById('panelContentIndividus').style.display = 'none';
+  });
+
+  tabIndividus?.addEventListener('click', () => {
+    tabIndividus.classList.add('active');
+    tabDonnees?.classList.remove('active');
+    document.getElementById('panelContentDonnees').style.display = 'none';
+    document.getElementById('panelContentIndividus').style.display = 'flex';
+  });
 
   const pageSizeSelect = document.getElementById('panelPageSizeSelect');
   pageSizeSelect?.addEventListener('change', (e) => {
@@ -224,6 +367,19 @@ function trierDonnees() {
   });
 }
 
+function trierIndividus() {
+  if (!colonneTrieeIndividus) return;
+  donneesIndividusFiltrees.sort((a, b) => {
+    let valA = a[colonneTrieeIndividus] ?? '';
+    let valB = b[colonneTrieeIndividus] ?? '';
+    if (typeof valA === 'string') valA = valA.toLowerCase();
+    if (typeof valB === 'string') valB = valB.toLowerCase();
+    if (valA < valB) return sensTrieeIndividus === 'asc' ? -1 : 1;
+    if (valA > valB) return sensTrieeIndividus === 'asc' ? 1 : -1;
+    return 0;
+  });
+}
+
 function rendrePage() {
   const tbody = document.getElementById('panelTableBody');
   if (!tbody) return;
@@ -238,18 +394,43 @@ function rendrePage() {
   tbody.innerHTML = page.map(loc => `
     <tr class="panel-table-row">
       ${colonnesDisponibles
-        .filter(c => colonnesActives.includes(c.key))
-        .map(c => `<td>${formaterValeur(c.key, loc[c.key])}</td>`)
-        .join('')}
+      .filter(c => colonnesActives.includes(c.key))
+      .map(c => `<td>${formaterValeur(c.key, loc[c.key], loc)}</td>`)
+      .join('')}
     </tr>
   `).join('');
+
+  tbody.querySelectorAll('.panel-table-row').forEach((tr, index) => {
+    const loc = page[index];
+    if (!loc) return;
+
+    // Survol — grossir le point
+    tr.addEventListener('mouseenter', () => {
+      if (window._highlightPoint) window._highlightPoint(loc.ani_id, true);
+    });
+
+    tr.addEventListener('mouseleave', () => {
+      if (window._highlightPoint) window._highlightPoint(loc.ani_id, false);
+    });
+
+    // Clic — zoom + popup
+    tr.addEventListener('click', () => {
+      if (window._zoomToPoint) window._zoomToPoint(loc);
+    });
+  });
 
   // Mettre à jour la pagination
   rendrePagination(total);
 }
 
-function formaterValeur(key, valeur) {
-  if (valeur === null || valeur === undefined) return '-';
+function formaterValeur(key, valeur, loc = {}) {
+  if (valeur === null || valeur === undefined) {
+    if (key === 'loc_datetime_local' && loc.loc_date_local) {
+      valeur = loc.loc_date_local;
+    } else {
+      return '-';
+    }
+  }
 
   switch (key) {
     case 'loc_datetime_local':
@@ -414,4 +595,216 @@ function reconstruireSelectPageSize(total) {
     select.value = i1;
     lignesParPage = i1;
   }
+}
+
+function reconstruireSelectPageSizeIndividus(total) {
+  const select = document.getElementById('panelIndividusPageSizeSelect');
+  if (!select) return;
+
+  const [i1, i2] = calculerIntervalles(total);
+  const ancienneValeur = select.value;
+
+  select.innerHTML = `
+    <option value="${i1}">${i1}</option>
+    <option value="${i2}">${i2}</option>
+    <option value="all">Tous</option>
+  `;
+
+  if (ancienneValeur === 'all') {
+    select.value = 'all';
+    lignesParPageIndividus = 'all';
+  } else if (Array.from(select.options).some(opt => opt.value === ancienneValeur)) {
+    select.value = ancienneValeur;
+    lignesParPageIndividus = ancienneValeur;
+  } else {
+    select.value = i1;
+    lignesParPageIndividus = i1;
+  }
+}
+
+export function mettreAJourIndividus(animals) {
+  donneesIndividus = animals || [];
+  donneesIndividusFiltrees = [...donneesIndividus];
+  trierIndividus();
+  pageCouranteIndividus = 1;
+  reconstruireSelectPageSizeIndividus(donneesIndividusFiltrees.length);
+  rendrePageIndividus();
+}
+
+function mettreAJourColonnesIndividus() {
+  const thead = document.getElementById('panelIndividusHead');
+  if (!thead) return;
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = colonnesIndividus
+    .filter(c => colonnesIndividusActives.includes(c.key))
+    .map(c => {
+      let icone;
+      if (colonneTrieeIndividus === c.key) {
+        icone = sensTrieeIndividus === 'asc'
+          ? '<span class="sort-icon"><span class="sort-up active">▲</span><span class="sort-down">▼</span></span>'
+          : '<span class="sort-icon"><span class="sort-up">▲</span><span class="sort-down active">▼</span></span>';
+      } else {
+        icone = '<span class="sort-icon"><span class="sort-up">▲</span><span class="sort-down">▼</span></span>';
+      }
+      return `
+        <th data-col="${c.key}" class="panel-th-sortable${colonneTrieeIndividus === c.key ? ' active-sort' : ''}">
+          <div class="th-label">${icone} ${c.label}</div>
+          <div class="th-filter">
+            <input type="text" class="panel-individu-filter" data-col="${c.key}" placeholder="Filtrer...">
+          </div>
+        </th>
+      `;
+    })
+    .join('');
+
+  tr.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', (e) => {
+      if (e.target.classList.contains('panel-individu-filter')) return;
+      const col = th.dataset.col;
+      if (colonneTrieeIndividus === col) {
+        sensTrieeIndividus = sensTrieeIndividus === 'asc' ? 'desc' : 'asc';
+      } else {
+        colonneTrieeIndividus = col;
+        sensTrieeIndividus = 'asc';
+      }
+      trierIndividus();
+      mettreAJourColonnesIndividus();
+      rendrePageIndividus();
+    });
+  });
+
+  thead.innerHTML = '';
+  thead.appendChild(tr);
+}
+
+function rendrePageIndividus() {
+  const tbody = document.getElementById('panelIndividusBody');
+  if (!tbody) return;
+
+  const total = donneesIndividusFiltrees.length;
+  const size = lignesParPageIndividus === 'all' ? total : parseInt(lignesParPageIndividus, 10);
+  const debut = lignesParPageIndividus === 'all' ? 0 : (pageCouranteIndividus - 1) * size;
+  const fin = lignesParPageIndividus === 'all' ? total : Math.min(debut + size, total);
+  const page = donneesIndividusFiltrees.slice(debut, fin);
+
+  tbody.innerHTML = page.map(ani => `
+    <tr class="panel-table-row panel-individu-row" data-ani-id="${ani.ani_id}">
+      ${colonnesIndividus
+      .filter(c => colonnesIndividusActives.includes(c.key))
+      .map(c => `<td>${formaterValeurIndividu(c.key, ani[c.key])}</td>`)
+      .join('')}
+    </tr>
+  `).join('');
+
+  tbody.querySelectorAll('.panel-individu-row').forEach(tr => {
+    const aniId = tr.dataset.aniId;
+
+    tr.addEventListener('mouseenter', () => {
+      if (window._highlightPoint) window._highlightPoint(aniId, true);
+    });
+
+    tr.addEventListener('mouseleave', () => {
+      if (window._highlightPoint) window._highlightPoint(aniId, false);
+    });
+
+    tr.addEventListener('click', () => {
+      if (window._afficherPositionsIndividu) window._afficherPositionsIndividu(aniId);
+    });
+  });
+
+  rendrePaginationIndividus(total);
+}
+
+function formaterValeurIndividu(key, valeur) {
+  if (valeur === null || valeur === undefined) return '-';
+  switch (key) {
+    case 'ani_sexe':
+      return valeur === 'M' ? 'Mâle' : valeur === 'F' ? 'Femelle' : valeur;
+    case 'ani_date_relache':
+    case 'ani_date_mort':
+      return valeur ? valeur.slice(0, 10) : '-';
+    default:
+      return valeur;
+  }
+}
+
+function rendrePaginationIndividus(total) {
+  const paginationControls = document.getElementById('panelIndividusPaginationControls');
+  if (!paginationControls) return;
+
+  const size = lignesParPageIndividus === 'all' ? total : parseInt(lignesParPageIndividus, 10);
+  const nbPages = size > 0 ? Math.ceil(total / size) : 1;
+  const pageInfo = document.getElementById('panelIndividusPageInfo');
+  if (pageInfo) pageInfo.textContent = `Page ${pageCouranteIndividus} sur ${nbPages || 0}`;
+
+  paginationControls.querySelectorAll('.panel-page-btn, .panel-page-dots').forEach(b => b.remove());
+  if (nbPages <= 1) return;
+
+  const fragment = document.createDocumentFragment();
+
+  const btnPrev = document.createElement('button');
+  btnPrev.className = 'panel-page-btn';
+  btnPrev.textContent = '‹';
+  btnPrev.disabled = pageCouranteIndividus === 1;
+  btnPrev.addEventListener('click', () => {
+    if (pageCouranteIndividus > 1) { pageCouranteIndividus--; rendrePageIndividus(); }
+  });
+  fragment.appendChild(btnPrev);
+
+  const pages = [];
+  for (let i = 1; i <= nbPages; i++) {
+    if (i === 1 || i === nbPages || (i >= pageCouranteIndividus - 1 && i <= pageCouranteIndividus + 1)) {
+      pages.push(i);
+    } else if (pages[pages.length - 1] !== '...') {
+      pages.push('...');
+    }
+  }
+
+  pages.forEach(p => {
+    if (p === '...') {
+      const dots = document.createElement('span');
+      dots.className = 'panel-page-dots';
+      dots.textContent = '...';
+      fragment.appendChild(dots);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = `panel-page-btn${p === pageCouranteIndividus ? ' active' : ''}`;
+      btn.textContent = p;
+      btn.addEventListener('click', () => { pageCouranteIndividus = p; rendrePageIndividus(); });
+      fragment.appendChild(btn);
+    }
+  });
+
+  const btnNext = document.createElement('button');
+  btnNext.className = 'panel-page-btn';
+  btnNext.textContent = '›';
+  btnNext.disabled = pageCouranteIndividus === nbPages;
+  btnNext.addEventListener('click', () => {
+    if (pageCouranteIndividus < nbPages) { pageCouranteIndividus++; rendrePageIndividus(); }
+  });
+  fragment.appendChild(btnNext);
+  paginationControls.appendChild(fragment);
+}
+
+export function setLabelDatetime(label) {
+  const col = colonnesDisponibles.find(c => c.key === 'loc_datetime_local');
+  if (col) {
+    col.label = label;
+    mettreAJourColonnes();
+  }
+}
+
+export function ouvrirPanneauSiNecessaire() {
+  if (panneauFermeManuel) return;
+  const sidebarRight = document.getElementById('sidebarRight');
+  const icon = document.querySelector('.sidebar-right-toggle .toggle-icon');
+  if (sidebarRight && !sidebarRight.classList.contains('visible')) {
+    sidebarRight.classList.add('visible');
+    if (icon) icon.textContent = '›';
+  }
+}
+
+export function setPanneauFermeManuel(valeur) {
+  panneauFermeManuel = valeur;
 }
