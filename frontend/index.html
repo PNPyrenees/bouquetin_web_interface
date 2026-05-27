@@ -37,7 +37,7 @@
         </a>
         <a href="#" class="nav-link">
           <img src="assets/img/rapport.png" alt="" class="nav-icon">
-          Rapports/statistiques
+          statistiques
         </a>
         <a href="#" id="btnAjouter" class="nav-link nav-link-add" style="display: none;">+ Ajouter</a>
       </nav>
@@ -183,6 +183,16 @@
           </div>
         </details>
       </div>
+      <div class="sidebar-symbologie">
+          <div class="sidebar-symbologie-label">Symbologie</div>
+          <div class="sidebar-symbologie-options">
+            <label class="radio-couleur"><input type="radio" name="modeCouleur" value="individu" checked> Individu</label>
+            <label class="radio-couleur"><input type="radio" name="modeCouleur" value="date"> Date</label>
+            <label class="radio-couleur"><input type="radio" name="modeCouleur" value="saison"> Saison</label>
+            <label class="radio-couleur"><input type="radio" name="modeCouleur" value="sexe"> Sexe</label>
+            <label class="radio-couleur"><input type="radio" name="modeCouleur" value="gestionnaire"> Gestionnaire</label>
+          </div>
+        </div>
       <div class="sidebar-footer">
         <div class="filter-count">0 filtres actifs</div>
         <button class="btn-apply" id="btnApplyFilters">Appliquer les filtres</button>
@@ -194,29 +204,16 @@
     </button>
   </aside>
   <div id="loginScreen" style="display:none"></div>
-  <div class="map-toolbar">
-    <div class="toolbar-left">
-      <button id="btnPositions" class="pill-btn active">Positions</button>
-      <button id="btnTrajectoire" class="pill-btn">Trajectoire</button>
-      <div class="toolbar-couleur">
-        <span class="toolbar-label">Symbologie:</span>
-        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="individu" checked> Individu</label>
-        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="date"> Date</label>
-        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="saison"> Saison</label>
-        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="sexe"> Sexe</label>
-        <label class="radio-couleur"><input type="radio" name="modeCouleur" value="gestionnaire"> Gestionnaire</label>
-      </div>
-    </div>
-    <div class="toolbar-right">
-      <span class="count-text">Positions affichées : <span id="positionsCount">0</span></span>
-    </div>
-  </div>
   <div id="mapScreen" style="display:block">
     <div id="mapLoading" style="display:none">
       <div class="map-loading-spinner"></div>
       <span>Chargement des données...</span>
     </div>
     <div id="map"></div>
+    <div id="modeButtons">
+      <button id="btnPositions" class="mode-btn active">Positions</button>
+      <button id="btnTrajectoire" class="mode-btn">Trajectoire</button>
+    </div>
     <div id="mapLayersWrapper">
       <button id="btnLayers" class="btn-layers-bottom">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
@@ -236,12 +233,17 @@
       </div>
     </div>
     <div id="popup"></div>
-    <div id="legendePanel" class="legende-panel">
-      <div class="legende-header">
-        <span>Légende</span>
-        <button id="btnLegende">−</button>
+    <div class="legende-wrapper">
+      <div id="legendePanel" class="legende-panel">
+        <div class="legende-header">
+          <span>Légende</span>
+          <button id="btnLegende">−</button>
+        </div>
+        <div id="legendeContenu" class="legende-contenu"></div>
       </div>
-      <div id="legendeContenu" class="legende-contenu"></div>
+      <div id="positionsCountPanel" class="positions-count-panel">
+        Positions affichées : <strong id="positionsCount">0</strong>
+      </div>
     </div>
     <div id="panneau-attributaire" class="panneau-attributaire" style="display:none">
       <button class="panneau-toggle" id="panneauToggle" title="Masquer/Afficher le panneau">
