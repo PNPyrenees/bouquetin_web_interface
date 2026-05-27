@@ -165,7 +165,8 @@ export function initMap(targetId, popupId) {
       center: ol.proj.transform(DEFAULT_CENTER, 'EPSG:4326', 'EPSG:3857'),
       zoom: DEFAULT_ZOOM
     }),
-    controls: ol.control.defaults.defaults().extend([
+    controls: ol.control.defaults.defaults({ zoom: false }).extend([
+      new ol.control.Zoom({ className: 'ol-zoom-custom' }),
       new ol.control.ScaleLine({ units: 'metric' })
     ])
   });
@@ -424,3 +425,46 @@ export function switchBasemap(index) {
 
 export function getMap() { return map; }
 export function getGpsSource() { return gpsSource; }
+
+export function highlightPoint(ani_id, actif) {
+  const features = gpsSource.getFeatures();
+  features.forEach(f => {
+    if (String(f.get('ani_id')) === String(ani_id)) {
+      const style = f.getStyle() || f.get('_styleOriginal');
+      if (!f.get('_styleOriginal')) f.set('_styleOriginal', f.getStyle());
+      
+      if (actif) {
+        const original = f.get('_styleOriginal');
+        const image = original?.getImage?.();
+        if (image) {
+          const newStyle = new ol.style.Style({
+            image: new ol.style.Circle({
+              radius: (image.getRadius?.() || 6) + 3,
+              fill: image.getFill?.(),
+              stroke: image.getStroke?.()
+            })
+          });
+          f.setStyle(newStyle);
+        }
+      } else {
+        f.setStyle(f.get('_styleOriginal'));
+      }
+    }
+  });
+}
+
+export function zoomToPoint(loc) {
+  const features = gpsSource.getFeatures();
+  const feature = features.find(f => String(f.get('ani_id')) === String(loc.ani_id));
+  if (!feature) return;
+
+  const geom = feature.getGeometry();
+  if (!geom) return;
+
+  const coord = geom.getCoordinates();
+  map.getView().animate({ center: coord, zoom: 14, duration: 400 });
+
+  // Afficher le popup
+  const popupEl = document.getElementById('popup');
+  if (popupEl) showPopup(feature, coord, popupEl);
+}
