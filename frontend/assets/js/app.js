@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocations, fetchLastLocationsInactifs, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations } from './api.js?v=1.1.0';
-import { ROLES, DEV_PASSWORD } from './config.js?v=1.1.0';
+import { ROLES, DEV_PASSWORD, ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI } from './config.js?v=1.1.0';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js?v=1.1.0';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus } from './panel.js';
 
@@ -31,6 +31,23 @@ function enrichirLocations(locations) {
       ani_pop_rattach: loc.ani_pop_rattach || ani?.ani_pop_rattach || null
     };
   });
+}
+
+function enrichirAnimauxAvecPositions(locations) {
+  return animals
+    .filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id)))
+    .map(a => {
+      const locs = locations.filter(l => String(l.ani_id) === String(a.ani_id));
+      const dates = locs
+        .map(l => l.loc_datetime_local || l.loc_date_local)
+        .filter(Boolean)
+        .sort();
+      return {
+        ...a,
+        premiere_position: dates[0] || null,
+        derniere_position: dates[dates.length - 1] || null
+      };
+    });
 }
 
 function initSidebarRight() {
@@ -111,6 +128,9 @@ async function startApp(token) {
     initMap('map', 'popup');
     window._highlightPoint = highlightPoint;
     window._zoomToPoint = zoomToPoint;
+    window._getMap = getMap;
+    window._getGpsFeatures = () => getGpsSource().getFeatures();
+    window._ZOOM_POINT_SINGLE = ZOOM_POINT_SINGLE;
     window._afficherPositionsIndividu = (aniId) => {
       const features = getGpsSource().getFeatures();
       const feature = features.find(f => String(f.get('ani_id')) === String(aniId));
@@ -118,7 +138,7 @@ async function startApp(token) {
       const geom = feature.getGeometry();
       if (!geom) return;
       const coord = geom.getCoordinates();
-      getMap().getView().animate({ center: coord, zoom: 14, duration: 400 });
+      getMap().getView().animate({ center: coord, zoom: ZOOM_POINT_SINGLE, duration: 400 });
     };
 
     // Récupération des données depuis l'API via le module api.js
@@ -150,10 +170,7 @@ async function startApp(token) {
     const count = renderPoints(locationsEnrichies);
     mettreAJourPanneau(locationsEnrichies);
     document.getElementById('positionsCount').textContent = count;
-    const animauxAffiches = animals.filter(a =>
-   locationsEnrichies.some(l => String(l.ani_id) === String(a.ani_id))
-);
-mettreAJourIndividus(animauxAffiches);
+    mettreAJourIndividus(enrichirAnimauxAvecPositions(locationsEnrichies));
     mettreAJourLegende();
     setLabelDatetime('Dernière position');
 
@@ -296,9 +313,9 @@ mettreAJourIndividus(animauxAffiches);
             if (!extent || ol.extent.isEmpty(extent)) return;
 
             if (selectedIds.length === 1) {
-              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 14, duration: 400 });
+              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
             } else if (selectedIds.length > 1) {
-              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 12, duration: 400 });
+              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
             }
           }, 800);
         }
@@ -574,8 +591,13 @@ async function applyFilters(token) {
         const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
         const count = renderPoints(locations, true, false, modeCouleur);
         mettreAJourPanneau(locations);
-        mettreAJourIndividus(animals.filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
+        mettreAJourIndividus(enrichirAnimauxAvecPositions(locations));
         ouvrirPanneauSiNecessaire();
+        const mapScreen = document.getElementById('mapScreen');
+        if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
+          mapScreen?.classList.add('panel-open');
+          setTimeout(() => updateMapSize(), 310);
+        }
         document.getElementById('positionsCount').textContent = count;
         mettreAJourLegende();
         setLabelDatetime('Date/Heure');
@@ -587,10 +609,10 @@ async function applyFilters(token) {
           if (geom?.coordinates) {
             const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
             const coord = ol.proj.fromLonLat(wgs84);
-            getMap().getView().animate({ center: coord, zoom: 13, duration: 400 });
+            getMap().getView().animate({ center: coord, zoom: ZOOM_FILTER_SINGLE, duration: 400 });
           }
         } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 13, duration: 400 });
+          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
         }
 
         return; // ← sortir du bloc isPositionMode
@@ -679,6 +701,11 @@ async function applyFilters(token) {
       mettreAJourPanneau(locations);
       mettreAJourIndividus(animals.filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
       ouvrirPanneauSiNecessaire();
+      const mapScreen = document.getElementById('mapScreen');
+      if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
+        mapScreen?.classList.add('panel-open');
+        setTimeout(() => updateMapSize(), 310);
+      }
       document.getElementById('positionsCount').textContent = count;
       mettreAJourLegende();
       setLabelDatetime('Dernière position');
@@ -691,11 +718,11 @@ async function applyFilters(token) {
         if (geom?.coordinates) {
           const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
           const coord = ol.proj.fromLonLat(wgs84);
-          getMap().getView().animate({ center: coord, zoom: 13, duration: 400 });
+          getMap().getView().animate({ center: coord, zoom: ZOOM_FILTER_SINGLE, duration: 400 });
         }
       } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
         // Plusieurs points → zoom adaptatif pour tous les voir
-        getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 13, duration: 400 });
+        getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
       }
     } else {
       // Mode Trajectoire — on ne vide pas les points existants
@@ -729,7 +756,7 @@ async function applyFilters(token) {
           const valides = await fetchLocations(token, {
             ...filters,
             ani_id: [id],
-            limit: 500,
+            limit: 10,
             include_outliers: false
           });
 
@@ -762,6 +789,11 @@ async function applyFilters(token) {
       mettreAJourPanneau(locations);
       mettreAJourIndividus(animals.filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
       ouvrirPanneauSiNecessaire();
+      const mapScreenTraj = document.getElementById('mapScreen');
+      if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
+        mapScreenTraj?.classList.add('panel-open');
+        setTimeout(() => updateMapSize(), 310);
+      }
       renderTrajectoire(locations, modeCouleur);
       document.getElementById('positionsCount').textContent = count;
       mettreAJourLegende();
@@ -770,9 +802,9 @@ async function applyFilters(token) {
         const extent = getGpsSource().getExtent();
         if (!extent || ol.extent.isEmpty(extent)) return;
         if (selectedIds.length === 1) {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 14, duration: 400 });
+          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
         } else if (selectedIds.length > 1) {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: 12, duration: 400 });
+          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
         }
       }, 300);
     }
