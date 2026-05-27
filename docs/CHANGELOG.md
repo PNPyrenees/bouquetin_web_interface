@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## [0.11.0] - 2026-05-27
+
+### Added
+- **Onglet 'Individus observés'** dans le panneau droit - tableau synthétique par animal avec colonnes configurables (Individu, ID, Sexe, Population, Gestionnaire, Année naissance + optionnelles : Code, Date lâcher, Date mort)
+- **Synchronisation carte vers Individus observés** - le tableau se met à jour après chaque `applyFilters()` avec uniquement les animaux visibles sur la carte
+- **Clic sur une ligne 'Individus observés'** - zoom sur le point de l'animal sur la carte (sans filtrer)
+- **Survol d'une ligne 'Individus observés'** - grossissement du point sur la carte (`highlightPoint`)
+- **`#mapScreen.panel-open`** - la carte se réduit quand le panneau droit s'ouvre, les éléments bas droite restent visibles
+
+### Changed
+- `mettreAJourIndividus()` appelé après `renderPoints()` dans `startApp()` - synchronisé avec les points affichés sur la carte
+- `window._afficherPositionsIndividu` simplifié - zoom uniquement sur le point sans filtrer la carte
+- `initSidebarRight()` - listener unifié pour le toggle (suppression du doublon) + appel `updateMapSize()` après transition
+- Colonnes par défaut de l'onglet 'Données' : ID, Dernière position, Altitude, Temp. (°C)
+- `formaterValeur()` - fallback `loc_date_local` si `loc_datetime_local` est null
+
+### Fixed
+- Double listener sur `sidebarRightToggle` - fusionné en un seul bloc
+- `mettreAJourIndividus` appelé trop tôt - déplacé après `renderPoints()`
+
+## [0.10.0] - 2026-05-26
+
+### Changed
+- Suppression complète de la `.map-toolbar` - layout simplifié, `#mapScreen` part désormais de `top: 60px` (juste sous le header)
+- Boutons **Positions** et **Trajectoire** déplacés sur la carte en bas à droite (style Google Maps)
+- **Symbologie** déplacée dans la sidebar gauche juste au-dessus du bouton Appliquer
+- **Légende** repositionnée en haut à gauche de la carte
+- **Compteur de positions** collé sous la légende en bas
+- Contrôles zoom OpenLayers repositionnés en bas à droite avec style épuré (fond blanc, ombre légère)
+- Bouton couches `#mapLayersWrapper` repositionné en bas à droite au-dessus des boutons mode
+- Navigation header en majuscules, sans fond au hover, soulignement actif uniquement
+- `.sidebar-right` et `.sidebar` mis à jour pour `top: 60px`
+- Boutons radio **Symbologie** remplacés visuellement par des cases carrées (`appearance: none` + style carré CSS, radio conservés pour la sélection unique)
+
+### Removed
+- `.map-toolbar` et tous ses styles associés (`.toolbar-left`, `.toolbar-right`, `.toolbar-couleur`, `.toolbar-label`, `.pill-btn`)
+
 ## [0.9.0] - 2026-05-13 au 22
 
 ### Added
