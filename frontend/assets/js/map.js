@@ -1,10 +1,10 @@
-import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93 } from './config.js';
-
+import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL } from './config.js';
 let map;
 let gpsSource;
 let trajectoireSource;
 let popupOverlay;
 let basemaps = [];
+let isAnimating = false;
 
 const COULEURS_PALETTE = [
   '#2D6A4F', '#E07B39', '#3A86FF', '#9B2335', '#8338EC',
@@ -149,7 +149,7 @@ export function initMap(targetId, popupId) {
   popupOverlay = new ol.Overlay({
     element: popupEl,
     positioning: 'bottom-center',
-    offset: [0, -10]
+    offset: [0, -16]
   });
 
   // Création de l'objet Map principal
@@ -163,7 +163,9 @@ export function initMap(targetId, popupId) {
     overlays: [popupOverlay],
     view: new ol.View({
       center: ol.proj.transform(DEFAULT_CENTER, 'EPSG:4326', 'EPSG:3857'),
-      zoom: DEFAULT_ZOOM
+      zoom: DEFAULT_ZOOM,
+      maxZoom: ZOOM_MAX_MANUAL,
+      minZoom: ZOOM_MIN_MANUAL
     }),
     controls: ol.control.defaults.defaults({ zoom: false }).extend([
       new ol.control.Zoom({ className: 'ol-zoom-custom' }),
@@ -181,10 +183,20 @@ export function initMap(targetId, popupId) {
     let hit = false;
     map.forEachFeatureAtPixel(evt.pixel, feature => {
       if (hit) return;
+      // Ignorer les lignes de trajectoire et les flèches — uniquement les points GPS
+      const geometry = feature.getGeometry();
+      if (!geometry || geometry.getType() !== 'Point') return;
+      // Ignorer les flèches directionnelles (pas de ani_id)
+      if (!feature.get('ani_id')) return;
       hit = true;
       showPopup(feature, evt.coordinate, popupEl);
     });
     if (!hit) popupEl.style.display = 'none';
+  });
+
+  // Fermer le popup uniquement au déplacement manuel (drag)
+  map.on('movestart', () => {
+    if (!isAnimating && popupEl) popupEl.style.display = 'none';
   });
 
   // Observateur de redimensionnement robuste pour synchroniser OpenLayers avec les dimensions réelles du DOM
@@ -265,7 +277,6 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
         image: new ol.style.Circle({
           radius: 8,
           fill: new ol.style.Fill({ color: couleur }),
-          stroke: new ol.style.Stroke({ color: 'white', width: 2.5 })
         })
       }));
     } else if (modeTrajectoire) {
@@ -283,7 +294,7 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
         image: new ol.style.Circle({
           radius: 6,
           fill: new ol.style.Fill({ color: couleur }),
-          stroke: new ol.style.Stroke({ color: 'white', width: 2 })
+           stroke: new ol.style.Stroke({ color: 'white', width: 2 })
         })
       }));
     }
@@ -326,7 +337,10 @@ function showPopup(feature, coordinate, popupEl) {
 
   popupOverlay.setPosition(coordinate);
   popupEl.style.display = 'block';
-  map.getView().animate({ center: coordinate, zoom: 13, duration: 400 });
+  isAnimating = true;
+  map.getView().animate({ center: coordinate, zoom: ZOOM_POINT_SINGLE, duration: 400 }, () => {
+    isAnimating = false;
+  });
 }
 
 /**
@@ -432,7 +446,7 @@ export function highlightPoint(ani_id, actif) {
     if (String(f.get('ani_id')) === String(ani_id)) {
       const style = f.getStyle() || f.get('_styleOriginal');
       if (!f.get('_styleOriginal')) f.set('_styleOriginal', f.getStyle());
-      
+
       if (actif) {
         const original = f.get('_styleOriginal');
         const image = original?.getImage?.();
@@ -462,9 +476,5 @@ export function zoomToPoint(loc) {
   if (!geom) return;
 
   const coord = geom.getCoordinates();
-  map.getView().animate({ center: coord, zoom: 14, duration: 400 });
-
-  // Afficher le popup
-  const popupEl = document.getElementById('popup');
-  if (popupEl) showPopup(feature, coord, popupEl);
+  map.getView().animate({ center: coord, zoom: ZOOM_POINT_SINGLE, duration: 400 });
 }
