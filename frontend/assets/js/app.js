@@ -1,7 +1,7 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocations, fetchLastLocationsInactifs, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations } from './api.js?v=1.1.0';
 import { ROLES, DEV_PASSWORD } from './config.js?v=1.1.0';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js?v=1.1.0';
-import { initPanneau, mettreAJourPanneau } from './panel.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js?v=1.1.0';
+import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus } from './panel.js';
 
 const DEV_MODE = true;
 
@@ -38,13 +38,22 @@ function initSidebarRight() {
   const sidebarRightToggle = document.getElementById('sidebarRightToggle');
 
   sidebarRightToggle?.addEventListener('click', () => {
-    const icon = sidebarRightToggle.querySelector('.toggle-icon');
-    const isVisible = sidebarRight.classList.toggle('visible');
-    icon.textContent = isVisible ? '›' : '‹';
-    if (!isVisible) {
-      sidebarRight.style.width = '';
-    }
-  });
+  const icon = sidebarRightToggle.querySelector('.toggle-icon');
+  sidebarRight.classList.toggle('visible');
+  const estVisible = sidebarRight.classList.contains('visible');
+  icon.textContent = estVisible ? '›' : '‹';
+  setPanneauFermeManuel(!estVisible);
+  if (!estVisible) {
+    sidebarRight.style.width = '';
+  }
+  const mapScreen = document.getElementById('mapScreen');
+  if (estVisible) {
+    mapScreen?.classList.add('panel-open');
+  } else {
+    mapScreen?.classList.remove('panel-open');
+  }
+  setTimeout(() => updateMapSize(), 310);
+});
 
   const resizer = document.getElementById('sidebarRightResizer');
   let isResizing = false;
@@ -100,6 +109,17 @@ async function startApp(token) {
   try {
     // Initialisation de la carte OpenLayers
     initMap('map', 'popup');
+    window._highlightPoint = highlightPoint;
+    window._zoomToPoint = zoomToPoint;
+    window._afficherPositionsIndividu = (aniId) => {
+      const features = getGpsSource().getFeatures();
+      const feature = features.find(f => String(f.get('ani_id')) === String(aniId));
+      if (!feature) return;
+      const geom = feature.getGeometry();
+      if (!geom) return;
+      const coord = geom.getCoordinates();
+      getMap().getView().animate({ center: coord, zoom: 14, duration: 400 });
+    };
 
     // Récupération des données depuis l'API via le module api.js
     animals = await fetchAnimals(token);
@@ -117,6 +137,7 @@ async function startApp(token) {
 
     // ← initPanneau() ici — après les données, avant le rendu
     initPanneau();
+    // mettreAJourIndividus(animals);
 
     // Chargement initial (Tous par défaut : actifs + inactifs)
     const [actifs, inactifs] = await Promise.all([
@@ -129,7 +150,14 @@ async function startApp(token) {
     const count = renderPoints(locationsEnrichies);
     mettreAJourPanneau(locationsEnrichies);
     document.getElementById('positionsCount').textContent = count;
+    const animauxAffiches = animals.filter(a =>
+   locationsEnrichies.some(l => String(l.ani_id) === String(a.ani_id))
+);
+mettreAJourIndividus(animauxAffiches);
     mettreAJourLegende();
+    setLabelDatetime('Dernière position');
+
+
 
     activeIds = new Set(actifs.map(l => l.ani_id));
 
@@ -240,6 +268,7 @@ async function startApp(token) {
         btnPos.classList.add('active');
         btnTraj.classList.remove('active');
         clearTrajectoire();
+        setLabelDatetime('Dernière position');
         applyFilters(currentToken);
       });
       btnTraj.addEventListener('click', () => {
@@ -258,6 +287,7 @@ async function startApp(token) {
         // Bascule en mode Trajectoire
         btnTraj.classList.add('active');
         btnPos.classList.remove('active');
+        setLabelDatetime('Date/Heure');
         applyFilters(currentToken);
 
         if (selectedIds.length > 0) {
@@ -544,8 +574,11 @@ async function applyFilters(token) {
         const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
         const count = renderPoints(locations, true, false, modeCouleur);
         mettreAJourPanneau(locations);
+        mettreAJourIndividus(animals.filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
+        ouvrirPanneauSiNecessaire();
         document.getElementById('positionsCount').textContent = count;
         mettreAJourLegende();
+        setLabelDatetime('Date/Heure');
 
         const extent = getGpsSource().getExtent();
         if (selectedIds.length === 1 && locations.length > 0) {
@@ -644,8 +677,11 @@ async function applyFilters(token) {
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
       const count = renderPoints(locations, true, false, modeCouleur);
       mettreAJourPanneau(locations);
+      mettreAJourIndividus(animals.filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
+      ouvrirPanneauSiNecessaire();
       document.getElementById('positionsCount').textContent = count;
       mettreAJourLegende();
+      setLabelDatetime('Dernière position');
 
       const extent = getGpsSource().getExtent();
       if (selectedIds.length === 1 && locations.length > 0) {
@@ -724,6 +760,8 @@ async function applyFilters(token) {
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
       const count = renderPoints(locations, true, true, modeCouleur);
       mettreAJourPanneau(locations);
+      mettreAJourIndividus(animals.filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
+      ouvrirPanneauSiNecessaire();
       renderTrajectoire(locations, modeCouleur);
       document.getElementById('positionsCount').textContent = count;
       mettreAJourLegende();
@@ -1075,6 +1113,7 @@ async function reinitialiserTousLesFiltres() {
         clearTrajectoire();
         renderPoints(locationsEnrichies, false);
         mettreAJourPanneau(locationsEnrichies);
+        mettreAJourIndividus(animals.filter(a => locationsEnrichies.some(l => String(l.ani_id) === String(a.ani_id))));
         document.getElementById('positionsCount').textContent = locations.length;
         mettreAJourLegende();
       } catch (err) {
