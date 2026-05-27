@@ -27,15 +27,17 @@ let sensTriee = 'asc';
 let panneauFermeManuel = false;
 
 const colonnesIndividus = [
-  { key: 'ani_nom', label: 'Individu', defaut: true },
-  { key: 'ani_id', label: 'ID', defaut: true },
-  { key: 'ani_sexe', label: 'Sexe', defaut: true },
-  { key: 'ani_pop_rattach', label: 'Population', defaut: true },
-  { key: 'ani_gestionnaire', label: 'Gestionnaire', defaut: true },
-  { key: 'ani_annee_naissance', label: 'Année naissance', defaut: false },
-  { key: 'ani_code', label: 'Code', defaut: false },
-  { key: 'ani_date_relache', label: 'Date lâcher', defaut: false },
-  { key: 'ani_date_mort', label: 'Date mort', defaut: false }
+  { key: 'ani_nom',             label: 'Individu',          defaut: true  },
+  { key: 'ani_id',              label: 'ID',                defaut: true  },
+  { key: 'ani_sexe',            label: 'Sexe',              defaut: true  },
+  { key: 'ani_pop_rattach',     label: 'Population',        defaut: true  },
+  { key: 'ani_gestionnaire',    label: 'Gestionnaire',      defaut: true  },
+  { key: 'ani_annee_naissance', label: 'Année naissance',   defaut: false },
+  { key: 'premiere_position',   label: 'Première position', defaut: false },
+  { key: 'derniere_position',   label: 'Dernière position', defaut: false },
+  { key: 'ani_code',            label: 'Code',              defaut: false },
+  { key: 'ani_date_relache',    label: 'Date lâcher',       defaut: false },
+  { key: 'ani_date_mort',       label: 'Date mort',         defaut: false }
 ];
 
 let colonnesIndividusActives = colonnesIndividus.filter(c => c.defaut).map(c => c.key);
@@ -61,10 +63,10 @@ export function initPanneau() {
 
   sidebarRightBody.innerHTML = `
     <div class="panel-tabs">
-      <button class="panel-tab active" id="tabDonnees">Données</button>
-      <button class="panel-tab" id="tabIndividus">Individus observés</button>
+      <button class="panel-tab active" id="tabIndividus">Individus observés</button>
+      <button class="panel-tab" id="tabDonnees">Données</button>
     </div>
-    <div class="panel-tab-content" id="panelContentDonnees">
+    <div class="panel-tab-content" id="panelContentDonnees" style="display:none">
       <div class="panel-toolbar">
         <div style="position:relative; margin-left:auto;">
           <button class="panel-btn-filtres" id="panelBtnFiltres">
@@ -104,7 +106,7 @@ export function initPanneau() {
         </div>
       </div>
     </div>
-    <div class="panel-tab-content" id="panelContentIndividus" style="display:none">
+    <div class="panel-tab-content" id="panelContentIndividus" style="display:flex">
       <div class="panel-toolbar">
         <div style="position:relative; margin-left:auto;">
           <button class="panel-btn-filtres" id="panelBtnFiltresIndividus">
@@ -217,18 +219,19 @@ export function initPanneau() {
   const tabDonnees = sidebarRightBody.querySelector('#tabDonnees');
   const tabIndividus = sidebarRightBody.querySelector('#tabIndividus');
 
+  tabIndividus?.addEventListener('click', () => {
+    tabIndividus.classList.add('active');
+    tabDonnees?.classList.remove('active');
+    document.getElementById('panelContentIndividus').style.display = 'flex';
+    document.getElementById('panelContentDonnees').style.display = 'none';
+  });
+
   tabDonnees?.addEventListener('click', () => {
     tabDonnees.classList.add('active');
     tabIndividus?.classList.remove('active');
     document.getElementById('panelContentDonnees').style.display = 'flex';
     document.getElementById('panelContentIndividus').style.display = 'none';
-  });
-
-  tabIndividus?.addEventListener('click', () => {
-    tabIndividus.classList.add('active');
-    tabDonnees?.classList.remove('active');
-    document.getElementById('panelContentDonnees').style.display = 'none';
-    document.getElementById('panelContentIndividus').style.display = 'flex';
+    mettreAJourColonnes();
   });
 
   const pageSizeSelect = document.getElementById('panelPageSizeSelect');
@@ -404,18 +407,28 @@ function rendrePage() {
     const loc = page[index];
     if (!loc) return;
 
-    // Survol — grossir le point
+    // Survol — grossir le point (mode Positions uniquement)
     tr.addEventListener('mouseenter', () => {
-      if (window._highlightPoint) window._highlightPoint(loc.ani_id, true);
+      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+      if (!isTrajectoire && window._highlightPoint) window._highlightPoint(loc.ani_id, true);
     });
 
     tr.addEventListener('mouseleave', () => {
-      if (window._highlightPoint) window._highlightPoint(loc.ani_id, false);
+      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+      if (!isTrajectoire && window._highlightPoint) window._highlightPoint(loc.ani_id, false);
     });
 
-    // Clic — zoom + popup
+    // Clic — zoom sans popup
     tr.addEventListener('click', () => {
-      if (window._zoomToPoint) window._zoomToPoint(loc);
+      if (window._zoomToPoint) {
+        const features = window._getGpsFeatures?.();
+        const feature = features?.find(f => String(f.get('ani_id')) === String(loc.ani_id));
+        if (!feature) return;
+        const coord = feature.getGeometry()?.getCoordinates();
+        if (coord && window._getMap) {
+          window._getMap().getView().animate({ center: coord, zoom: window._ZOOM_POINT_SINGLE, duration: 400 });
+        }
+      }
     });
   });
 
@@ -701,11 +714,13 @@ function rendrePageIndividus() {
     const aniId = tr.dataset.aniId;
 
     tr.addEventListener('mouseenter', () => {
-      if (window._highlightPoint) window._highlightPoint(aniId, true);
+      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+      if (!isTrajectoire && window._highlightPoint) window._highlightPoint(aniId, true);
     });
 
     tr.addEventListener('mouseleave', () => {
-      if (window._highlightPoint) window._highlightPoint(aniId, false);
+      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+      if (!isTrajectoire && window._highlightPoint) window._highlightPoint(aniId, false);
     });
 
     tr.addEventListener('click', () => {
@@ -724,6 +739,9 @@ function formaterValeurIndividu(key, valeur) {
     case 'ani_date_relache':
     case 'ani_date_mort':
       return valeur ? valeur.slice(0, 10) : '-';
+    case 'premiere_position':
+    case 'derniere_position':
+      return valeur ? valeur.replace('T', ' ').slice(0, 16) : '-';
     default:
       return valeur;
   }
@@ -802,6 +820,10 @@ export function ouvrirPanneauSiNecessaire() {
   if (sidebarRight && !sidebarRight.classList.contains('visible')) {
     sidebarRight.classList.add('visible');
     if (icon) icon.textContent = '›';
+    document.getElementById('tabIndividus')?.classList.add('active');
+    document.getElementById('tabDonnees')?.classList.remove('active');
+    document.getElementById('panelContentIndividus').style.display = 'flex';
+    document.getElementById('panelContentDonnees').style.display = 'none';
   }
 }
 
