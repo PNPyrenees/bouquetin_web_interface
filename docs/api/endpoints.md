@@ -30,27 +30,27 @@ GET /v_localisation?ani_pop_rattach=eq.Cagateille
 Valeurs disponibles : Aspe, Aure, Beas, Cagateille, Cauterets, Gedre, 
 Ossese, PNRPA_Massat, Soulcem
 
-### Mode Positions avec période — dernière position par animal
+### Mode Positions avec période - dernière position par animal
 Une requête par animal sélectionné via `Promise.all()` :
 ```
 GET /v_localisation?ani_id=eq.{id}&geom=not.is.null&loc_datetime_local=gte.{date_from}&loc_datetime_local=lte.{date_to}&loc_anomalie=not.is.true&loc_outlier=is.null&order=loc_datetime_local.desc&limit=1
 ```
-Utilisé par `fetchLastLocationsParPeriode()` — renvoie une position par individu sur la plage sélectionnée.
+Utilisé par `fetchLastLocationsParPeriode()` - renvoie une position par individu sur la plage sélectionnée.
 
-### Filtrage de la liste d'individus par période — IDs distincts
+### Filtrage de la liste d'individus par période - IDs distincts
 Une seule requête pour récupérer les `ani_id` distincts ayant des données sur une période :
 ```
 GET /v_localisation?select=ani_id&geom=not.is.null&loc_anomalie=not.is.true&loc_outlier=is.null&loc_datetime_local=gte.{date_from}&loc_datetime_local=lte.{date_to}
 ```
 Header supplémentaire : `Prefer: count=none`  
-Utilisé par `fetchAnimalIdsParPeriode()` — permet de masquer dans la liste les individus sans données sur la période choisie sans recharger la carte.  
+Utilisé par `fetchAnimalIdsParPeriode()` - permet de masquer dans la liste les individus sans données sur la période choisie sans recharger la carte.  
 Filtres qualité appliqués par défaut (`loc_anomalie=not.is.true&loc_outlier=is.null`), retirés si `include_outliers: true` est passé dans les filtres.
 
-### Programmations GPS — association animal ↔ programme
+### Programmations GPS - association animal ↔ programme
 ```
 GET /cor_animal_capteur?select=ani_id,prog_id,cor_date_debut&prog_id=not.is.null&order=cor_date_debut.desc
 ```
-Utilisé par `fetchProgrammations()` — construit une `Map(ani_id → prog_id)` pour le filtre "Programmation GPS" dans la sidebar.  
+Utilisé par `fetchProgrammations()` - construit une `Map(ani_id → prog_id)` pour le filtre "Programmation GPS" dans la sidebar.  
 Valeurs `prog_id` : 1 (12 locs/j 180s), 2 (24 locs/j 70s), 3 (4 locs/j 90s), 4 (12 locs/j 120s), 5 (6 locs/j 90s), 6 (6 locs/j 90s)
 
 ### Mode Trajectoire - logique des requêtes
