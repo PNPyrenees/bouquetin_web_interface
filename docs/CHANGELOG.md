@@ -2,23 +2,44 @@
 
 ## [0.11.0] - 2026-05-27
 
-### Added
-- **Onglet 'Individus observés'** dans le panneau droit - tableau synthétique par animal avec colonnes configurables (Individu, ID, Sexe, Population, Gestionnaire, Année naissance + optionnelles : Code, Date lâcher, Date mort)
-- **Synchronisation carte vers Individus observés** - le tableau se met à jour après chaque `applyFilters()` avec uniquement les animaux visibles sur la carte
-- **Clic sur une ligne 'Individus observés'** - zoom sur le point de l'animal sur la carte (sans filtrer)
-- **Survol d'une ligne 'Individus observés'** - grossissement du point sur la carte (`highlightPoint`)
-- **`#mapScreen.panel-open`** - la carte se réduit quand le panneau droit s'ouvre, les éléments bas droite restent visibles
+### Ajouts
+- Onglet 'Individus observés' dans le panneau droit — tableau synthétique par animal avec colonnes configurables (Individu, ID, Sexe, Population, Gestionnaire + optionnelles : Année naissance, Première position, Dernière position, Code, Date lâcher, Date mort)
+- Synchronisation carte ↔ panneau droit — les deux onglets se mettent à jour après chaque application de filtres avec uniquement les animaux/positions visibles sur la carte
+- Clic sur une ligne 'Individus observés' → zoom sur le point de l'animal sans filtrer la carte
+- Survol d'une ligne tableau (mode Positions uniquement) → grossissement du point sur la carte
+- `#mapScreen.panel-open` — la carte se réduit quand le panneau droit s'ouvre, les éléments bas droite restent visibles
+- Colonnes 'Première position' et 'Dernière position' calculées côté JS dans l'onglet Individus observés
+- Fonction utilitaire `enrichirAnimauxAvecPositions()` dans `app.js`
+- Constantes de zoom centralisées dans `config.js` : `ZOOM_POINT_SINGLE`, `ZOOM_FILTER_SINGLE`, `ZOOM_FILTER_MULTI`, `ZOOM_TRAJECTOIRE_SINGLE`, `ZOOM_TRAJECTOIRE_MULTI`, `ZOOM_MAX_MANUAL`, `ZOOM_MIN_MANUAL`
+- Limites de zoom manuel définies dans la vue OpenLayers (`minZoom`, `maxZoom`)
+- Stylisation personnalisée du popup cartographique dans `map.css` (fond blanc, ombre, typographie, taille min/max)
+- Ajout de variables globales de commodité sur `window` (`_getMap`, `_getGpsFeatures`, `_ZOOM_POINT_SINGLE`)
 
-### Changed
-- `mettreAJourIndividus()` appelé après `renderPoints()` dans `startApp()` - synchronisé avec les points affichés sur la carte
-- `window._afficherPositionsIndividu` simplifié - zoom uniquement sur le point sans filtrer la carte
-- `initSidebarRight()` - listener unifié pour le toggle (suppression du doublon) + appel `updateMapSize()` après transition
+### Modifications
+- Onglet 'Individus observés' affiché en premier dans le panneau droit
+- `ouvrirPanneauSiNecessaire()` ouvre sur l'onglet 'Individus observés' par défaut
 - Colonnes par défaut de l'onglet 'Données' : ID, Dernière position, Altitude, Temp. (°C)
-- `formaterValeur()` - fallback `loc_date_local` si `loc_datetime_local` est null
+- `formaterValeur()` — fallback `loc_date_local` si `loc_datetime_local` est null
+- `mettreAJourIndividus()` appelé après `renderPoints()` dans `startApp()` — synchronisé avec les points affichés
+- `window._afficherPositionsIndividu` simplifié — zoom uniquement sur le point sans filtrer la carte
+- Listener toggle sidebar droite unifié — suppression du doublon, ajout `updateMapSize()` après transition
+- Popup retiré au clic sur une ligne tableau — uniquement au clic sur un point carte
+- Popup fermé au déplacement manuel de la carte (`movestart`) sans interférer avec les animations programmatiques
+- Popup uniquement sur les points GPS — ignoré sur les lignes de trajectoire et flèches directionnelles
+- Contour blanc retiré des points GPS en mode Positions et Trajectoire
+- Tous les niveaux de zoom hardcodés remplacés par les constantes de `config.js`
+- `mettreAJourIndividus(animals.filter(...))` remplacé par `enrichirAnimauxAvecPositions(locations)` dans les trois occurrences de `applyFilters()` et `reinitialiserTousLesFiltres()`
+- Survol désactivé en mode Trajectoire pour éviter le sautillement des points
+- Offset vertical du popup augmenté de -10 à -16 dans `map.js`
+- Clic sur l'onglet 'Données' appelle `mettreAJourColonnes()` pour rafraîchir l'affichage
+- Formatage spécifique des dates de première et dernière position dans `formaterValeurIndividu()`
+- Ajout de la classe `.panel-open` à `#mapScreen` et redimensionnement de la carte lors du filtrage dans tous les modes
+- Limite de positions par segment ramenée de 500 à 10 lors du chargement des trajectoires sans période
+- Inversion de l'ordre des onglets dans `index.html` pour cohérence avec l'ordre par défaut
 
-### Fixed
-- Double listener sur `sidebarRightToggle` - fusionné en un seul bloc
-- `mettreAJourIndividus` appelé trop tôt - déplacé après `renderPoints()`
+### Corrections
+- Double listener sur `sidebarRightToggle` fusionné en un seul bloc
+- `MIN_ZOOM` non importé dans `map.js` causant carte blanche — remplacé par `ZOOM_MIN_MANUAL`
 
 ## [0.10.0] - 2026-05-26
 
