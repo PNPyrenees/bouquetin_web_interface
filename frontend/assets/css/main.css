@@ -815,6 +815,10 @@ details[open] summary::after {
   border-color: #aaa;
 }
 
+.basemap-card:hover span {
+  color: var(--color-text);
+}
+
 /* Zoom remonté */
 .ol-zoom-custom {
   position: absolute;
