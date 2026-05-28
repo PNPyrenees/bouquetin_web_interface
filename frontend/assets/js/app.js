@@ -863,68 +863,40 @@ function unlockSidebar() {
  * Cache ou affiche les éléments en fonction de l'attribut data-classe
  */
 function initBasemapSelector() {
-  const btnLayers = document.getElementById('btnLayers');
-  const layersModal = document.getElementById('layersModal');
-  const layersModalClose = document.getElementById('layersModalClose');
-  const layersGrid = document.getElementById('layersGrid');
-
-  // Définition des fonds de carte
-  const basemapsList = [
-    {
-      index: 0,
-      nom: 'SCAN25 IGN',
-      apercu: 'assets/img/ign.png'
-    },
-    {
-      index: 1,
-      nom: 'OpenTopoMap',
-      apercu: 'assets/img/opentopomap.png'
-    },
-    {
-      index: 2,
-      nom: 'OpenStreetMap',
-      apercu: 'assets/img/openstreetmap.png'
-    }
+  const basemaps = [
+    { index: 0, nom: 'IGN SCAN25',    apercu: 'assets/img/ign.png' },
+    { index: 1, nom: 'OpenTopoMap',   apercu: 'assets/img/opentopomap.png' },
+    { index: 2, nom: 'OpenStreetMap', apercu: 'assets/img/openstreetmap.png' }
   ];
 
-  // Rendu des vignettes
-  if (layersGrid) {
-    layersGrid.innerHTML = '';
-    basemapsList.forEach(bm => {
-      const card = document.createElement('div');
-      card.className = 'layers-card';
-      card.dataset.index = bm.index;
-      if (bm.index === 0) card.classList.add('active');
+  const basemapActive = document.getElementById('basemapActive');
+  const basemapOptions = document.getElementById('basemapOptions');
+  const activeImg = document.getElementById('basemapActiveImg');
+  const activeLabel = document.getElementById('basemapActiveLabel');
 
-      card.innerHTML = `
-        <div class="layers-card-img">
-          <img src="${bm.apercu}" alt="${bm.nom}" onerror="this.style.background='#eee'">
-        </div>
-        <div class="layers-card-label">${bm.nom}</div>
-      `;
-
-      card.addEventListener('click', () => {
-        document.querySelectorAll('.layers-card').forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        switchBasemap(bm.index);
-        layersModal.style.display = 'none';
-      });
-
-      layersGrid.appendChild(card);
-    });
-  }
-
-  btnLayers?.addEventListener('click', (e) => {
+  basemapActive?.addEventListener('click', (e) => {
     e.stopPropagation();
-    layersModal.style.display = layersModal.style.display === 'none' ? 'flex' : 'none';
+    basemapOptions.classList.toggle('open');
   });
 
-  layersModalClose?.addEventListener('click', () => {
-    layersModal.style.display = 'none';
+  document.querySelectorAll('.basemap-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const index = parseInt(card.dataset.index);
+      const bm = basemaps[index];
+
+      activeImg.src = bm.apercu;
+      activeLabel.textContent = bm.nom;
+
+      document.querySelectorAll('.basemap-card').forEach(c => c.classList.remove('active'));
+      card.classList.add('active');
+
+      switchBasemap(index);
+      basemapOptions.classList.remove('open');
+    });
   });
 
-  layersModal?.addEventListener('click', (e) => {
-    if (e.target === layersModal) layersModal.style.display = 'none';
+  document.addEventListener('click', () => {
+    basemapOptions.classList.remove('open');
   });
 }
 
