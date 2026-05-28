@@ -8,7 +8,7 @@ Cette interface permet aux agents du Parc National des Pyrénées de :
 - Visualiser les positions GPS des bouquetins sur une carte (OpenLayers)
 - Filtrer les données par individu, période, secteur géographique et qualité GPS
 - Consulter les données attributaires dans un panneau interactif
-- Saisir de nouveaux individus et capteurs (utilisateurs BDD-writer uniquement)
+- Saisir de nouveaux individus et capteurs
 - Exporter les données filtrées (CSV, GeoJSON, PDF)
 
 ## Stack technique
