@@ -533,6 +533,11 @@
   border-color: var(--color-primary);
 }
 
+.panel-page-btn.active:hover {
+  background: var(--color-primary-hover);
+  color: white;
+}
+
 .panel-page-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
