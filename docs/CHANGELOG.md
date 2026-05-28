@@ -2,17 +2,25 @@
 
 ## [0.12.0] - 2026-05-28
 
+### Ajouts
+- Sélecteur de fonds de carte style Google Maps - vignette active toujours visible, menu qui s'ouvre vers la gauche avec transition scale + opacity
+- Vignettes agrandies (64px), bordure verte sur le fond actif, noms réels affichés : IGN SCAN25, OpenTopoMap, OpenStreetMap
+- Mise à jour `config.example.js` - ajout constantes de zoom et DEV_PASSWORD
+- Nouveau module `filters.js` - regroupe toute la logique de filtrage extraite de `app.js`
+
 ### Modifications
-- Selecteur de fonds de carte refait style Google Maps - vignette active toujours visible, menu qui s'ouvre vers la gauche avec transition `scale` + `opacity`
-- Vignettes agrandies (64px), bordure verte sur le fond actif
-- Noms reels affiches : IGN SCAN25, OpenTopoMap, OpenStreetMap
-- Zoom OpenLayers remonte (`bottom: 180px`) pour ne plus etre masque par le selecteur
-- Suppression de la modal `#layersModal` et de tous ses styles associes
+- Retrait du cache-busting `?v=1.1.0` de tous les imports JS et CSS
+- Variables partagées `animals`, `activeIds`, `currentToken`, `programmationsMap` accessibles via getters/setters exportés depuis `app.js`
+- Zoom OpenLayers remonté (`bottom: 180px`) pour ne plus être masqué par le sélecteur de fonds de carte
+- Suppression de la modal `#layersModal` et de tous ses styles associés
+- `app.js` allégé - logique de filtrage déplacée dans `filters.js`
 
 ### Corrections
-- Contour blanc retire des points GPS en mode Positions et Trajectoire
-- Popup masque au deplacement manuel de la carte sans interferer avec les animations
-- Popup ignore sur les lignes de trajectoire et fleches directionnelles
+- Recherche textuelle filtre uniquement parmi les animaux de la période sélectionnée
+- Listener `searchIndividu` simplifié - délègue entièrement à `mettreAJourListeParDate()`
+- Suppression du listener `input` sur les dates - seul `change` conservé car `<input type=date>` ne retourne pas `value` pendant la frappe manuelle
+- Double listener `searchIndividu` supprimé
+- Imports ES6 de variables `let` non réactifs entre modules - remplacés par getters/setters
 
 ## [0.11.0] - 2026-05-27
 
