@@ -214,22 +214,32 @@
       <button id="btnPositions" class="mode-btn active">Positions</button>
       <button id="btnTrajectoire" class="mode-btn">Trajectoire</button>
     </div>
-    <div id="mapLayersWrapper">
-      <button id="btnLayers" class="btn-layers-bottom">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="white">
-          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-        </svg>
-      </button>
-      <div id="layersModal" class="layers-modal" style="display:none">
-        <div class="layers-modal-content">
-          <div class="layers-modal-header">
-            <span>Fonds de carte</span>
-            <button class="layers-modal-close" id="layersModalClose">×</button>
+    <div id="basemapSelector">
+      <div id="basemapOptions">
+        <div class="basemap-card active" data-index="0">
+          <div class="basemap-card-img">
+            <img src="assets/img/ign.png" alt="Plan">
           </div>
-          <div class="layers-modal-grid" id="layersGrid">
-            <!-- Vignettes dynamiques -->
-          </div>
+          <span>IGN SCAN25</span>
         </div>
+        <div class="basemap-card" data-index="1">
+          <div class="basemap-card-img">
+            <img src="assets/img/opentopomap.png" alt="Relief">
+          </div>
+          <span>OpenTopoMap</span>
+        </div>
+        <div class="basemap-card" data-index="2">
+          <div class="basemap-card-img">
+            <img src="assets/img/openstreetmap.png" alt="Standard">
+          </div>
+          <span>OpenStreetMap</span>
+        </div>
+      </div>
+      <div id="basemapActive">
+        <div class="basemap-card-img">
+          <img id="basemapActiveImg" src="assets/img/ign.png" alt="Plan">
+        </div>
+        <span id="basemapActiveLabel">Fond de carte</span>
       </div>
     </div>
     <div id="popup"></div>
