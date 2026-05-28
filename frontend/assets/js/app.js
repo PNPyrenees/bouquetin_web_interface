@@ -1,7 +1,8 @@
-import { login, fetchAnimals, fetchLocations, fetchLastLocations, fetchLastLocationsInactifs, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations } from './api.js?v=1.1.0';
-import { ROLES, DEV_PASSWORD, ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI } from './config.js?v=1.1.0';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js?v=1.1.0';
+import { login, fetchAnimals, fetchLocations, fetchLastLocations, fetchLastLocationsInactifs, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations } from './api.js';
+import { ROLES, DEV_PASSWORD, ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL } from './config.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus } from './panel.js';
+import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse } from './filters.js';
 
 const DEV_MODE = true;
 
@@ -16,12 +17,21 @@ let currentToken = null;
 const anneeActuelle = new Date().getFullYear();
 const programmationsMap = new Map(); // ani_id → prog_id
 
+export function getAnimals() { return animals; }
+export function getActiveIds() { return activeIds; }
+export function getCurrentToken() { return currentToken; }
+export function getProgrammationsMap() { return programmationsMap; }
+
+export function setAnimals(val) { animals = val; }
+export function setActiveIds(val) { activeIds = val; }
+export function setCurrentToken(val) { currentToken = val; }
+
 /**
  * ENRICHISSEMENT DES DONNÉES
  * Les tables de positions GPS ne contiennent pas toujours les métadonnées (sexe, etc.).
  * Cette fonction fusionne les positions avec les informations de la table t_animal.
  */
-function enrichirLocations(locations) {
+export function enrichirLocations(locations) {
   return locations.map(loc => {
     const ani = animals.find(a => String(a.ani_id) === String(loc.ani_id));
     return {
@@ -33,7 +43,7 @@ function enrichirLocations(locations) {
   });
 }
 
-function enrichirAnimauxAvecPositions(locations) {
+export function enrichirAnimauxAvecPositions(locations) {
   return animals
     .filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id)))
     .map(a => {
@@ -142,10 +152,10 @@ async function startApp(token) {
     };
 
     // Récupération des données depuis l'API via le module api.js
-    animals = await fetchAnimals(token);
+    setAnimals(await fetchAnimals(token));
     console.log('Premier individu :', animals[0]);
 
-    currentToken = token;
+    setCurrentToken(token);
 
     const programmations = await fetchProgrammations(token);
     programmations.forEach(p => {
@@ -176,7 +186,7 @@ async function startApp(token) {
 
 
 
-    activeIds = new Set(actifs.map(l => l.ani_id));
+    setActiveIds(new Set(actifs.map(l => l.ani_id)));
 
     // Identifier tous les animaux qui ont au moins une géométrie
     const idsAvecGeom = new Set([
@@ -202,6 +212,7 @@ async function startApp(token) {
           label.dataset.sexe = ani.ani_sexe || '';
           label.dataset.gestionnaire = ani.ani_gestionnaire || '';
           label.dataset.population = ani.ani_pop_rattach || '';
+          label.dataset.masqueParDate = 'false';
 
           label.innerHTML = `<input type="checkbox" value="${ani.ani_id}"> ${ani.ani_nom}`;
 
@@ -260,18 +271,9 @@ async function startApp(token) {
     }
 
     // Champ de recherche textuelle pour filtrer les noms d'individus
-    searchIndividu.addEventListener('input', (e) => {
-      const val = e.target.value.toLowerCase().trim();
-      listeIndividus.querySelectorAll('.checkbox-label').forEach(label => {
-        if (label.dataset.sansGeom === 'true') {
-          label.style.display = 'none';
-          return;
-        }
-        const match = label.textContent.toLowerCase().includes(val);
-        label.style.display = match ? 'flex' : 'none';
-      });
+    searchIndividu.addEventListener('input', () => {
+      mettreAJourListeParDate();
     });
-
     // Initialisation de la logique des badges pour tous les autres filtres de la sidebar
     initSidebarBadges(token);
     // Initialisation du sélecteur de fond de carte
@@ -358,14 +360,12 @@ function initSidebarBadges(token) {
     const annee = parseInt(valeur.split('-')[0]);
     return annee >= 1900 && annee <= 2100;
   }
-  let dateDebounceTimer = null;
-
   ['dateFrom', 'dateTo'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const prefix = id === 'dateFrom' ? 'Du ' : 'Au ';
 
-    // Événement change — souris ou touche Tab
+    // Événement change — fonctionne à la fois avec le sélecteur et la saisie manuelle (au blur)
     el.addEventListener('change', () => {
       supprimerBadgeById(id);
       if (el.value && estDateValide(el.value)) {
@@ -378,25 +378,6 @@ function initSidebarBadges(token) {
       } else if (!el.value) {
         mettreAJourListeParDate();
       }
-    });
-
-    // Événement input — saisie manuelle avec debounce
-    el.addEventListener('input', () => {
-      clearTimeout(dateDebounceTimer);
-      dateDebounceTimer = setTimeout(() => {
-        // Ne lancer que si la date est complète ou vide
-        if (!el.value || estDateValide(el.value)) {
-          supprimerBadgeById(id);
-          if (el.value) {
-            const [y, m, d] = el.value.split('-');
-            ajouterBadge(`${prefix}${d}/${m}/${y}`, () => {
-              el.value = '';
-              mettreAJourListeParDate();
-            }, id);
-          }
-          mettreAJourListeParDate();
-        }
-      }, 800);
     });
   });
 
@@ -529,312 +510,17 @@ function initSidebarBadges(token) {
 
 }
 
-/**
- * APPLICATION DES FILTRES
- * Récupère les données filtrées depuis l'API et met à jour la carte.
- */
-async function applyFilters(token) {
-  const btnApply = document.getElementById('btnApplyFilters');
-  showMapLoading();
-  lockSidebar();
-
-  // Collecte des filtres
-  const filters = {
-    ani_id: Array.from(document.querySelectorAll('#listeIndividus input:checked')).map(cb => cb.value),
-    date_from: document.getElementById('dateFrom').value,
-    date_to: document.getElementById('dateTo').value,
-    sexe: document.getElementById('selectSexe').value,
-    gestionnaire: document.getElementById('selectGestionnaire').value,
-    population: document.getElementById('selectPopulation').value,
-    include_outliers: document.getElementById('checkAberrantes')?.checked || false,
-    programmation: document.getElementById('selectProgrammation').value
-  };
-
-  if (btnApply) {
-    btnApply.disabled = true;
-    btnApply.textContent = 'Chargement...';
-  }
-
-  try {
-    const isPositionMode = document.getElementById('btnPositions').classList.contains('active');
-    const selectedIds = filters.ani_id;
-    const suivisSeulement = document.getElementById('checkSuivis')?.checked || false;
-
-    let locations;
-
-    if (isPositionMode) {
-      // Si une date est sélectionnée → filtrer par période
-      if (filters.date_from || filters.date_to) {
-        console.log('Mode période détecté — date_from:', filters.date_from, 'date_to:', filters.date_to);
-
-        const idsAInterroger = selectedIds.length > 0
-          ? selectedIds
-          : animals.map(a => String(a.ani_id));
-
-        console.log('IDs à interroger:', idsAInterroger.length);
-
-        locations = await fetchLastLocationsParPeriode(token, {
-          ani_id: idsAInterroger,
-          date_from: filters.date_from,
-          date_to: filters.date_to,
-          sexe: filters.sexe,
-          gestionnaire: filters.gestionnaire,
-          population: filters.population,
-          include_outliers: filters.include_outliers
-        });
-
-        console.log('Locations retournées:', locations.length);
-
-        locations = enrichirLocations(locations);
-
-        clearMapPoints();
-        const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-        const count = renderPoints(locations, true, false, modeCouleur);
-        mettreAJourPanneau(locations);
-        mettreAJourIndividus(enrichirAnimauxAvecPositions(locations));
-        ouvrirPanneauSiNecessaire();
-        const mapScreen = document.getElementById('mapScreen');
-        if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
-          mapScreen?.classList.add('panel-open');
-          setTimeout(() => updateMapSize(), 310);
-        }
-        document.getElementById('positionsCount').textContent = count;
-        mettreAJourLegende();
-        setLabelDatetime('Date/Heure');
-
-        const extent = getGpsSource().getExtent();
-        if (selectedIds.length === 1 && locations.length > 0) {
-          const loc = locations[0];
-          const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
-          if (geom?.coordinates) {
-            const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
-            const coord = ol.proj.fromLonLat(wgs84);
-            getMap().getView().animate({ center: coord, zoom: ZOOM_FILTER_SINGLE, duration: 400 });
-          }
-        } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
-        }
-
-        return; // ← sortir du bloc isPositionMode
-      }
-
-      const fetchParams = {
-        ani_id: selectedIds,
-        sexe: filters.sexe,
-        gestionnaire: filters.gestionnaire,
-        population: filters.population,
-        include_outliers: filters.include_outliers
-      };
-
-      if (suivisSeulement) {
-        locations = await fetchLastLocations(token, fetchParams);
-        if (filters.sexe) {
-          locations = locations.filter(l => {
-            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_sexe === filters.sexe;
-          });
-        }
-        if (filters.gestionnaire) {
-          locations = locations.filter(l => {
-            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_gestionnaire === filters.gestionnaire;
-          });
-        }
-        if (filters.population) {
-          locations = locations.filter(l => {
-            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_pop_rattach === filters.population;
-          });
-        }
-      } else {
-        // Tous — actifs + inactifs
-        const actifs = await fetchLastLocations(token, fetchParams);
-        const actifsIds = new Set(actifs.map(l => String(l.ani_id)));
-        const inactifsIds = animals
-          .filter(a => !actifsIds.has(String(a.ani_id)))
-          .map(a => String(a.ani_id));
-        const inactifs = await fetchLastLocationsInactifs(token, {
-          ...fetchParams,
-          ani_id: selectedIds.length > 0 ? selectedIds : inactifsIds
-        });
-        let actifsFiltered = actifs;
-        if (filters.sexe) {
-          actifsFiltered = actifsFiltered.filter(l => {
-            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_sexe === filters.sexe;
-          });
-        }
-        if (filters.gestionnaire) {
-          actifsFiltered = actifsFiltered.filter(l => {
-            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_gestionnaire === filters.gestionnaire;
-          });
-        }
-        if (filters.population) {
-          actifsFiltered = actifsFiltered.filter(l => {
-            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_pop_rattach === filters.population;
-          });
-        }
-        const seen = new Set(actifsFiltered.map(l => l.ani_id));
-
-        // Filtrer aussi les inactifs par population côté client si nécessaire
-        let inactifsFiltered = inactifs;
-        if (filters.population) {
-          inactifsFiltered = inactifsFiltered.filter(l => {
-            const ani = animals.find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_pop_rattach === filters.population;
-          });
-        }
-
-        locations = [...actifsFiltered, ...inactifsFiltered.filter(l => !seen.has(l.ani_id))];
-      }
-      if (filters.programmation) {
-        locations = locations.filter(l =>
-          String(programmationsMap.get(String(l.ani_id))) === filters.programmation
-        );
-      }
-      locations = enrichirLocations(locations);
-      clearMapPoints();
-      const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-      const count = renderPoints(locations, true, false, modeCouleur);
-      mettreAJourPanneau(locations);
-      mettreAJourIndividus(animals.filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
-      ouvrirPanneauSiNecessaire();
-      const mapScreen = document.getElementById('mapScreen');
-      if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
-        mapScreen?.classList.add('panel-open');
-        setTimeout(() => updateMapSize(), 310);
-      }
-      document.getElementById('positionsCount').textContent = count;
-      mettreAJourLegende();
-      setLabelDatetime('Dernière position');
-
-      const extent = getGpsSource().getExtent();
-      if (selectedIds.length === 1 && locations.length > 0) {
-        // 1 individu → zoom vers son point
-        const loc = locations[0];
-        const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
-        if (geom?.coordinates) {
-          const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
-          const coord = ol.proj.fromLonLat(wgs84);
-          getMap().getView().animate({ center: coord, zoom: ZOOM_FILTER_SINGLE, duration: 400 });
-        }
-      } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
-        // Plusieurs points → zoom adaptatif pour tous les voir
-        getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
-      }
-    } else {
-      // Mode Trajectoire — on ne vide pas les points existants
-      if (filters.date_from && filters.date_to) {
-        // Avec période → une seule requête, toutes les positions sur la plage
-        const trajFilters = {
-          ...filters,
-          limit: 999999
-        };
-        locations = await fetchLocations(token, trajFilters);
-      } else {
-        // Sans période → 100 dernières positions PAR individu sélectionné
-        if (selectedIds.length === 0) {
-          showToast('Sélectionnez un individu pour afficher sa trajectoire');
-          hideMapLoading();
-          unlockSidebar();
-          if (btnApply) {
-            btnApply.disabled = false;
-            btnApply.textContent = 'Appliquer les filtres';
-          }
-          return;
-        }
-
-        if (filters.include_outliers && (!filters.date_from || !filters.date_to)) {
-          showToast('Veuillez sélectionner une période');
-          filters.include_outliers = false;
-        }
-
-        const promises = selectedIds.map(async id => {
-          // Requête 1 — positions valides
-          const valides = await fetchLocations(token, {
-            ...filters,
-            ani_id: [id],
-            limit: 10,
-            include_outliers: false
-          });
-
-          // Requête 2 — outliers uniquement si case cochée
-          let outliers = [];
-          if (filters.include_outliers) {
-            const toutesPositions = await fetchLocations(token, {
-              ...filters,
-              ani_id: [id],
-              limit: 999999,
-              include_outliers: true,
-              only_outliers: true
-            });
-            outliers = toutesPositions.filter(l =>
-              l.loc_outlier !== null || l.loc_anomalie === true
-            );
-          }
-
-          return [...valides, ...outliers];
-        });
-
-        const results = await Promise.all(promises);
-        locations = results.flat();
-      }
-      locations = enrichirLocations(locations);
-      clearMapPoints();
-      clearTrajectoire();
-      const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-      const count = renderPoints(locations, true, true, modeCouleur);
-      mettreAJourPanneau(locations);
-      mettreAJourIndividus(animals.filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
-      ouvrirPanneauSiNecessaire();
-      const mapScreenTraj = document.getElementById('mapScreen');
-      if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
-        mapScreenTraj?.classList.add('panel-open');
-        setTimeout(() => updateMapSize(), 310);
-      }
-      renderTrajectoire(locations, modeCouleur);
-      document.getElementById('positionsCount').textContent = count;
-      mettreAJourLegende();
-
-      setTimeout(() => {
-        const extent = getGpsSource().getExtent();
-        if (!extent || ol.extent.isEmpty(extent)) return;
-        if (selectedIds.length === 1) {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
-        } else if (selectedIds.length > 1) {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
-        }
-      }, 300);
-    }
-
-  } catch (err) {
-    console.error('Erreur filtrage:', err);
-    alert('Erreur lors du chargement des données');
-  } finally {
-    hideMapLoading();
-    unlockSidebar();
-    if (btnApply) {
-      btnApply.disabled = false;
-      btnApply.textContent = 'Appliquer les filtres';
-    }
-
-  }
-
-}
-
-function showMapLoading() {
+export function showMapLoading() {
   const el = document.getElementById('mapLoading');
   if (el) el.style.display = 'flex';
 }
 
-function hideMapLoading() {
+export function hideMapLoading() {
   const el = document.getElementById('mapLoading');
   if (el) el.style.display = 'none';
 }
 
-function lockSidebar() {
+export function lockSidebar() {
   document.querySelectorAll('.sidebar-input, .sidebar-select, .checkbox-label input, input[name="statutCollier"], #checkSuivis, #searchIndividu, #btnApplyFilters, #btnResetFilters, #btnReinitialiser').forEach(el => {
     el.disabled = true;
   });
@@ -844,7 +530,7 @@ function lockSidebar() {
   });
 }
 
-function unlockSidebar() {
+export function unlockSidebar() {
   document.querySelectorAll('.sidebar-input, .sidebar-select, .checkbox-label input, input[name="statutCollier"], #checkSuivis, #searchIndividu, #btnApplyFilters, #btnResetFilters, #btnReinitialiser').forEach(el => {
     el.disabled = false;
   });
@@ -854,14 +540,6 @@ function unlockSidebar() {
   });
 }
 
-/**
- * FONCTIONS UTILITAIRES DE FILTRAGE
- */
-
-/**
- * Filtre la liste des individus par classe d'âge (Cabri, Éterlou, Adulte)
- * Cache ou affiche les éléments en fonction de l'attribut data-classe
- */
 function initBasemapSelector() {
   const basemaps = [
     { index: 0, nom: 'IGN SCAN25',    apercu: 'assets/img/ign.png' },
@@ -900,111 +578,7 @@ function initBasemapSelector() {
   });
 }
 
-function filtrerListeIndividus() {
-  const sexe = document.getElementById('selectSexe')?.value;
-  const gestionnaire = document.getElementById('selectGestionnaire')?.value;
-  const population = document.getElementById('selectPopulation')?.value;
-  const classe = document.getElementById('selectClasseAge')?.value;
-  const suivisSeulement = document.getElementById('checkSuivis')?.checked || false;
-  const programmation = document.getElementById('selectProgrammation')?.value;
-
-  document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-    if (label.dataset.sansGeom === 'true') {
-      label.style.display = 'none';
-      return;
-    }
-    const checkbox = label.querySelector('input');
-    const aniId = checkbox?.value;
-    if (!aniId) return;
-
-    // Récupération des filtres depuis le dataset (alimenté dans startApp)
-    const aniSexe = label.dataset.sexe || '';
-    const aniGestionnaire = label.dataset.gestionnaire || '';
-    const aniPopulation = label.dataset.population || '';
-    const aniClasse = label.dataset.classe || '';
-
-    const matchSexe = !sexe || aniSexe === sexe;
-    const matchGestionnaire = !gestionnaire || aniGestionnaire === gestionnaire;
-    const matchPopulation = !population || aniPopulation === population;
-    const matchClasse = !classe || aniClasse === classe;
-    const matchSuivis = !suivisSeulement || activeIds.has(Number(aniId));
-    const matchProgrammation = !programmation ||
-      String(programmationsMap.get(String(aniId))) === programmation;
-
-    label.style.display = (matchSexe && matchGestionnaire && matchPopulation && matchClasse && matchSuivis && matchProgrammation) ? 'flex' : 'none';
-  });
-}
-
-/**
- * Met à jour la liste des individus selon les dates sélectionnées
- * sans recharger la carte — appelée au changement de date
- */
-async function mettreAJourListeParDate() {
-  const dateFrom = document.getElementById('dateFrom').value;
-  const dateTo = document.getElementById('dateTo').value;
-
-  // Si aucune date — réafficher normalement
-  if (!dateFrom && !dateTo) {
-    filtrerListeIndividus();
-    return;
-  }
-
-  try {
-    // Une seule requête pour tous les ani_id distincts sur la période
-    const idsAvecDonnees = new Set(
-      await fetchAnimalIdsParPeriode(currentToken, {
-        date_from: dateFrom,
-        date_to: dateTo,
-        include_outliers: false
-      })
-    );
-
-    // Mettre à jour la liste
-    document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-      if (label.dataset.sansGeom === 'true') {
-        label.style.display = 'none';
-        return;
-      }
-      const checkbox = label.querySelector('input');
-      if (!checkbox) return;
-
-      const sexe = document.getElementById('selectSexe')?.value;
-      const gestionnaire = document.getElementById('selectGestionnaire')?.value;
-      const population = document.getElementById('selectPopulation')?.value;
-      const classe = document.getElementById('selectClasseAge')?.value;
-      const suivisSeulement = document.getElementById('checkSuivis')?.checked || false;
-      const programmation = document.getElementById('selectProgrammation')?.value;
-
-      const matchPeriode = idsAvecDonnees.has(String(checkbox.value));
-      const matchSexe = !sexe || label.dataset.sexe === sexe;
-      const matchGestionnaire = !gestionnaire || label.dataset.gestionnaire === gestionnaire;
-      const matchPopulation = !population || label.dataset.population === population;
-      const matchClasse = !classe || label.dataset.classe === classe;
-      const matchSuivis = !suivisSeulement || activeIds.has(Number(checkbox.value));
-      const matchProgrammation = !programmation ||
-        String(programmationsMap.get(String(checkbox.value))) === programmation;
-
-      label.style.display = (matchPeriode && matchSexe && matchGestionnaire && matchPopulation && matchClasse && matchSuivis && matchProgrammation) ? 'flex' : 'none';
-    });
-
-  } catch (err) {
-    console.error('Erreur mise à jour liste par date:', err);
-  }
-}
-
-// Supprimé: fonctions individuelles devenues obsolètes car centralisées dans filtrerListeIndividus
-function filtrerIndividusParClasse(classe) { filtrerListeIndividus(); }
-function filtrerIndividusParSexe(sexe) { filtrerListeIndividus(); }
-function filtrerIndividusParGestionnaire(gestionnaire) { filtrerListeIndividus(); }
-function filtrerIndividusParPopulation(population) { filtrerListeIndividus(); }
-
-function getClasse(age) {
-  if (age <= 1) return 'Cabri';
-  if (age <= 2) return 'Éterlou';
-  return 'Adulte';
-}
-
-function supprimerBadgeById(id) {
+export function supprimerBadgeById(id) {
   document.querySelectorAll(`.filtre-badge[data-id="${id}"]`).forEach(badge => {
     badge.remove();
   });
@@ -1015,7 +589,7 @@ function supprimerBadgeById(id) {
  * SYSTÈME DE BADGES
  * Affiche un badge amovible pour chaque filtre actif.
  */
-function ajouterBadge(label, onRemove, id = null) {
+export function ajouterBadge(label, onRemove, id = null) {
   const badge = document.createElement('div');
   badge.className = 'filtre-badge';
   if (id) badge.dataset.id = id;
@@ -1032,7 +606,7 @@ function ajouterBadge(label, onRemove, id = null) {
   mettreAJourFiltresActifs();
 }
 
-function mettreAJourFiltresActifs() {
+export function mettreAJourFiltresActifs() {
   const zone = document.getElementById('filtresActifs');
   const badges = document.getElementById('badgesFiltres');
   const count = badges ? badges.children.length : 0;
@@ -1065,6 +639,10 @@ async function reinitialiserTousLesFiltres() {
       clearTrajectoire();
     }
 
+    // Réinitialiser la recherche textuelle
+    const searchIndividu = document.getElementById('searchIndividu');
+    if (searchIndividu) searchIndividu.value = '';
+
     ['dateFrom', 'dateTo'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
@@ -1089,6 +667,7 @@ async function reinitialiserTousLesFiltres() {
       cb.checked = false;
       const label = cb.closest('label');
       if (!label) return;
+      label.dataset.masqueParDate = 'false';
       if (label.dataset.sansGeom === 'true') {
         label.style.display = 'none';
         return;
@@ -1179,7 +758,7 @@ if (DEV_MODE) {
  * MISE À JOUR DE LA LÉGENDE
  * Adapte la légende selon le mode d'affichage et de coloration.
  */
-function mettreAJourLegende() {
+export function mettreAJourLegende() {
   const contenu = document.getElementById('legendeContenu');
   if (!contenu) return;
 
@@ -1263,7 +842,7 @@ function hideGlobalLoading() {
   hideMapLoading();
 }
 
-function showToast(message) {
+export function showToast(message) {
   let toast = document.getElementById('toast');
   if (!toast) {
     toast = document.createElement('div');
