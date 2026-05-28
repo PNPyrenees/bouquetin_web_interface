@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [0.12.0] - 2026-05-28
+
+### Modifications
+- Selecteur de fonds de carte refait style Google Maps - vignette active toujours visible, menu qui s'ouvre vers la gauche avec transition `scale` + `opacity`
+- Vignettes agrandies (64px), bordure verte sur le fond actif
+- Noms reels affiches : IGN SCAN25, OpenTopoMap, OpenStreetMap
+- Zoom OpenLayers remonte (`bottom: 180px`) pour ne plus etre masque par le selecteur
+- Suppression de la modal `#layersModal` et de tous ses styles associes
+
+### Corrections
+- Contour blanc retire des points GPS en mode Positions et Trajectoire
+- Popup masque au deplacement manuel de la carte sans interferer avec les animations
+- Popup ignore sur les lignes de trajectoire et fleches directionnelles
+
 ## [0.11.0] - 2026-05-27
 
 ### Ajouts
