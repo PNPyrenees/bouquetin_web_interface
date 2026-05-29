@@ -25,6 +25,7 @@ let lignesParPage = 25;
 let colonneTriee = null;
 let sensTriee = 'asc';
 let panneauFermeManuel = false;
+let aniIdSelectionne = null;
 
 const colonnesIndividus = [
   { key: 'ani_nom',             label: 'Individu',          defaut: true  },
@@ -219,19 +220,40 @@ export function initPanneau() {
   const tabDonnees = sidebarRightBody.querySelector('#tabDonnees');
   const tabIndividus = sidebarRightBody.querySelector('#tabIndividus');
 
-  tabIndividus?.addEventListener('click', () => {
-    tabIndividus.classList.add('active');
-    tabDonnees?.classList.remove('active');
-    document.getElementById('panelContentIndividus').style.display = 'flex';
-    document.getElementById('panelContentDonnees').style.display = 'none';
-  });
-
   tabDonnees?.addEventListener('click', () => {
     tabDonnees.classList.add('active');
     tabIndividus?.classList.remove('active');
     document.getElementById('panelContentDonnees').style.display = 'flex';
     document.getElementById('panelContentIndividus').style.display = 'none';
     mettreAJourColonnes();
+
+    const aniIdSelectionne = document.querySelector('.panel-individu-row.selected-carte')?.dataset.aniId;
+    if (aniIdSelectionne) {
+      window._scrollToAniId?.(aniIdSelectionne);
+      setTimeout(() => {
+        document.querySelectorAll(`.panel-table-row[data-ani-id='${aniIdSelectionne}']`).forEach(tr => {
+          tr.classList.add('selected-carte');
+        });
+      }, 50);
+    }
+  });
+
+  tabIndividus?.addEventListener('click', () => {
+    tabIndividus.classList.add('active');
+    tabDonnees?.classList.remove('active');
+    document.getElementById('panelContentDonnees').style.display = 'none';
+    document.getElementById('panelContentIndividus').style.display = 'flex';
+    mettreAJourColonnesIndividus();
+
+    const aniIdSelectionne = document.querySelector('.panel-table-row.selected-carte')?.dataset.aniId;
+    if (aniIdSelectionne) {
+      window._scrollToAniIdIndividus?.(aniIdSelectionne);
+      setTimeout(() => {
+        document.querySelectorAll(`.panel-individu-row[data-ani-id='${aniIdSelectionne}']`).forEach(tr => {
+          tr.classList.add('selected-carte');
+        });
+      }, 50);
+    }
   });
 
   const pageSizeSelect = document.getElementById('panelPageSizeSelect');
@@ -360,8 +382,13 @@ export function mettreAJourPanneau(locations) {
 function trierDonnees() {
   if (!colonneTriee) return;
   donneesFiltrees.sort((a, b) => {
-    let valA = a[colonneTriee] ?? '';
-    let valB = b[colonneTriee] ?? '';
+    // Fallback loc_date_local si loc_datetime_local est null
+    let valA = colonneTriee === 'loc_datetime_local'
+      ? (a.loc_datetime_local || a.loc_date_local || '')
+      : (a[colonneTriee] ?? '');
+    let valB = colonneTriee === 'loc_datetime_local'
+      ? (b.loc_datetime_local || b.loc_date_local || '')
+      : (b[colonneTriee] ?? '');
     if (typeof valA === 'string') valA = valA.toLowerCase();
     if (typeof valB === 'string') valB = valB.toLowerCase();
     if (valA < valB) return sensTriee === 'asc' ? -1 : 1;
@@ -395,7 +422,7 @@ function rendrePage() {
 
   // Rendu des lignes
   tbody.innerHTML = page.map(loc => `
-    <tr class="panel-table-row">
+    <tr class="panel-table-row" data-ani-id="${loc.ani_id}">
       ${colonnesDisponibles
       .filter(c => colonnesActives.includes(c.key))
       .map(c => `<td>${formaterValeur(c.key, loc[c.key], loc)}</td>`)
@@ -418,19 +445,19 @@ function rendrePage() {
       if (!isTrajectoire && window._highlightPoint) window._highlightPoint(loc.ani_id, false);
     });
 
-    // Clic — zoom sans popup
     tr.addEventListener('click', () => {
-      if (window._zoomToPoint) {
-        const features = window._getGpsFeatures?.();
-        const feature = features?.find(f => String(f.get('ani_id')) === String(loc.ani_id));
-        if (!feature) return;
-        const coord = feature.getGeometry()?.getCoordinates();
-        if (coord && window._getMap) {
-          window._getMap().getView().animate({ center: coord, zoom: window._ZOOM_POINT_SINGLE, duration: 400 });
-        }
-      }
+      document.querySelectorAll('.panel-table-row.selected-carte').forEach(r => r.classList.remove('selected-carte'));
+      tr.classList.add('selected-carte');
+      aniIdSelectionne = String(loc.ani_id);
+      if (window._afficherPositionsIndividu) window._afficherPositionsIndividu(loc.ani_id);
     });
   });
+
+  if (aniIdSelectionne) {
+    document.querySelectorAll(`.panel-table-row[data-ani-id='${aniIdSelectionne}']`).forEach(tr => {
+      tr.classList.add('selected-carte');
+    });
+  }
 
   // Mettre à jour la pagination
   rendrePagination(total);
@@ -724,9 +751,18 @@ function rendrePageIndividus() {
     });
 
     tr.addEventListener('click', () => {
+      document.querySelectorAll('.panel-table-row.selected-carte').forEach(r => r.classList.remove('selected-carte'));
+      tr.classList.add('selected-carte');
+      aniIdSelectionne = String(aniId);
       if (window._afficherPositionsIndividu) window._afficherPositionsIndividu(aniId);
     });
   });
+
+  if (aniIdSelectionne) {
+    document.querySelectorAll(`.panel-individu-row[data-ani-id='${aniIdSelectionne}']`).forEach(tr => {
+      tr.classList.add('selected-carte');
+    });
+  }
 
   rendrePaginationIndividus(total);
 }
@@ -803,6 +839,58 @@ function rendrePaginationIndividus(total) {
   });
   fragment.appendChild(btnNext);
   paginationControls.appendChild(fragment);
+}
+
+export function setAniIdSelectionne(id) {
+  aniIdSelectionne = id ? String(id) : null;
+}
+
+export function scrollToAniId(aniId) {
+  const index = donneesFiltrees.findIndex(l => String(l.ani_id) === String(aniId));
+  if (index === -1) return;
+
+  const size = lignesParPage === 'all' ? donneesFiltrees.length : parseInt(lignesParPage, 10);
+  const pageCible = Math.floor(index / size) + 1;
+
+  if (pageCible !== pageCourante) {
+    pageCourante = pageCible;
+    rendrePage();
+  }
+
+  setTimeout(() => {
+    const tr = document.querySelector(`.panel-table-row[data-ani-id='${aniId}']`);
+    const wrapper = tr?.closest('.panel-table-wrapper');
+    if (tr && wrapper) {
+      const trRect = tr.getBoundingClientRect();
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const offset = trRect.top - wrapperRect.top - (wrapperRect.height / 2) + (trRect.height / 2);
+      wrapper.scrollTop += offset;
+    }
+  }, 50);
+}
+
+export function scrollToAniIdIndividus(aniId) {
+  const index = donneesIndividusFiltrees.findIndex(a => String(a.ani_id) === String(aniId));
+  if (index === -1) return;
+
+  const size = lignesParPageIndividus === 'all' ? donneesIndividusFiltrees.length : parseInt(lignesParPageIndividus, 10);
+  const pageCible = Math.floor(index / size) + 1;
+
+  if (pageCible !== pageCouranteIndividus) {
+    pageCouranteIndividus = pageCible;
+    rendrePageIndividus();
+  }
+
+  setTimeout(() => {
+    const tr = document.querySelector(`.panel-individu-row[data-ani-id='${aniId}']`);
+    const wrapper = tr?.closest('.panel-table-wrapper');
+    if (tr && wrapper) {
+      const trRect = tr.getBoundingClientRect();
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const offset = trRect.top - wrapperRect.top - (wrapperRect.height / 2) + (trRect.height / 2);
+      wrapper.scrollTop += offset;
+    }
+  }, 50);
 }
 
 export function setLabelDatetime(label) {
