@@ -1,7 +1,7 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocations, fetchLastLocationsInactifs, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations } from './api.js';
 import { ROLES, DEV_PASSWORD, ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
-import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus } from './panel.js';
+import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse } from './filters.js';
 
 const DEV_MODE = true;
@@ -70,10 +70,11 @@ function initSidebarRight() {
   const estVisible = sidebarRight.classList.contains('visible');
   icon.textContent = estVisible ? '›' : '‹';
   setPanneauFermeManuel(!estVisible);
+  const mapScreen = document.getElementById('mapScreen');
   if (!estVisible) {
     sidebarRight.style.width = '';
+    if (mapScreen) mapScreen.style.right = '';
   }
-  const mapScreen = document.getElementById('mapScreen');
   if (estVisible) {
     mapScreen?.classList.add('panel-open');
   } else {
@@ -91,6 +92,8 @@ function initSidebarRight() {
     document.body.style.cursor = 'ew-resize';
     document.body.style.userSelect = 'none';
     sidebarRight.style.transition = 'none';
+    const mapScreen = document.getElementById('mapScreen');
+    if (mapScreen) mapScreen.style.transition = 'none';
   });
 
   document.addEventListener('mousemove', (e) => {
@@ -104,14 +107,25 @@ function initSidebarRight() {
       sidebarRight.style.transition = 'right 0.3s ease, width 0.3s ease';
       sidebarRight.style.width = 'var(--panel-width)';
       sidebarRight.classList.remove('visible');
+      const mapScreen = document.getElementById('mapScreen');
+      if (mapScreen) {
+        mapScreen.style.right = '';
+        mapScreen.style.transition = '';
+        mapScreen.classList.remove('panel-open');
+      }
       const icon = sidebarRightToggle?.querySelector('.toggle-icon');
       if (icon) icon.textContent = '›';
+      setPanneauFermeManuel(true);
+      setTimeout(() => updateMapSize(), 310);
       return;
     }
 
     const maxWidth = window.innerWidth * 0.85;
     if (newWidth <= maxWidth) {
       sidebarRight.style.width = `${newWidth}px`;
+      const mapScreen = document.getElementById('mapScreen');
+      if (mapScreen) mapScreen.style.right = `${newWidth}px`;
+      updateMapSize();
     }
   });
 
@@ -121,6 +135,8 @@ function initSidebarRight() {
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       sidebarRight.style.transition = 'right 0.3s ease';
+      const mapScreen = document.getElementById('mapScreen');
+      if (mapScreen) mapScreen.style.transition = '';
     }
   });
 }
@@ -153,8 +169,6 @@ async function startApp(token) {
 
     // Récupération des données depuis l'API via le module api.js
     setAnimals(await fetchAnimals(token));
-    console.log('Premier individu :', animals[0]);
-
     setCurrentToken(token);
 
     const programmations = await fetchProgrammations(token);
@@ -167,6 +181,9 @@ async function startApp(token) {
 
     // ← initPanneau() ici — après les données, avant le rendu
     initPanneau();
+    window._scrollToAniId = scrollToAniId;
+    window._scrollToAniIdIndividus = scrollToAniIdIndividus;
+    window._setAniIdSelectionne = setAniIdSelectionne;
     // mettreAJourIndividus(animals);
 
     // Chargement initial (Tous par défaut : actifs + inactifs)
@@ -785,24 +802,8 @@ export function mettreAJourLegende() {
         <div class="legende-item"><div class="legende-pastille" style="background:#E07B39"></div><span>PNRPA</span></div>
       `;
       break;
-    case 'saison':
-      legendeCouleur = `
-        <div class="legende-section-titre">Saison</div>
-        <div class="legende-item"><div class="legende-pastille" style="background:#3A86FF"></div><span>Hiver (déc-fév)</span></div>
-        <div class="legende-item"><div class="legende-pastille" style="background:#06D6A0"></div><span>Printemps (mar-mai)</span></div>
-        <div class="legende-item"><div class="legende-pastille" style="background:#FFBE0B"></div><span>Été (juin-août)</span></div>
-        <div class="legende-item"><div class="legende-pastille" style="background:#FB5607"></div><span>Rude (sep-nov)</span></div>
-      `;
-      break;
-    case 'date':
-      legendeCouleur = `
-        <div class="legende-section-titre">Date</div>
-        <div style="width:100%;height:10px;border-radius:4px;background:linear-gradient(to right,#FFBE0B,#FB5607,#9B2335,#8338EC);margin:4px 0"></div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:#888">
-          <span>Ancien</span><span>Récent</span>
-        </div>
-      `;
-      break;
+    // case 'saison': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
+    // case 'date': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
     default:
       legendeCouleur = ''; // Individu — pas de légende couleur
       break;
