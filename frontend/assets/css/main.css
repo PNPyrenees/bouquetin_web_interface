@@ -73,10 +73,17 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #ffffff;
+  background: #f8fdff;
   height: 60px;
   padding: 0 20px;
   border-bottom: 1px solid #e0e0e0;
+}
+
+.header-top {
+  background-image: url('../img/header_top.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .header-top-left {
@@ -722,8 +729,8 @@ details[open] summary::after {
   display: flex;
   flex-direction: row;
   gap: 10px;
-  background: white;
-  border-radius: 6px;
+  background: rgb(255, 255, 255);
+  border-radius: 3px;
   padding: 10px;
   box-shadow: 0 1px 6px rgba(0,0,0,0.15);
   margin-right: 8px;
@@ -818,7 +825,6 @@ details[open] summary::after {
 .basemap-card:hover span {
   color: var(--color-text);
 }
-
 /* Zoom remonté */
 .ol-zoom-custom {
   position: absolute;
