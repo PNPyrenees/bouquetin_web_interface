@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [0.13.0] - 2026-05-29
+
+### Ajouts
+- Image de fond personnalisée dans le header (`header_top.png`) - dégradé turquoise cohérent avec la thématique nature/montagne
+- Interaction carte ↔ tableau attributaire - clic sur un point carte surligne la ligne correspondante en vert dans les onglets Données et Individus observés
+- Navigation automatique vers la page du tableau contenant la donnée sélectionnée avec centrage de la ligne
+- Persistance de la sélection lors du changement d'onglet ou de l'application des filtres
+- Sélection exclusive - une seule ligne surlignée à la fois, retiré automatiquement à la sélection suivante
+- Fonction `scrollToAniId()` et `scrollToAniIdIndividus()` exportées depuis `panel.js`
+- Variable `aniIdSelectionne` mémorisée dans `panel.js` pour maintenir la sélection après rendu
+
+### Modifications
+- Symbologie : options Date et Saison retirées temporairement - à valider avec Ludovic et Alexandre, code commenté pour réactivation future
+- Seuil des flèches directionnelles en mode Trajectoire réduit de 1500m à 800m
+- Bordure arrondie du sélecteur de fonds de carte réduite (`border-radius: 4px`)
+- Retrait du survol point carte sur les lignes du tableau - uniquement au clic
+
+### Corrections
+- Tri de la colonne Dernière position en mode Positions - fallback sur `loc_date_local` si `loc_datetime_local` est null
+- Fond gris visible pendant le drag de fermeture du panneau droit - `right` de `#mapScreen` synchronisé en temps réel avec la largeur du panneau
+- Retrait du `console.log('Premier individu')` restant dans `app.js`
+
 ## [0.12.0] - 2026-05-28
 
 ### Ajouts
