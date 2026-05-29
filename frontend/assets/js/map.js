@@ -61,20 +61,8 @@ function getCouleur(loc, mode) {
     default:
       return couleursIndividus.get(loc.ani_id) || COULEURS_PALETTE[0];
 
-    case 'date': {
-      if (!_dateMin || !_dateMax || _dateMin === _dateMax) return '#2D6A4F';
-      const cur = new Date(loc.loc_datetime_local || loc.loc_date_local).getTime();
-      const ratio = (cur - _dateMin) / (_dateMax - _dateMin);
-      return getGradientColor(ratio);
-    }
-
-    case 'saison': {
-      const mois = new Date(loc.loc_datetime_local || loc.loc_date_local).getMonth() + 1;
-      if ([12, 1, 2].includes(mois)) return '#3A86FF';
-      if ([3, 4, 5].includes(mois)) return '#06D6A0';
-      if ([6, 7, 8].includes(mois)) return '#FFBE0B';
-      return '#FB5607';
-    }
+    // case 'date': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
+    // case 'saison': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
 
     case 'sexe':
       if (loc.ani_sexe === 'M') return '#3A86FF';
@@ -181,6 +169,7 @@ export function initMap(targetId, popupId) {
   // Gestion du clic pour afficher le popup
   map.on('singleclick', evt => {
     let hit = false;
+    let aniId = null;
     map.forEachFeatureAtPixel(evt.pixel, feature => {
       if (hit) return;
       // Ignorer les lignes de trajectoire et les flèches — uniquement les points GPS
@@ -189,9 +178,27 @@ export function initMap(targetId, popupId) {
       // Ignorer les flèches directionnelles (pas de ani_id)
       if (!feature.get('ani_id')) return;
       hit = true;
+      aniId = String(feature.get('ani_id'));
       showPopup(feature, evt.coordinate, popupEl);
     });
     if (!hit) popupEl.style.display = 'none';
+
+    document.querySelectorAll('.panel-table-row.selected-carte').forEach(tr => {
+      tr.classList.remove('selected-carte');
+    });
+
+    const panneauOuvert = document.getElementById('sidebarRight')?.classList.contains('visible');
+    if (panneauOuvert && aniId) {
+      window._scrollToAniId?.(aniId);
+      window._scrollToAniIdIndividus?.(aniId);
+
+      setTimeout(() => {
+        document.querySelectorAll(`.panel-table-row[data-ani-id='${aniId}']`).forEach(tr => {
+          tr.classList.add('selected-carte');
+        });
+      }, 50);
+      window._setAniIdSelectionne?.(aniId);
+    }
   });
 
   // Fermer le popup uniquement au déplacement manuel (drag)
@@ -387,7 +394,7 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
       const dy = coordB[1] - coordA[1];
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < 1500) continue;
+      if (dist < 800) continue;
 
       const rotation = Math.atan2(dy, dx) - Math.PI / 2;
       const midpoint = [(coordA[0] + coordB[0]) / 2, (coordA[1] + coordB[1]) / 2];
