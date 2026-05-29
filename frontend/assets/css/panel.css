@@ -597,3 +597,11 @@
   font-size: var(--panel-font-size);
   font-style: italic;
 }
+
+.panel-table-row.hover-carte {
+  background: rgba(45, 106, 79, 0.08) !important;
+}
+
+.panel-table-row.selected-carte {
+  background: rgba(45, 106, 79, 0.18) !important;
+}
