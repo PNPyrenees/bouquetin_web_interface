@@ -171,6 +171,33 @@ export async function fetchLastLocationsInactifs(token, filters = {}) {
 }
 
 /**
+ * Récupère la dernière position de tous les animaux en une seule requête
+ * depuis la vue v_animal_last_loc modifiée (actifs + inactifs).
+ */
+export async function fetchAllLastLocations(token, filters = {}) {
+  const params = new URLSearchParams();
+  params.append('geom', 'not.is.null');
+
+  if (!filters.include_outliers) {
+    params.append('loc_anomalie', 'not.is.true');
+  }
+
+  if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
+  if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
+  if (filters.population) params.append('ani_pop_rattach', `eq.${filters.population}`);
+
+  const res = await fetch(`${API_URL}/v_animal_last_loc?${params.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin'
+    }
+  });
+
+  if (!res.ok) throw new Error('Échec chargement positions');
+  return res.json();
+}
+
+/**
  * Récupère la dernière position de chaque individu sur une période donnée.
  * Utilisé en mode Positions quand une date est sélectionnée.
  */
