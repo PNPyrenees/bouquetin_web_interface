@@ -1,4 +1,4 @@
-import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL } from './config.js';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY } from './config.js';
 let map;
 let gpsSource;
 let trajectoireSource;
@@ -109,11 +109,11 @@ export function initMap(targetId, popupId) {
 
   // Définition des fonds de carte
   basemaps = [
-    // SCAN25 IGN (via Géoportail)
+    // IGN SCAN25 - fond de carte topographique
     new ol.layer.Tile({
       source: new ol.source.XYZ({
-        url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
-        attributions: '© IGN Géoportail'
+        url: `https://data.geopf.fr/private/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&apikey=${IGN_API_KEY}&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN25TOUR&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}`,
+        attributions: '©IGN'
       }),
       visible: true
     }),
