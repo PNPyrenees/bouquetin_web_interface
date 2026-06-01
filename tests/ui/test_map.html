@@ -7,6 +7,10 @@
   <script src="https://cdn.jsdelivr.net/npm/ol@8.2.0/dist/ol.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
   <link rel="stylesheet" href="../../frontend/assets/css/map.css">
+  <style>
+    #mapScreen { display: none; }
+    #loginScreen { display: flex; }
+  </style>
 </head>
 <body>
   <div id="loginScreen">
@@ -31,7 +35,6 @@
     <div id="status"></div>
     <div id="popup"></div>
   </div>
-  <script type="module" src="../../frontend/assets/js/app.js"></script>
-  <script type="module" src="test_map.js"></script>
+  <script type="module" src="./test_map.js"></script>
 </body>
 </html>

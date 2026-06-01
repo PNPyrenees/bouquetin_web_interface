@@ -1,17 +1,28 @@
-import { getMap, getGpsSource } from '../../frontend/assets/js/map.js';
-import { ZOOM_POINT_SINGLE } from '../../frontend/assets/js/config.js';
-import { getProgrammationsMap } from '../../frontend/assets/js/app.js';
+import { API_URL, ROLES, DEV_PASSWORD, DEFAULT_CENTER, DEFAULT_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE } from '../../frontend/assets/js/config.js';
+import { login } from '../../frontend/assets/js/api.js';
+import { initMap, renderPoints } from '../../frontend/assets/js/map.js';
 
-/**
- * EXPOSITIONS GLOBALES POUR LE DÉBOGAGE & LES TESTS DE LA CARTE
- * 
- * Ces variables et fonctions de test étaient précédemment exposées directement 
- * dans le fichier de production app.js. Elles ont été déplacées ici afin d'isoler 
- * le code de debug hors de l'environnement de production.
- */
-window._getMap = getMap;
-window._getGpsFeatures = () => getGpsSource().getFeatures();
-window._ZOOM_POINT_SINGLE = ZOOM_POINT_SINGLE;
-window._progMap = getProgrammationsMap();
+console.log('Test Map JS chargé');
 
-console.log("Test Map JS chargé avec succès - Outils de débogage exposés sur window.");
+// Login et affichage minimal de la carte
+document.getElementById('loginForm')?.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+  const errorEl = document.getElementById('loginError');
+  errorEl.textContent = '';
+
+  try {
+    const token = await login(username, password);
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mapScreen').style.display = 'block';
+    initMap('map', 'popup');
+    console.log('Carte initialisée - token:', token ? 'ok' : 'manquant');
+
+    // Expositions debug
+    window._token = token;
+  } catch (err) {
+    errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';
+    console.error(err);
+  }
+});
