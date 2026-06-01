@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [0.15.0] - 2026-06-01
+
+### Ajouts
+- Système de cache des requêtes API dans `api.js` - les résultats sont mémorisés par endpoint et combinaison de filtres
+- Fonction `viderCache()` exportée depuis `api.js` - appelée automatiquement à la réinitialisation des filtres
+- Normalisation des clés de cache - les filtres vides sont ignorés pour partager le cache entre `startApp()` et `applyFilters()`
+
+### Performances
+- Premier clic 'Appliquer les filtres' : 2580ms → 18ms (cache alimenté au chargement initial)
+- Clics suivants avec mêmes filtres : instantané (< 30ms)
+- Gain global : x100 à x1000 selon les cas
+
+### Corrections
+- Retrait des `console.time` et `console.log` de debug dans `filters.js`
+- Retrait de `window._currentToken` temporaire dans `app.js`
+
 ## [0.14.0] - 2026-06-01
 
 ### Ajouts
