@@ -1,4 +1,4 @@
-import { fetchLocations, fetchLastLocations, fetchLastLocationsInactifs, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode } from './api.js';
+import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
 import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI } from './config.js';
@@ -100,82 +100,34 @@ export async function applyFilters(token) {
         return; // ← sortir du bloc isPositionMode
       }
 
-      const fetchParams = {
-        ani_id: selectedIds,
-        sexe: filters.sexe,
-        gestionnaire: filters.gestionnaire,
-        population: filters.population,
-        include_outliers: filters.include_outliers
-      };
-
       if (suivisSeulement) {
-        locations = await fetchLastLocations(token, fetchParams);
-        if (filters.sexe) {
-          locations = locations.filter(l => {
-            const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_sexe === filters.sexe;
-          });
-        }
-        if (filters.gestionnaire) {
-          locations = locations.filter(l => {
-            const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_gestionnaire === filters.gestionnaire;
-          });
-        }
-        if (filters.population) {
-          locations = locations.filter(l => {
-            const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_pop_rattach === filters.population;
-          });
-        }
-      } else {
-        // Tous — actifs + inactifs
-        const actifs = await fetchLastLocations(token, fetchParams);
-        const actifsIds = new Set(actifs.map(l => String(l.ani_id)));
-        const inactifsIds = getAnimals()
-          .filter(a => !actifsIds.has(String(a.ani_id)))
-          .map(a => String(a.ani_id));
-        const inactifs = await fetchLastLocationsInactifs(token, {
-          ...fetchParams,
-          ani_id: selectedIds.length > 0 ? selectedIds : inactifsIds
+        locations = await fetchAllLastLocations(token, {
+          sexe: filters.sexe,
+          gestionnaire: filters.gestionnaire,
+          population: filters.population,
+          include_outliers: filters.include_outliers
         });
-        let actifsFiltered = actifs;
-        if (filters.sexe) {
-          actifsFiltered = actifsFiltered.filter(l => {
-            const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_sexe === filters.sexe;
-          });
-        }
-        if (filters.gestionnaire) {
-          actifsFiltered = actifsFiltered.filter(l => {
-            const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_gestionnaire === filters.gestionnaire;
-          });
-        }
-        if (filters.population) {
-          actifsFiltered = actifsFiltered.filter(l => {
-            const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_pop_rattach === filters.population;
-          });
-        }
-        const seen = new Set(actifsFiltered.map(l => l.ani_id));
+        // Filtrer uniquement les actifs côté JS
+        locations = locations.filter(l => l.cor_date_fin === null);
+      } else {
+        locations = await fetchAllLastLocations(token, {
+          sexe: filters.sexe,
+          gestionnaire: filters.gestionnaire,
+          population: filters.population,
+          include_outliers: filters.include_outliers
+        });
+      }
 
-        // Filtrer aussi les inactifs par population côté client si nécessaire
-        let inactifsFiltered = inactifs;
-        if (filters.population) {
-          inactifsFiltered = inactifsFiltered.filter(l => {
-            const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
-            return ani && ani.ani_pop_rattach === filters.population;
-          });
-        }
-
-        locations = [...actifsFiltered, ...inactifsFiltered.filter(l => !seen.has(l.ani_id))];
+      // Filtres supplémentaires côté JS
+      if (selectedIds.length > 0) {
+        locations = locations.filter(l => selectedIds.includes(String(l.ani_id)));
       }
       if (filters.programmation) {
         locations = locations.filter(l =>
           String(getProgrammationsMap().get(String(l.ani_id))) === filters.programmation
         );
       }
+
       locations = enrichirLocations(locations);
       clearMapPoints();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
@@ -238,7 +190,7 @@ export async function applyFilters(token) {
           const valides = await fetchLocations(token, {
             ...filters,
             ani_id: [id],
-            limit: 10,
+            limit: 30,
             include_outliers: false
           });
 
