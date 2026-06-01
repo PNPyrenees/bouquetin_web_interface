@@ -24,3 +24,5 @@ export const ZOOM_TRAJECTOIRE_SINGLE = 14;
 export const ZOOM_TRAJECTOIRE_MULTI = 12;
 export const ZOOM_MAX_MANUAL = 18;
 export const ZOOM_MIN_MANUAL = 6;
+
+export const IGN_API_KEY = 'ign_scan_ws'; 
