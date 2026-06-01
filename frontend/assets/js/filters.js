@@ -47,13 +47,9 @@ export async function applyFilters(token) {
     if (isPositionMode) {
       // Si une date est sélectionnée → filtrer par période
       if (filters.date_from || filters.date_to) {
-        console.log('Mode période détecté — date_from:', filters.date_from, 'date_to:', filters.date_to);
-
         const idsAInterroger = selectedIds.length > 0
           ? selectedIds
           : getAnimals().map(a => String(a.ani_id));
-
-        console.log('IDs à interroger:', idsAInterroger.length);
 
         locations = await fetchLastLocationsParPeriode(token, {
           ani_id: idsAInterroger,
@@ -65,8 +61,6 @@ export async function applyFilters(token) {
           include_outliers: filters.include_outliers
         });
 
-        console.log('Locations retournées:', locations.length);
-
         locations = enrichirLocations(locations);
 
         clearMapPoints();
@@ -74,6 +68,7 @@ export async function applyFilters(token) {
         const count = renderPoints(locations, true, false, modeCouleur);
         mettreAJourPanneau(locations);
         mettreAJourIndividus(enrichirAnimauxAvecPositions(locations));
+
         ouvrirPanneauSiNecessaire();
         const mapScreen = document.getElementById('mapScreen');
         if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
@@ -134,6 +129,7 @@ export async function applyFilters(token) {
       const count = renderPoints(locations, true, false, modeCouleur);
       mettreAJourPanneau(locations);
       mettreAJourIndividus(getAnimals().filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
+
       ouvrirPanneauSiNecessaire();
       const mapScreen = document.getElementById('mapScreen');
       if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
@@ -229,6 +225,7 @@ export async function applyFilters(token) {
         setTimeout(() => updateMapSize(), 310);
       }
       renderTrajectoire(locations, modeCouleur);
+
       document.getElementById('positionsCount').textContent = count;
       mettreAJourLegende();
 
@@ -253,7 +250,6 @@ export async function applyFilters(token) {
       btnApply.disabled = false;
       btnApply.textContent = 'Appliquer les filtres';
     }
-
   }
 
 }
