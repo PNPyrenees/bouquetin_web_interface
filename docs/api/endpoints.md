@@ -97,6 +97,25 @@ GET /v_localisation?ani_id=in.(1,2,3)&loc_datetime_utc=gte.{date_from}&loc_datet
 
 ## Localisations & Tracking
 
+## fetchAllLastLocations()
+
+Remplace `fetchLastLocations()` + `fetchLastLocationsInactifs()` depuis la version 0.14.0.
+GET /v_animal_last_loc?geom=not.is.null&loc_anomalie=not.is.true
+
+Retourne la dernière position de tous les animaux ayant un collier associé (actifs ET inactifs).
+La distinction actif/inactif se fait côté JS via `cor_date_fin === null`.
+
+Filtres optionnels supportés :
+- `ani_sexe=eq.{valeur}`
+- `ani_gestionnaire=eq.{valeur}`  
+- `ani_pop_rattach=eq.{valeur}`
+- `loc_anomalie=not.is.true` retiré si `include_outliers: true`
+
+### Prérequis serveur
+- `v_animal_last_loc` sans `AND cor.cor_date_fin IS NULL`
+- `cor_date_fin` présent dans le SELECT de la vue
+- Index `idx_localisation_date` et `idx_localisation_capt_id` sur `t_localisation`
+
 ### **Colliers Actifs (Temps Réel)**
 *   **Description** : Récupère la dernière position connue pour chaque animal ayant un collier actif.
 *   **Méthode** : `GET`

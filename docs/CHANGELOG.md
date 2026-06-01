@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [0.14.0] - 2026-06-01
+
+### Ajouts
+- Fonction `fetchAllLastLocations()` dans `api.js` - récupère la dernière position de tous les animaux en une seule requête depuis `v_animal_last_loc`
+- Clé API IGN `IGN_API_KEY` dans `config.js` et `config.example.js` - URL privée SCAN25 activée
+- Index `idx_localisation_date` et `idx_localisation_capt_id` créés sur `t_localisation` côté serveur
+- Champ `cor_date_fin` ajouté dans `v_animal_last_loc` - permet de calculer `activeIds` sans requête supplémentaire
+
+### Modifications
+- `v_animal_last_loc` modifiée côté serveur - retrait de `AND cor.cor_date_fin IS NULL`, retourne désormais 200 animaux (actifs + inactifs) au lieu de 52
+- Chargement initial - `fetchAllLastLocations` remplace `fetchLastLocations` + `fetchLastLocationsInactifs` (230 requêtes → 1 requête)
+- `activeIds` calculé directement depuis `cor_date_fin === null` sans appel supplémentaire à `fetchLastLocations`
+- `applyFilters()` mode Positions - source unique `fetchAllLastLocations`, filtrage `suivisSeulement` via `cor_date_fin === null` côté JS
+- `reinitialiserTousLesFiltres()` - utilise `fetchAllLastLocations` uniquement
+- `fetchLastLocations` et `fetchLastLocationsInactifs` retirés des imports de `app.js` et `filters.js`
+
+### Performances
+- Chargement initial : 230 requêtes → 1 requête
+- Temps de chargement : 15-30 secondes → moins de 2 secondes
+- Index sur `t_localisation` - suppression du scan complet de 996 000 lignes à chaque requête
+
 ## [0.13.0] - 2026-05-29
 
 ### Ajouts
