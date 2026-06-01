@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations } from './api.js';
+import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, viderCache } from './api.js';
 import { ROLES, DEV_PASSWORD, ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -154,6 +154,9 @@ async function startApp(token) {
     initMap('map', 'popup');
     window._highlightPoint = highlightPoint;
     window._zoomToPoint = zoomToPoint;
+    window._getMap = getMap;
+    window._getGpsFeatures = () => getGpsSource().getFeatures();
+    window._ZOOM_POINT_SINGLE = ZOOM_POINT_SINGLE;
     window._afficherPositionsIndividu = (aniId) => {
       const features = getGpsSource().getFeatures();
       const feature = features.find(f => String(f.get('ani_id')) === String(aniId));
@@ -174,6 +177,7 @@ async function startApp(token) {
         programmationsMap.set(String(p.ani_id), p.prog_id);
       }
     });
+    window._progMap = programmationsMap; // ← debug temporaire
 
     // ← initPanneau() ici — après les données, avant le rendu
     initPanneau();
@@ -630,6 +634,7 @@ let isResetting = false;
 async function reinitialiserTousLesFiltres() {
   if (isResetting) return;
   isResetting = true;
+  viderCache();
 
   showMapLoading();
   lockSidebar();
