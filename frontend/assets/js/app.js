@@ -154,9 +154,6 @@ async function startApp(token) {
     initMap('map', 'popup');
     window._highlightPoint = highlightPoint;
     window._zoomToPoint = zoomToPoint;
-    window._getMap = getMap;
-    window._getGpsFeatures = () => getGpsSource().getFeatures();
-    window._ZOOM_POINT_SINGLE = ZOOM_POINT_SINGLE;
     window._afficherPositionsIndividu = (aniId) => {
       const features = getGpsSource().getFeatures();
       const feature = features.find(f => String(f.get('ani_id')) === String(aniId));
@@ -177,7 +174,6 @@ async function startApp(token) {
         programmationsMap.set(String(p.ani_id), p.prog_id);
       }
     });
-    window._progMap = programmationsMap; // ← debug temporaire
 
     // ← initPanneau() ici — après les données, avant le rendu
     initPanneau();

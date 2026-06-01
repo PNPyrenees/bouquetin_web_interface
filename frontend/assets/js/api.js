@@ -1,5 +1,28 @@
 import { API_URL, DEFAULT_LIMIT } from './config.js';
 
+// Cache des requêtes API
+const _cache = new Map();
+
+function _cleCache(endpoint, filters = {}) {
+  const filtresNormalises = Object.fromEntries(
+    Object.entries(filters).filter(([_, v]) => v !== '' && v !== false && v !== null && v !== undefined)
+  );
+  return `${endpoint}:${JSON.stringify(filtresNormalises)}`;
+}
+
+function _getCache(cle) {
+  return _cache.has(cle) ? _cache.get(cle) : null;
+}
+
+function _setCache(cle, data) {
+  _cache.set(cle, data);
+  return data;
+}
+
+export function viderCache() {
+  _cache.clear();
+}
+
 /**
  * Gère l'authentification de l'utilisateur.
  * @param {string} username - Nom d'utilisateur
@@ -32,6 +55,10 @@ export async function login(username, password) {
  * @param {Object} filters - Objet contenant les critères de filtrage
  */
 export async function fetchLocations(token, filters = {}) {
+  const cle = _cleCache('v_localisation', filters);
+  const cached = _getCache(cle);
+  if (cached) return cached;
+
   const params = new URLSearchParams();
 
   // Filtrage par ID d'individus (multi-sélection ou individuel)
@@ -78,7 +105,11 @@ export async function fetchLocations(token, filters = {}) {
   });
   
   if (!res.ok) throw new Error('Échec chargement données');
-  return res.json();
+  const data = await res.json();
+  if (data && data.length > 0) {
+    _setCache(cle, data);
+  }
+  return data;
 }
 
 /**
@@ -175,6 +206,10 @@ export async function fetchLastLocationsInactifs(token, filters = {}) {
  * depuis la vue v_animal_last_loc modifiée (actifs + inactifs).
  */
 export async function fetchAllLastLocations(token, filters = {}) {
+  const cle = _cleCache('v_animal_last_loc', filters);
+  const cached = _getCache(cle);
+  if (cached) return cached;
+
   const params = new URLSearchParams();
   params.append('geom', 'not.is.null');
 
@@ -194,7 +229,11 @@ export async function fetchAllLastLocations(token, filters = {}) {
   });
 
   if (!res.ok) throw new Error('Échec chargement positions');
-  return res.json();
+  const data = await res.json();
+  if (data && data.length > 0) {
+    _setCache(cle, data);
+  }
+  return data;
 }
 
 /**
@@ -202,6 +241,10 @@ export async function fetchAllLastLocations(token, filters = {}) {
  * Utilisé en mode Positions quand une date est sélectionnée.
  */
 export async function fetchLastLocationsParPeriode(token, filters = {}) {
+  const cle = _cleCache('v_localisation_periode', filters);
+  const cached = _getCache(cle);
+  if (cached) return cached;
+
   const ids = filters.ani_id || [];
   if (ids.length === 0) return [];
 
@@ -236,7 +279,11 @@ export async function fetchLastLocationsParPeriode(token, filters = {}) {
   );
 
   const results = await Promise.all(promises);
-  return results.flat().filter(l => l != null);
+  const locations = results.flat().filter(l => l != null);
+  if (locations.length > 0) {
+    _setCache(cle, locations);
+  }
+  return locations;
 }
 
 /**
@@ -244,6 +291,10 @@ export async function fetchLastLocationsParPeriode(token, filters = {}) {
  * Une seule requête au lieu de N requêtes par animal.
  */
 export async function fetchAnimalIdsParPeriode(token, filters = {}) {
+  const cle = _cleCache('v_localisation_ids', filters);
+  const cached = _getCache(cle);
+  if (cached) return cached;
+
   const params = new URLSearchParams();
 
   params.append('select', 'ani_id');
@@ -269,7 +320,11 @@ export async function fetchAnimalIdsParPeriode(token, filters = {}) {
   const data = await res.json();
 
   // Retourner uniquement les ani_id distincts
-  return [...new Set(data.map(l => String(l.ani_id)))];
+  const ids = [...new Set(data.map(l => String(l.ani_id)))];
+  if (ids.length > 0) {
+    _setCache(cle, ids);
+  }
+  return ids;
 }
 
 /**
