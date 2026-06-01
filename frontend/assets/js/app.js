@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchLocations, fetchLastLocations, fetchLastLocationsInactifs, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations } from './api.js';
+import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations } from './api.js';
 import { ROLES, DEV_PASSWORD, ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -186,14 +186,15 @@ async function startApp(token) {
     window._setAniIdSelectionne = setAniIdSelectionne;
     // mettreAJourIndividus(animals);
 
-    // Chargement initial (Tous par défaut : actifs + inactifs)
-    const [actifs, inactifs] = await Promise.all([
-      fetchLastLocations(token),
-      fetchLastLocationsInactifs(token, { ani_id: animals.map(a => a.ani_id) })
-    ]);
-    const actifsIds = new Set(actifs.map(l => l.ani_id));
-    const locations = [...actifs, ...inactifs.filter(l => !actifsIds.has(l.ani_id))];
+    // Une seule requête pour tout
+    const locations = await fetchAllLastLocations(currentToken);
     const locationsEnrichies = enrichirLocations(locations);
+
+    // Calculer activeIds directement depuis les données - cor_date_fin null = actif
+    setActiveIds(new Set(
+      locations.filter(l => l.cor_date_fin === null).map(l => l.ani_id)
+    ));
+
     const count = renderPoints(locationsEnrichies);
     mettreAJourPanneau(locationsEnrichies);
     document.getElementById('positionsCount').textContent = count;
@@ -201,15 +202,8 @@ async function startApp(token) {
     mettreAJourLegende();
     setLabelDatetime('Dernière position');
 
-
-
-    setActiveIds(new Set(actifs.map(l => l.ani_id)));
-
     // Identifier tous les animaux qui ont au moins une géométrie
-    const idsAvecGeom = new Set([
-      ...actifs.map(l => String(l.ani_id)),
-      ...inactifs.map(l => String(l.ani_id))
-    ]);
+    const idsAvecGeom = new Set(locations.map(l => String(l.ani_id)));
 
     const listeIndividus = document.getElementById('listeIndividus');
     const searchIndividu = document.getElementById('searchIndividu');
@@ -702,19 +696,14 @@ async function reinitialiserTousLesFiltres() {
         if (checkSuivis) checkSuivis.checked = false;
         supprimerBadgeById('checkSuivis');
 
-        const [actifs, inactifs] = await Promise.all([
-          fetchLastLocations(currentToken),
-          fetchLastLocationsInactifs(currentToken, { ani_id: animals.map(a => a.ani_id) })
-        ]);
-        const actifsIds = new Set(actifs.map(l => l.ani_id));
-        const locations = [...actifs, ...inactifs.filter(l => !actifsIds.has(l.ani_id))];
+        const locations = await fetchAllLastLocations(currentToken);
         const locationsEnrichies = enrichirLocations(locations);
         clearMapPoints();
         clearTrajectoire();
-        renderPoints(locationsEnrichies, false);
+        const count = renderPoints(locationsEnrichies, false);
         mettreAJourPanneau(locationsEnrichies);
         mettreAJourIndividus(animals.filter(a => locationsEnrichies.some(l => String(l.ani_id) === String(a.ani_id))));
-        document.getElementById('positionsCount').textContent = locations.length;
+        document.getElementById('positionsCount').textContent = count;
         mettreAJourLegende();
       } catch (err) {
         console.error('Erreur reset map:', err);
