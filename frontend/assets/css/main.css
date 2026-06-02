@@ -3,9 +3,9 @@
   --sidebar-width: 380px;
 
   /* Couleurs principales */
-  --color-primary: #2D6A4F;
-  --color-primary-light: #2D9469;
-  --color-primary-hover: #245640;
+  --color-primary: #099469;
+  --color-primary-light: #130101;
+  --color-primary-hover: #006B4A;
   --color-border: #e0e0e0;
   --color-bg: #ffffff;
   --color-bg-light: #f8f9fa;
@@ -39,7 +39,6 @@
   --panel-padding: 16px;
   --panel-width: 770px;
 }
-
 * {
   margin: 0;
   padding: 0;
@@ -93,10 +92,9 @@ header {
 }
 
 .logo-parc {
-  height: 40px;
+  height: 64px;
   width: auto;
-  object-fit: contain;
-  margin-right: 15px;
+  margin-left: -20px;
 }
 
 .logo-bqt {
@@ -147,12 +145,12 @@ header {
 }
 
 .nav-link:hover {
-  color: var(--color-primary-light);
+  color: var(--color-primary-hover);
   background: none;
 }
 
 .nav-link.active {
-  color: var(--color-primary-light);
+  color: var(--color-primary);
   background: none;
   border-radius: 0;
   box-shadow: none;
@@ -291,7 +289,7 @@ header {
 .sidebar-header {
   height: 43px;
   padding: 0 20px;
-  background: #2D6A4F;
+  background: var(--color-primary);
   color: #fff;
   font-family: var(--font-family);
   font-weight: 700;
@@ -300,6 +298,8 @@ header {
   display: flex;
   align-items: center;
 }
+
+
 
 .accordion {
   flex: 1;
@@ -374,7 +374,7 @@ details[open] summary::after {
   display: block;
   font-size: var(--sidebar-font-size-label);
   font-weight: 600;
-  color: var(--color-text-muted);
+  color: var(--color-primary);
   margin-bottom: 4px;
 }
 
@@ -403,6 +403,10 @@ details[open] summary::after {
   accent-color: #2D6A4F;
 }
 
+input[type="checkbox"] {
+  accent-color: var(--color-primary);
+}
+
 .range-group {
   margin-top: 5px;
 }
@@ -415,7 +419,7 @@ details[open] summary::after {
 
 .range-group input {
   width: 100%;
-  accent-color: #2D6A4F;
+  accent-color: var(--color-primary);
 }
 
 .btn-spatial {
@@ -455,10 +459,10 @@ details[open] summary::after {
   width: fit-content;
   align-self: center;
   padding: 8px 24px;
-  background: #2D6A4F;
+  background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 9px;
+  border-radius: 18px;
   font-weight: 700;
   font-size: var(--sidebar-font-size);
   font-family: var(--font-family);
@@ -467,7 +471,7 @@ details[open] summary::after {
 }
 
 .btn-apply:hover {
-  opacity: 0.9;
+  background-color: var(--color-primary-hover);
 }
 
 .btn-reset {
@@ -484,15 +488,14 @@ details[open] summary::after {
 .sidebar-toggle {
   position: absolute;
   left: 100%;
-  top: 50%;
+  top: 30%;
   transform: translateY(-50%);
-  width: 15px;
-  height: 30px;
-  min-height: 36px;
-  background: #2D6A4F;
+  width: 16px;
+  min-height: 100px;
+  background: var(--color-primary);
   color: #fff;
   border: none;
-  border-radius: 0 8px 8px 0;
+  border-radius: none;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -506,7 +509,7 @@ details[open] summary::after {
 }
 
 .sidebar-toggle:hover {
-  background: #245640;
+  background: var(--color-primary-hover);
 }
 
 .toggle-text {
@@ -581,7 +584,7 @@ details[open] summary::after {
 .filtres-actifs-label a {
   color: #2D6A4F;
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 .filtre-badge {
@@ -759,9 +762,9 @@ details[open] summary::after {
 #basemapActive .basemap-card-img {
   width: 64px;
   height: 64px;
-  border-radius: 6px;
+  border-radius: 7px;
   overflow: hidden;
-  border: 2px solid var(--color-primary);
+  border: 2px solid var(--color-primary-hover);
 }
 
 #basemapActive .basemap-card-img img {
@@ -794,7 +797,7 @@ details[open] summary::after {
   height: 64px;
   border-radius: 6px;
   overflow: hidden;
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   transition: border-color 0.15s;
 }
 
@@ -855,7 +858,7 @@ details[open] summary::after {
   justify-content: space-between;
   align-items: center;
   padding: 6px 10px;
-  background: #2D6A4F;
+  background: var(--color-primary-hover);
   color: white;
   border-radius: 0;
   font-weight: 600;
@@ -925,7 +928,7 @@ details[open] summary::after {
   padding: 6px 14px;
   background: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 1px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.2);
   font-family: var(--font-family);
   font-size: 13px;
@@ -936,7 +939,7 @@ details[open] summary::after {
 }
 
 .mode-btn.active {
-  background: var(--color-primary);
+  background: var(--color-primary-hover);
   color: white;
 }
 
@@ -1001,7 +1004,7 @@ details[open] summary::after {
 
 .positions-count-panel {
   background: white;
-  border-top: 1px solid var(--color-border);
+  border-top: none;
   padding: 6px 10px;
   font-family: var(--font-family);
   font-size: 12px;

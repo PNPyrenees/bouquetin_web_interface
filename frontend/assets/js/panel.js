@@ -75,7 +75,7 @@ export function initPanneau() {
           </button>
           <div class="panel-colonnes-dropdown" id="panelColonnesDropdown" style="display:none">
             <div class="panel-colonnes-header">
-              <span>Colonnes visibles</span>
+              <span>Colonnes</span>
               <button class="panel-colonnes-reset" id="panelColonnesReset">Réinitialiser</button>
             </div>
             ${colonnesDisponibles.map(c => `
@@ -115,7 +115,7 @@ export function initPanneau() {
           </button>
           <div class="panel-colonnes-dropdown" id="panelIndividusDropdown" style="display:none">
             <div class="panel-colonnes-header">
-              <span>Colonnes visibles</span>
+              <span>Colonnes</span>
               <button class="panel-colonnes-reset" id="panelIndividusReset">Réinitialiser</button>
             </div>
             ${colonnesIndividus.map(c => `

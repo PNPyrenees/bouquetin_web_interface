@@ -177,8 +177,6 @@ async function startApp(token) {
         programmationsMap.set(String(p.ani_id), p.prog_id);
       }
     });
-    window._progMap = programmationsMap; // ← debug temporaire
-
     // ← initPanneau() ici — après les données, avant le rendu
     initPanneau();
     window._scrollToAniId = scrollToAniId;

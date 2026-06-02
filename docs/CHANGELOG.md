@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [0.16.0] - 2026-06-02
+
+### Modifications UI
+- Couleur primaire : `#099469`, hover : `#006B4A`
+- Logo PNP agrandi (`height: 64px`) et repositionné (`margin-left: -20px`)
+- Bouton 'Appliquer les filtres' et bouton spatial : `border-radius: 18px`
+- Toggle sidebar : repositionné (`top: 30%`), hauteur augmentée (`min-height: 100px`), border-radius réduit à `1px`
+- Mode buttons Positions/Trajectoire : `border-radius: 1px`
+- Checkbox et range : `accent-color: var(--color-primary)`
+- Bouton 'Appliquer' hover : `background-color: var(--color-primary-hover)`
+- Positions count panel : séparateur `border-top` retiré
+- Badge filtre : border corrigé (`1px solid #b2d8bf`)
+- Basemap active : border `color-primary-hover`, vignette réduite à `1px`
+- Lien 'Réinitialiser' : `text-decoration: none`
+- Onglets panneau : trait actif via `::after` centré à `60%`
+
+### Modifications panel.js
+- Libellé dropdown colonnes : 'Colonnes visibles' → 'Colonnes'
+
 ## [0.15.0] - 2026-06-01
 
 ### Ajouts
