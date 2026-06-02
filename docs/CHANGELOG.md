@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [0.17.0] - 2026-06-02
+
+### Ajouts
+- TomSelect intégré sur tous les selects de la sidebar (Population, Sexe, Classe d'âge, Gestionnaire, Translocation, Programmation GPS)
+- Initialisation lazy au premier toggle de chaque accordéon - évite les problèmes de dimensions sur éléments cachés
+- Flatpickr intégré sur les champs date Du/Au - calendrier stylisé, locale fr, format d/m/Y, placeholder jj/mm/aaaa
+- `static: true` sur Flatpickr - calendrier stable sans déplacement au scroll
+- Logo `logo_tramnoir.png` en fond semi-transparent sur la sidebar (opacité 0.08 via ::before)
+- Spinner de chargement remplacé par le logo PNP rotatif avec filtre CSS vert
+
+### Modifications UI
+- Override CSS `.ts-wrapper.sidebar-select` - corrige l'héritage des styles sidebar-select sur le wrapper TomSelect
+- Variables root ajoutées : `--select-border-radius`, `--select-dropdown-radius`, `--select-hover-bg`, `--select-selected-bg`, `--select-color`, `--input-border-radius`, `--select-width`
+- Hover TomSelect harmonisé avec Flatpickr : `--select-hover-bg: #d1e5df`
+- Largeur selects réduite à `--select-width: 85%`
+- Z-index dropdowns TomSelect et Flatpickr à 9999
+- Options sélectionnées et au survol en couleur primaire `#099469`
+
 ## [0.16.0] - 2026-06-02
 
 ### Modifications UI

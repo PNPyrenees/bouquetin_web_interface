@@ -288,6 +288,52 @@ async function startApp(token) {
     // Initialisation du sélecteur de fond de carte
     initBasemapSelector();
 
+    // TomSelect — initialisation au premier toggle de chaque details
+    // Les selects natifs sont cachés via CSS (select.sidebar-select { display: none })
+    // TomSelect injecte son propre widget au premier toggle
+    ['selectPopulation', 'selectSexe', 'selectClasseAge', 'selectGestionnaire', 'selectTranslocation', 'selectProgrammation'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+
+      const details = el.closest('details');
+      if (!details) return;
+
+      let initialized = false;
+      details.addEventListener('toggle', () => {
+        if (!initialized && details.open) {
+          initialized = true;
+          new TomSelect(el, {
+            create: false,
+            allowEmptyOption: true,
+            onChange(value) {
+              el.value = value;
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+        }
+      });
+    });
+
+    // Flatpickr sur les champs date
+    const flatpickrConfig = {
+      locale: 'fr',
+      dateFormat: 'Y-m-d',
+      altInput: true,
+      altFormat: 'd/m/Y',
+      allowInput: true,
+      disableMobile: true,
+      static: true,
+      onReady(selectedDates, dateStr, instance) {
+        instance.altInput.placeholder = 'jj/mm/aaaa';
+      },
+      onChange(selectedDates, dateStr, instance) {
+        instance.input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    };
+
+    flatpickr('#dateFrom', flatpickrConfig);
+    flatpickr('#dateTo', flatpickrConfig);
+
     // Gestion du basculement entre les modes Positions et Trajectoire
     const btnPos = document.getElementById('btnPositions');
     const btnTraj = document.getElementById('btnTrajectoire');

@@ -1,6 +1,6 @@
 :root {
   /* Layout */
-  --sidebar-width: 380px;
+  --sidebar-width: 360px;
 
   /* Couleurs principales */
   --color-primary: #099469;
@@ -38,6 +38,15 @@
   --panel-header-height: 44px;
   --panel-padding: 16px;
   --panel-width: 770px;
+
+  /* Selects & pickers */
+  --select-border-radius: 10px;
+  --select-dropdown-radius: 8px;
+  --select-hover-bg: #d1e5df;
+  --select-selected-bg: var(--color-primary);
+  --select-color: #1a3d2f;
+  --input-border-radius: 10px;
+  --select-width: 85%;
 }
 * {
   margin: 0;
@@ -260,7 +269,7 @@ header {
   left: 0;
   width: var(--sidebar-width);
   height: calc(100vh - 60px);
-  background: #ffffff;
+  background: #d1e5df;
   border-right: 1px solid #e0e0e0;
   transition: transform 0.3s ease, width 0.3s ease;
   z-index: 1001;
@@ -273,12 +282,29 @@ header {
 }
 
 .sidebar-content {
+  position: relative;
   width: var(--sidebar-width);
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #fcfcfc;
+  background: #d1e5df;
+}
+
+.sidebar-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('../img/logo_tramnoir.png');
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: 80%;
+  opacity: 0.08;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .sidebar.collapsed .sidebar-content {
@@ -312,25 +338,27 @@ header {
 }
 
 .accordion::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: #ffffff;
   border-radius: 10px;
 }
 
 details {
-  border-bottom: 1px solid #eee;
+  border-bottom: none;
+  background: #ffffff;
 }
 
 summary {
   padding: var(--sidebar-summary-padding) var(--sidebar-padding);
   font-size: var(--sidebar-font-size);
   font-family: var(--font-family);
-  color: var(--color-text);
+  color: #1a3d2f;
   cursor: pointer;
   list-style: none;
   display: flex;
   justify-content: space-between;
   align-items: center;
   transition: background 0.2s;
+  background: #d1e5df;
 }
 
 summary:hover {
@@ -356,18 +384,41 @@ details[open] summary::after {
   display: flex;
   flex-direction: column;
   gap: var(--sidebar-gap);
-  background: #fff;
+  background: #c2dbd4;
+  border-radius: 0 0 4px 4px;
+}
+
+.sidebar-symbologie {
+  background: #d1e5df;
+  padding: 10px 16px;
+  border-radius: 4px;
 }
 
 .sidebar-input,
 .sidebar-select {
-  width: 100%;
+  width: 85%;
   height: var(--sidebar-item-height);
   padding: 6px 10px;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: var(--input-border-radius);
   font-size: var(--sidebar-font-size);
   font-family: var(--font-family);
+  background: #ffffff;
+}
+
+.sidebar-input {
+  border-radius: var(--input-border-radius);
+}
+
+.sidebar-select {
+  border-radius: var(--input-border-radius);
+  width: var(--select-width);
+}
+
+/* Les <select class="sidebar-select"> sont remplacés par TomSelect —
+   on les masque dès le CSS pour éviter tout flash avant l'initialisation JS */
+select.sidebar-select {
+  display: none;
 }
 
 .input-group label {
@@ -440,7 +491,7 @@ input[type="checkbox"] {
 
 .sidebar-footer {
   padding: 20px;
-  background: #fff;
+  background: #d1e5df;
   border-top: 1px solid #eee;
   display: flex;
   flex-direction: column;
@@ -567,9 +618,9 @@ input[type="checkbox"] {
 }
 
 .filtres-actifs {
-  padding: 8px 12px;
-  border-bottom: 1px solid #ddd;
-  background: #f9f9f9;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 6px;
+  padding: 8px;
 }
 
 .filtres-actifs-label {
@@ -591,11 +642,12 @@ input[type="checkbox"] {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: #e8f5ee;
+  background: rgba(255, 255, 255, 0.6);
   border: 1px solid #b2d8bf;
   padding: 3px 8px;
   border-radius: 999px;
   font-size: var(--sidebar-font-size-small);
+  color: #1a3d2f;
   margin: 2px;
 }
 
@@ -700,12 +752,14 @@ input[type="checkbox"] {
 }
 
 .map-loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #2D6A4F;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
+  width: 80px;
+  height: 80px;
+  background-image: url('../img/logo_tramnoir.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  animation: spin 2s linear infinite;
+  filter: invert(40%) sepia(60%) saturate(400%) hue-rotate(110deg);
 }
 
 @keyframes spin {
@@ -983,7 +1037,22 @@ input[type="checkbox"] {
 
 .sidebar-symbologie {
   padding: 12px var(--sidebar-padding);
-  background: #fff;
+  background: #d1e5df;
+}
+
+.sidebar-footer {
+  background: #d1e5df;
+}
+
+.sidebar .accordion,
+.sidebar .checkbox-label,
+.sidebar label,
+.sidebar-symbologie-label,
+.sidebar-symbologie-options label,
+details summary,
+.filtres-actifs-label,
+.filter-count {
+  color: #000000;
 }
 
 .sidebar-symbologie-label {
@@ -1061,14 +1130,6 @@ input[type="checkbox"] {
   gap: 12px;
 }
 
-.map-loading-spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e0e0e0;
-  border-top-color: #2D6A4F;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
 
 @keyframes spin {
   to {
@@ -1124,4 +1185,150 @@ input[type="checkbox"] {
 
 #toast.show {
   opacity: 1;
+}
+
+/* TomSelect */
+.ts-wrapper ~ select,
+select:has(+ .ts-wrapper) {
+  display: none !important;
+}
+
+.ts-wrapper .ts-control {
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  color: #1a3d2f;
+}
+
+
+.ts-wrapper.focus .ts-control {
+  border-color: var(--color-primary);
+  box-shadow: none;
+}
+
+.ts-dropdown {
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+}
+
+.ts-dropdown .option.selected,
+.ts-dropdown .option:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+/* Override - TomSelect hérite des classes sidebar-select */
+.ts-wrapper.sidebar-select {
+  height: auto !important;
+  border-radius: 0 !important;
+  border: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+  width: var(--select-width) !important;
+}
+
+.ts-wrapper.sidebar-select .ts-control {
+  border-radius: var(--select-border-radius);
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  height: 32px;
+  padding: 4px 10px;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  color: var(--select-color);
+  cursor: pointer;
+}
+
+.ts-wrapper.sidebar-select .ts-dropdown {
+  border-radius: var(--select-dropdown-radius);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.ts-wrapper.sidebar-select .ts-dropdown .option:hover,
+.ts-wrapper.sidebar-select .ts-dropdown .option.active {
+  background: var(--select-hover-bg) !important;
+  color: var(--select-color) !important;
+}
+
+.ts-wrapper.sidebar-select .ts-dropdown .option.selected {
+  background: var(--select-selected-bg) !important;
+  color: white !important;
+}
+
+/* Flatpickr */
+.flatpickr-calendar {
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  font-family: var(--font-family);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.flatpickr-day.selected,
+.flatpickr-day.selected:hover,
+.flatpickr-day.selected:focus {
+  background: var(--select-selected-bg) !important;
+  border-color: var(--select-selected-bg) !important;
+  color: white !important;
+}
+
+.flatpickr-day:hover,
+.flatpickr-day:focus {
+  background: var(--select-hover-bg) !important;
+  border-color: var(--select-hover-bg) !important;
+  color: var(--select-color) !important;
+}
+
+.flatpickr-day.today {
+  border-color: var(--color-primary) !important;
+  color: var(--color-primary) !important;
+}
+
+.flatpickr-day.today:hover {
+  background: #d1e5df !important;
+  border-color: var(--color-primary) !important;
+}
+
+.flatpickr-months .flatpickr-month,
+.flatpickr-current-month {
+  background: #ffffff !important;
+  color: #1a3d2f !important;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+  background: #ffffff !important;
+  color: #1a3d2f !important;
+}
+
+.flatpickr-current-month input.cur-year {
+  color: #1a3d2f !important;
+}
+
+.flatpickr-weekday {
+  color: var(--color-primary) !important;
+  font-weight: 700;
+}
+
+.flatpickr-prev-month svg,
+.flatpickr-next-month svg {
+  fill: var(--color-primary) !important;
+}
+
+.flatpickr-prev-month:hover svg,
+.flatpickr-next-month:hover svg {
+  fill: #d1e5df !important;
+}
+
+.ts-dropdown {
+  z-index: 9999 !important;
+}
+
+.flatpickr-calendar {
+  z-index: 9999 !important;
 }
