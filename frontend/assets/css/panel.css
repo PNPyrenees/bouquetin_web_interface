@@ -317,6 +317,7 @@
   padding: 10px var(--panel-padding);
   border-top: 1px solid var(--color-border);
   flex-shrink: 0;
+  gap: 12px;
 }
 
 .panel-pagination-controls {
@@ -597,6 +598,18 @@
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
+}
+
+.panel-positions-total {
+  font-family: var(--font-family);
+  font-size: var(--panel-font-size-small);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.panel-positions-total strong {
+  color: var(--color-primary);
+  font-weight: 700;
 }
 
 .panel-individus-placeholder {
