@@ -79,18 +79,20 @@ export async function applyFilters(token) {
         mettreAJourLegende();
         setLabelDatetime('Date/Heure');
 
-        const extent = getGpsSource().getExtent();
-        if (selectedIds.length === 1 && locations.length > 0) {
-          const loc = locations[0];
-          const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
-          if (geom?.coordinates) {
-            const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
-            const coord = ol.proj.fromLonLat(wgs84);
-            getMap().getView().animate({ center: coord, zoom: ZOOM_FILTER_SINGLE, duration: 400 });
+        setTimeout(() => {
+          const extent = getGpsSource().getExtent();
+          if (selectedIds.length === 1 && locations.length > 0) {
+            const loc = locations[0];
+            const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
+            if (geom?.coordinates) {
+              const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
+              const coord = ol.proj.fromLonLat(wgs84);
+              getMap().getView().animate({ center: coord, zoom: ZOOM_FILTER_SINGLE, duration: 400 });
+            }
+          } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
+            getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
           }
-        } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
-        }
+        }, 400); // augmenté de 0 à 400ms pour laisser le temps au redimensionnement
 
         return; // ← sortir du bloc isPositionMode
       }
@@ -140,20 +142,20 @@ export async function applyFilters(token) {
       mettreAJourLegende();
       setLabelDatetime('Dernière position');
 
-      const extent = getGpsSource().getExtent();
-      if (selectedIds.length === 1 && locations.length > 0) {
-        // 1 individu → zoom vers son point
-        const loc = locations[0];
-        const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
-        if (geom?.coordinates) {
-          const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
-          const coord = ol.proj.fromLonLat(wgs84);
-          getMap().getView().animate({ center: coord, zoom: ZOOM_FILTER_SINGLE, duration: 400 });
+      setTimeout(() => {
+        const extent = getGpsSource().getExtent();
+        if (selectedIds.length === 1 && locations.length > 0) {
+          const loc = locations[0];
+          const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
+          if (geom?.coordinates) {
+            const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
+            const coord = ol.proj.fromLonLat(wgs84);
+            getMap().getView().animate({ center: coord, zoom: ZOOM_FILTER_SINGLE, duration: 400 });
+          }
+        } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
+          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
         }
-      } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
-        // Plusieurs points → zoom adaptatif pour tous les voir
-        getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
-      }
+      }, 400); // augmenté de 0 à 400ms pour laisser le temps au redimensionnement
     } else {
       // Mode Trajectoire — on ne vide pas les points existants
       if (filters.date_from && filters.date_to) {
