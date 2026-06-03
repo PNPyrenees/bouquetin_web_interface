@@ -826,7 +826,6 @@ export function mettreAJourLegende() {
         <div class="legende-section-titre">Sexe</div>
         <div class="legende-item"><div class="legende-pastille" style="background:#3A86FF"></div><span>Mâle</span></div>
         <div class="legende-item"><div class="legende-pastille" style="background:#FF006E"></div><span>Femelle</span></div>
-        <div class="legende-item"><div class="legende-pastille" style="background:#888888"></div><span>Inconnu</span></div>
       `;
       break;
     case 'gestionnaire':
