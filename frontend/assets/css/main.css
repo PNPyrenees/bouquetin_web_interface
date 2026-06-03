@@ -882,21 +882,27 @@ input[type="checkbox"] {
 .basemap-card:hover span {
   color: var(--color-text);
 }
-/* Zoom remonté */
 .ol-zoom-custom {
   position: absolute;
-  bottom: 180px;
-  right: 10px;
+  top: 10px;
+  left: 10px;
+  bottom: auto;
+  right: auto;
   z-index: 100;
 }
 
 .legende-wrapper {
   position: absolute;
-  top: 10px;
+  bottom: 20px;
   left: 10px;
+  top: auto;
   z-index: 100;
-  min-width: 160px;
-  max-width: 200px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: unset;
+  max-width: unset;
 }
 
 .legende-panel {
@@ -1071,20 +1077,6 @@ details summary,
   gap: 8px;
 }
 
-.positions-count-panel {
-  background: white;
-  border-top: none;
-  padding: 6px 10px;
-  font-family: var(--font-family);
-  font-size: 12px;
-  color: var(--color-text-muted);
-  border-radius: 0 0 4px 4px;
-}
-
-.positions-count-panel strong {
-  color: var(--color-primary);
-  font-weight: 700;
-}
 
 
 .ol-zoom-custom-in,
@@ -1109,6 +1101,100 @@ details summary,
 .ol-zoom-custom-in:hover,
 .ol-zoom-custom-out:hover {
   background: #f4f4f4;
+}
+
+#scaleTarget {
+  display: flex;
+  align-items: flex-end;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 4px 8px;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+
+#scaleTarget .ol-scale-line {
+  position: relative !important;
+  bottom: auto !important;
+  left: auto !important;
+  background: transparent !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+}
+
+#scaleTarget .ol-scale-text {
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 600;
+  color: #333;
+  display: block;
+  text-align: left;
+  margin-bottom: 2px;
+  white-space: nowrap;
+}
+
+#scaleTarget .ol-scale-bar {
+  display: block;
+}
+
+#scaleTarget .ol-scale-singlebar-even {
+  background: #333 !important;
+  border: 1px solid #333 !important;
+  height: 8px;
+}
+
+#scaleTarget .ol-scale-singlebar-odd {
+  background: white !important;
+  border: 1px solid #333 !important;
+  height: 8px;
+}
+
+#scaleTarget .ol-scale-step-marker {
+  background: #333;
+  height: 10px;
+}
+
+#scaleTarget .ol-scale-step-text {
+  font-family: var(--font-family);
+  font-size: 10px;
+  color: #333;
+}
+
+.ol-fullscreen-custom {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  bottom: auto;
+  left: auto;
+}
+
+.ol-fullscreen-custom button {
+  display: block;
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: none;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  font-size: 16px;
+  color: #666;
+  cursor: pointer;
+  line-height: 32px;
+  text-align: center;
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.ol-fullscreen-custom button:hover {
+  background: #f4f4f4;
+}
+
+#map:-webkit-full-screen {
+  height: 100% !important;
+}
+
+#map:fullscreen {
+  height: 100% !important;
 }
 
 #mapLoading {
