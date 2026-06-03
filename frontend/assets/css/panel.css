@@ -459,7 +459,7 @@
 .th-filter {
   padding: 4px 6px;
   background: white;
-  border-top: 1px solid var(--color-border);
+  border-top: none;
 }
 
 .panel-table-filters th {
@@ -551,8 +551,7 @@
 
 .panel-tabs {
   display: flex;
-  border-bottom: 1px solid var(--color-border);
-
+  border-bottom: none;
   flex-shrink: 0;
   background: white;
 }
@@ -584,10 +583,10 @@
 .panel-tab.active::after {
   content: '';
   position: absolute;
-  bottom: -3px;
+  bottom: 0px; /* ← était -2px, maintenant 0 car plus de border-bottom */
   left: 50%;
   transform: translateX(-50%);
-  width: 60%; /* ← ajuste cette valeur pour la longueur du trait */
+  width: 60%;
   height: 2px;
   background: var(--color-primary);
 }
