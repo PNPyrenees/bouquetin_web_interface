@@ -195,7 +195,8 @@ async function startApp(token) {
 
     const count = renderPoints(locationsEnrichies);
     mettreAJourPanneau(locationsEnrichies);
-    document.getElementById('positionsCount').textContent = count;
+    const posEl = document.getElementById('positionsCount');
+    if (posEl) posEl.textContent = count;
     mettreAJourIndividus(enrichirAnimauxAvecPositions(locationsEnrichies));
     mettreAJourLegende();
     setLabelDatetime('Dernière position');
@@ -748,7 +749,8 @@ async function reinitialiserTousLesFiltres() {
         const count = renderPoints(locationsEnrichies, false);
         mettreAJourPanneau(locationsEnrichies);
         mettreAJourIndividus(animals.filter(a => locationsEnrichies.some(l => String(l.ani_id) === String(a.ani_id))));
-        document.getElementById('positionsCount').textContent = count;
+        const posEl = document.getElementById('positionsCount');
+        if (posEl) posEl.textContent = count;
         mettreAJourLegende();
       } catch (err) {
         console.error('Erreur reset map:', err);
