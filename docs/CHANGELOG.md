@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [0.19.0] - 2026-06-03
+
+### Ajouts
+- Contrôle FullScreen OpenLayers en haut à droite de la carte
+- Échelle scalebar OpenLayers avec ratio et barre graphique dans legende wrapper
+- Compteur positions totales dans la pagination du panneau attributaire
+
+### Modifications UI
+- Boutons zoom déplacés en haut à gauche
+- Légende et échelle repositionnées en bas à gauche côte à côte
+- Positions affichées retirées de la légende et intégrées dans la pagination
+- Pagination simplifiée fenêtre glissante 2 pages avec ellipsis
+
+### Corrections
+- Filtres sexe et gestionnaire appliqués côté JS car absents de v_animal_last_loc
+- Crash positionsCount corrigé via appels optionnels
+
 ## [0.18.0] - 2026-06-03
 
 ### Corrections
