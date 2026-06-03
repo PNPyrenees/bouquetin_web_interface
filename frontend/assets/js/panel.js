@@ -96,15 +96,18 @@ export function initPanneau() {
       <div class="panel-pagination" id="panelPagination">
         <div class="panel-pagesize-container">
           <select id="panelPageSizeSelect" class="panel-pagesize-select">
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
             <option value="25" selected>25</option>
             <option value="50">50</option>
             <option value="all">Tous</option>
           </select>
-          <span class="panel-pagesize-label">données / page</span>
         </div>
         <div class="panel-pagination-controls" id="panelPaginationControls">
           <span class="panel-page-info" id="panelPageInfo">Page 1 sur 0</span>
         </div>
+        <span class="panel-positions-total"><strong>0</strong> positions totales</span>
       </div>
     </div>
     <div class="panel-tab-content" id="panelContentIndividus" style="display:flex">
@@ -136,11 +139,13 @@ export function initPanneau() {
       <div class="panel-pagination" id="panelIndividusPagination">
         <div class="panel-pagesize-container">
           <select id="panelIndividusPageSizeSelect" class="panel-pagesize-select">
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="15">15</option>
             <option value="25" selected>25</option>
             <option value="50">50</option>
             <option value="all">Tous</option>
           </select>
-          <span class="panel-pagesize-label">données / page</span>
         </div>
         <div class="panel-pagination-controls" id="panelIndividusPaginationControls">
           <span class="panel-page-info" id="panelIndividusPageInfo">Page 1 sur 0</span>
@@ -497,6 +502,10 @@ function rendrePagination(total) {
   const pageInfo = document.getElementById('panelPageInfo');
   if (pageInfo) pageInfo.textContent = `Page ${pageCourante} sur ${nbPages || 0}`;
 
+  // Compteur positions — mis à jour avant le return
+  const totalEl = document.querySelector('.panel-positions-total');
+  if (totalEl) totalEl.innerHTML = `<strong>${donneesFiltrees.length}</strong> positions`;
+
   // Retirer les boutons existants en gardant le pageInfo
   paginationControls.querySelectorAll('.panel-page-btn, .panel-page-dots').forEach(b => b.remove());
 
@@ -515,14 +524,13 @@ function rendrePagination(total) {
   });
   fragment.appendChild(btnPrev);
 
-  // Boutons numéros avec ellipses
+  // Fenêtre glissante : page courante + suivante, ellipsis si suite
   const pages = [];
-  for (let i = 1; i <= nbPages; i++) {
-    if (i === 1 || i === nbPages || (i >= pageCourante - 1 && i <= pageCourante + 1)) {
-      pages.push(i);
-    } else if (pages[pages.length - 1] !== '...') {
-      pages.push('...');
-    }
+  for (let i = pageCourante; i <= Math.min(pageCourante + 1, nbPages); i++) {
+    pages.push(i);
+  }
+  if (pageCourante + 1 < nbPages) {
+    pages.push('...');
   }
 
   pages.forEach(p => {
@@ -807,12 +815,11 @@ function rendrePaginationIndividus(total) {
   fragment.appendChild(btnPrev);
 
   const pages = [];
-  for (let i = 1; i <= nbPages; i++) {
-    if (i === 1 || i === nbPages || (i >= pageCouranteIndividus - 1 && i <= pageCouranteIndividus + 1)) {
-      pages.push(i);
-    } else if (pages[pages.length - 1] !== '...') {
-      pages.push('...');
-    }
+  for (let i = pageCouranteIndividus; i <= Math.min(pageCouranteIndividus + 1, nbPages); i++) {
+    pages.push(i);
+  }
+  if (pageCouranteIndividus + 1 < nbPages) {
+    pages.push('...');
   }
 
   pages.forEach(p => {
