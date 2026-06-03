@@ -87,7 +87,8 @@ export async function applyFilters(token) {
           mapScreen?.classList.add('panel-open');
           setTimeout(() => updateMapSize(), 310);
         }
-        document.getElementById('positionsCount').textContent = count;
+        const posEl = document.getElementById('positionsCount');
+        if (posEl) posEl.textContent = count;
         mettreAJourLegende();
         setLabelDatetime('Date/Heure');
 
@@ -158,7 +159,8 @@ export async function applyFilters(token) {
         mapScreen?.classList.add('panel-open');
         setTimeout(() => updateMapSize(), 310);
       }
-      document.getElementById('positionsCount').textContent = count;
+      const posEl = document.getElementById('positionsCount');
+      if (posEl) posEl.textContent = count;
       mettreAJourLegende();
       setLabelDatetime('Dernière position');
 
@@ -248,7 +250,8 @@ export async function applyFilters(token) {
       }
       renderTrajectoire(locations, modeCouleur);
 
-      document.getElementById('positionsCount').textContent = count;
+      const posEl = document.getElementById('positionsCount');
+      if (posEl) posEl.textContent = count;
       mettreAJourLegende();
 
       setTimeout(() => {
