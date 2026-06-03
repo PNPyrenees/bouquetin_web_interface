@@ -157,9 +157,21 @@ export function initMap(targetId, popupId) {
     }),
     controls: ol.control.defaults.defaults({ zoom: false }).extend([
       new ol.control.Zoom({ className: 'ol-zoom-custom' }),
-      new ol.control.ScaleLine({ units: 'metric' })
+      new ol.control.ScaleLine({
+        units: 'metric',
+        type: 'scalebar',
+        steps: 4,
+        text: true,
+        minWidth: 100,
+        target: document.getElementById('scaleTarget')
+      })
     ])
   });
+
+  const fullscreenControl = new ol.control.FullScreen({
+    className: 'ol-fullscreen-custom'
+  });
+  map.addControl(fullscreenControl);
 
   // Changement du curseur au survol d'un point
   map.on('pointermove', evt => {
