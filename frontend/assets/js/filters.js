@@ -55,11 +55,23 @@ export async function applyFilters(token) {
           ani_id: idsAInterroger,
           date_from: filters.date_from,
           date_to: filters.date_to,
-          sexe: filters.sexe,
-          gestionnaire: filters.gestionnaire,
           population: filters.population,
           include_outliers: filters.include_outliers
         });
+
+        // Filtres sexe et gestionnaire côté JS car absents de v_animal_last_loc
+        if (filters.sexe) {
+          locations = locations.filter(l => {
+            const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
+            return ani?.ani_sexe === filters.sexe;
+          });
+        }
+        if (filters.gestionnaire) {
+          locations = locations.filter(l => {
+            const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
+            return ani?.ani_gestionnaire === filters.gestionnaire;
+          });
+        }
 
         locations = enrichirLocations(locations);
 
@@ -99,8 +111,6 @@ export async function applyFilters(token) {
 
       if (suivisSeulement) {
         locations = await fetchAllLastLocations(token, {
-          sexe: filters.sexe,
-          gestionnaire: filters.gestionnaire,
           population: filters.population,
           include_outliers: filters.include_outliers
         });
@@ -108,14 +118,24 @@ export async function applyFilters(token) {
         locations = locations.filter(l => l.cor_date_fin === null);
       } else {
         locations = await fetchAllLastLocations(token, {
-          sexe: filters.sexe,
-          gestionnaire: filters.gestionnaire,
           population: filters.population,
           include_outliers: filters.include_outliers
         });
       }
 
       // Filtres supplémentaires côté JS
+      if (filters.sexe) {
+        locations = locations.filter(l => {
+          const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
+          return ani?.ani_sexe === filters.sexe;
+        });
+      }
+      if (filters.gestionnaire) {
+        locations = locations.filter(l => {
+          const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
+          return ani?.ani_gestionnaire === filters.gestionnaire;
+        });
+      }
       if (selectedIds.length > 0) {
         locations = locations.filter(l => selectedIds.includes(String(l.ani_id)));
       }
