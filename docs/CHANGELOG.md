@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.18.0] - 2026-06-03
+
+### Corrections
+- Zoom au premier filtre avec plusieurs individus délai 400ms pour laisser le temps au redimensionnement du panneau
+- Label Inconnu retiré de la légende en mode couleur Sexe
+- Libellé prog id 5 corrigé 8 locs/j (3h/90s) au lieu de 6 locs/j
+
+### Modifications UI
+- Traits sous les en-têtes de colonnes du tableau retirés
+- Trait sous les onglets Individus/Données retiré trait vert actif conservé via after
+- Vignettes fonds de carte sans border radius
+- En-tête Légende masqué
+
 ## [0.17.0] - 2026-06-02
 
 ### Ajouts
