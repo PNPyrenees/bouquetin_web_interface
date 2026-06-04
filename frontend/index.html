@@ -70,12 +70,18 @@
           <summary>Période</summary>
           <div class="details-content">
             <div class="input-group">
+              <label>Année</label>
+              <select id="selectAnnee" class="sidebar-select">
+                <option value="">Toutes les années</option>
+              </select>
+            </div>
+            <div class="input-group">
               <label>Du</label>
-              <input type="date" class="sidebar-input" id="dateFrom">
+              <input type="text" class="sidebar-input" id="dateFrom" placeholder="jj/mm">
             </div>
             <div class="input-group">
               <label>Au</label>
-              <input type="date" class="sidebar-input" id="dateTo">
+              <input type="text" class="sidebar-input" id="dateTo" placeholder="jj/mm">
             </div>
           </div>
         </details>
@@ -83,10 +89,10 @@
         <details>
           <summary>Saison</summary>
           <div class="details-content">
-            <label class="checkbox-label"><input type="checkbox" id="checkRude"> Rude</label>
             <label class="checkbox-label"><input type="checkbox" id="checkHiver"> Hiver</label>
             <label class="checkbox-label"><input type="checkbox" id="checkPrintemps"> Printemps</label>
             <label class="checkbox-label"><input type="checkbox" id="checkEte"> Été</label>
+            <label class="checkbox-label"><input type="checkbox" id="checkRude"> RuT</label>
           </div>
         </details>
 
