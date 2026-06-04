@@ -450,14 +450,14 @@ function initSidebarBadges(token) {
     checkHiver:     { from: '01/01', to: '31/03', label: 'Hiver' },
     checkPrintemps: { from: '01/04', to: '30/06', label: 'Printemps' },
     checkEte:       { from: '01/07', to: '15/10', label: 'Été' },
-    checkRude:      { from: '16/10', to: '31/12', label: 'Rude' }
+    checkRut:      { from: '16/10', to: '31/12', label: 'Rut' }
   };
 
   const datesSaisonModifiees = {
     checkHiver: null,
     checkPrintemps: null,
     checkEte: null,
-    checkRude: null
+    checkRut: null
   };
 
   function mettreAJourBadgeSaison(id, label, estModifie) {
@@ -477,7 +477,7 @@ function initSidebarBadges(token) {
     const prefix = id === 'dateFrom' ? 'Du ' : 'Au ';
 
     el.addEventListener('change', () => {
-      const saisonsCochees = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRude']
+      const saisonsCochees = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut']
         .filter(sid => document.getElementById(sid)?.checked);
 
       if (saisonsCochees.length === 1) {
@@ -566,7 +566,7 @@ function initSidebarBadges(token) {
       }
     });
     // Si une saison est cochée, mettre à jour les dates jj/mm et son badge
-    ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRude'].forEach(id => {
+    ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut'].forEach(id => {
       const cb = document.getElementById(id);
       if (cb?.checked) cb.dispatchEvent(new Event('change'));
     });
@@ -580,7 +580,7 @@ function initSidebarBadges(token) {
   });
 
   // Saisons
-  ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRude'].forEach(id => {
+  ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     const saison = SAISONS_DATES[id];
@@ -593,7 +593,7 @@ function initSidebarBadges(token) {
         const badgeLabel = annee ? `${saison.label} ${annee}` : saison.label;
         const datesMemoisees = datesSaisonModifiees[id];
 
-        const saisonsCochees = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRude']
+        const saisonsCochees = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut']
           .filter(sid => document.getElementById(sid)?.checked);
 
         if (saisonsCochees.length === 1) {
@@ -615,7 +615,7 @@ function initSidebarBadges(token) {
           supprimerBadgeById(id);
           datesSaisonModifiees[id] = null;
 
-          const saisonsRestantes = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRude']
+          const saisonsRestantes = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut']
             .filter(sid => document.getElementById(sid)?.checked);
 
           if (saisonsRestantes.length === 1) {
@@ -663,7 +663,7 @@ function initSidebarBadges(token) {
         }
 
       } else {
-        const saisonsRestantes = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRude']
+        const saisonsRestantes = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut']
           .filter(sid => document.getElementById(sid)?.checked);
 
         if (saisonsRestantes.length === 1) {
@@ -932,7 +932,7 @@ async function reinitialiserTousLesFiltres() {
     });
     mettreAJourListeParDate();
 
-    ['checkRude', 'checkHiver', 'checkPrintemps', 'checkEte'].forEach(id => {
+    ['checkRut', 'checkHiver', 'checkPrintemps', 'checkEte'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.checked = false;
       supprimerBadgeById(id);

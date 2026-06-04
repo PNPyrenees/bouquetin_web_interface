@@ -33,7 +33,7 @@ export async function applyFilters(token) {
   };
 
   const saisons = {
-  rude: document.getElementById('checkRude')?.checked || false,
+  rut: document.getElementById('checkRut')?.checked || false,
   hiver: document.getElementById('checkHiver')?.checked || false,
   printemps: document.getElementById('checkPrintemps')?.checked || false,
   ete: document.getElementById('checkEte')?.checked || false
@@ -289,7 +289,7 @@ function correspondALaSaison(date, saisons) {
     (mois === 9) ||
     (mois === 10 && jour <= 15);
 
-  const estRude =
+  const estRut =
     (mois === 10 && jour >= 16) ||
     mois === 11 ||
     mois === 12;
@@ -298,7 +298,7 @@ function correspondALaSaison(date, saisons) {
     (saisons.hiver && estHiver) ||
     (saisons.printemps && estPrintemps) ||
     (saisons.ete && estEte) ||
-    (saisons.rude && estRude)
+    (saisons.rut && estRut)
   );
 }
 
