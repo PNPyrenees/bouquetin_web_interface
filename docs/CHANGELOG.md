@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [0.20.0] - 2026-06-04
+
+### Ajouts
+- Selecteur d'annee partage entre Periode et Saison - pilote les deux filtres
+- Memorisation des dates personnalisees par saison via datesSaisonModifiees
+- Badge saison cliquable - affiche les dates dans les inputs au clic sans supprimer le badge
+- Badge badge-modifie - couleur differenciee quand les dates d'une saison ont ete modifiees manuellement
+- Filtrage liste individus par jj/mm sur toutes les annees confondues quand aucune annee selectionnee
+- dataset.derniereDatePos ajoute sur chaque label individu pour le filtrage cote JS
+- Inputs Du/Au en format jj/mm avec masque automatique sans Flatpickr
+
+### Modifications
+- Saisons listener appelle mettreAJourListeParDate au lieu de filtrerListeIndividus
+- selectAnnee listener appelle mettreAJourListeParDate si dates presentes
+- mettreAJourListeParDate refactorise avec fonction _appliquerFiltreListeAvecIds
+- selectTranslocation retire des badges car filtre non implemente cote liste et API
+
+### Corrections
+- Restauration dates memorisees quand on revient a une seule saison cochee
+- Badge saison restaure la couleur badge-modifie apres decocher/recocher
+
 ## [0.19.0] - 2026-06-03
 
 ### Ajouts
