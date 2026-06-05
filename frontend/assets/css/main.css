@@ -1367,3 +1367,22 @@ select:has(+ .ts-wrapper) {
 .ts-dropdown {
   z-index: 9999 !important;
 }
+
+.date-jjmm-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.date-jjmm-picker .date-jj {
+  width: 70px;
+}
+
+.date-jjmm-picker .date-mm {
+  width: calc(var(--select-width) - 80px);
+}
+
+.date-sep {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}

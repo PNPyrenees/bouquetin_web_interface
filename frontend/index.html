@@ -75,13 +75,55 @@
                 <option value="">Toutes les années</option>
               </select>
             </div>
-            <div class="input-group">
+            <div class='input-group'>
               <label>Du</label>
-              <input type="text" class="sidebar-input" id="dateFrom" placeholder="jj/mm">
+              <div class='date-jjmm-picker' id='pickerFrom'>
+                <select id='dateFromJJ' class='sidebar-select date-jj'>
+                  <option value=''>JJ</option>
+                </select>
+                <span class='date-sep'>/</span>
+                <select id='dateFromMM' class='sidebar-select date-mm'>
+                  <option value=''>MM</option>
+                  <option value='01'>Jan</option>
+                  <option value='02'>Fév</option>
+                  <option value='03'>Mar</option>
+                  <option value='04'>Avr</option>
+                  <option value='05'>Mai</option>
+                  <option value='06'>Jun</option>
+                  <option value='07'>Jul</option>
+                  <option value='08'>Aoû</option>
+                  <option value='09'>Sep</option>
+                  <option value='10'>Oct</option>
+                  <option value='11'>Nov</option>
+                  <option value='12'>Déc</option>
+                </select>
+                <input type='hidden' id='dateFrom' value=''>
+              </div>
             </div>
-            <div class="input-group">
+            <div class='input-group'>
               <label>Au</label>
-              <input type="text" class="sidebar-input" id="dateTo" placeholder="jj/mm">
+              <div class='date-jjmm-picker' id='pickerTo'>
+                <select id='dateToJJ' class='sidebar-select date-jj'>
+                  <option value=''>JJ</option>
+                </select>
+                <span class='date-sep'>/</span>
+                <select id='dateToMM' class='sidebar-select date-mm'>
+                  <option value=''>MM</option>
+                  <option value='01'>Jan</option>
+                  <option value='02'>Fév</option>
+                  <option value='03'>Mar</option>
+                  <option value='04'>Avr</option>
+                  <option value='05'>Mai</option>
+                  <option value='06'>Jun</option>
+                  <option value='07'>Jul</option>
+                  <option value='08'>Aoû</option>
+                  <option value='09'>Sep</option>
+                  <option value='10'>Oct</option>
+                  <option value='11'>Nov</option>
+                  <option value='12'>Déc</option>
+                </select>
+                <input type='hidden' id='dateTo' value=''>
+              </div>
             </div>
           </div>
         </details>
