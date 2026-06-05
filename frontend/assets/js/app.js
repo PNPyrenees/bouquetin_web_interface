@@ -351,37 +351,24 @@ async function startApp(token) {
       });
     });
 
-    // Peupler les selects JJ (1-31)
-    ['dateFromJJ', 'dateToJJ'].forEach(id => {
+    // Listeners sur dateFrom et dateTo (masque automatique et validation sur blur)
+    ['dateFrom', 'dateTo'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
-      for (let j = 1; j <= 31; j++) {
-        const opt = document.createElement('option');
-        opt.value = String(j).padStart(2, '0');
-        opt.textContent = String(j).padStart(2, '0');
-        el.appendChild(opt);
-      }
-    });
 
-    // Synchroniser JJ/MM → input hidden dateFrom/dateTo
-    function syncDatePicker(prefix) {
-      const jj = document.getElementById(`${prefix}JJ`)?.value;
-      const mm = document.getElementById(`${prefix}MM`)?.value;
-      const hidden = document.getElementById(prefix === 'dateFrom' ? 'dateFrom' : 'dateTo');
-      if (!hidden) return;
-      if (jj && mm) {
-        hidden.value = `${jj}/${mm}`;
-      } else {
-        hidden.value = '';
-      }
-      hidden.dispatchEvent(new Event('change', { bubbles: true }));
-    }
+      // Masque automatique jj/mm
+      el.addEventListener('input', () => {
+        let val = el.value.replace(/\D/g, ''); // garder uniquement les chiffres
+        if (val.length >= 3) val = val.slice(0, 2) + '/' + val.slice(2, 4);
+        el.value = val;
+      });
 
-    ['dateFromJJ', 'dateFromMM'].forEach(id => {
-      document.getElementById(id)?.addEventListener('change', () => syncDatePicker('dateFrom'));
-    });
-    ['dateToJJ', 'dateToMM'].forEach(id => {
-      document.getElementById(id)?.addEventListener('change', () => syncDatePicker('dateTo'));
+      el.addEventListener('blur', () => {
+        if (el.value && !/^\d{2}\/\d{2}$/.test(el.value)) {
+          el.value = ''; // vider si format invalide
+        }
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      });
     });
 
     // Gestion du basculement entre les modes Positions et Trajectoire
@@ -477,31 +464,9 @@ function initSidebarBadges(token) {
     const badge = document.querySelector(`.filtre-badge[data-id='${id}']`);
     if (badge) {
       const btn = badge.querySelector('button');
-      Array.from(badge.childNodes).forEach(node => {
-        if (node !== btn) node.remove();
-      });
-      badge.insertBefore(document.createTextNode(label + ' '), btn);
+      badge.innerHTML = `${label} `;
+      badge.appendChild(btn);
       badge.classList.toggle('badge-modifie', estModifie);
-    }
-  }
-
-  function remplirDatePicker(inputId, valJJMM) {
-    const prefix = inputId === 'dateFrom' ? 'dateFrom' : 'dateTo';
-    const jjEl = document.getElementById(`${prefix}JJ`);
-    const mmEl = document.getElementById(`${prefix}MM`);
-    const hidden = document.getElementById(inputId);
-    if (!valJJMM || !/^\d{2}\/\d{2}$/.test(valJJMM)) {
-      if (jjEl) jjEl.value = '';
-      if (mmEl) mmEl.value = '';
-      if (hidden) { hidden.value = ''; hidden.dispatchEvent(new Event('change', { bubbles: true })); }
-      return;
-    }
-    const [jj, mm] = valJJMM.split('/');
-    if (jjEl) jjEl.value = jj;
-    if (mmEl) mmEl.value = mm;
-    if (hidden) {
-      hidden.value = valJJMM;
-      hidden.dispatchEvent(new Event('change', { bubbles: true }));
     }
   }
 
@@ -632,13 +597,17 @@ function initSidebarBadges(token) {
           .filter(sid => document.getElementById(sid)?.checked);
 
         if (saisonsCochees.length === 1) {
+          const dateFromEl = document.getElementById('dateFrom');
+          const dateToEl = document.getElementById('dateTo');
           const fromVal = datesMemoisees?.from || saison.from;
           const toVal = datesMemoisees?.to || saison.to;
-          supprimerBadgeById('dateFrom'); remplirDatePicker('dateFrom', fromVal);
-          supprimerBadgeById('dateTo'); remplirDatePicker('dateTo', toVal);
+          if (dateFromEl) { supprimerBadgeById('dateFrom'); dateFromEl.value = fromVal; }
+          if (dateToEl) { supprimerBadgeById('dateTo'); dateToEl.value = toVal; }
         } else {
-          supprimerBadgeById('dateFrom'); remplirDatePicker('dateFrom', '');
-          supprimerBadgeById('dateTo'); remplirDatePicker('dateTo', '');
+          const dateFromEl = document.getElementById('dateFrom');
+          const dateToEl = document.getElementById('dateTo');
+          if (dateFromEl) { supprimerBadgeById('dateFrom'); dateFromEl.value = ''; }
+          if (dateToEl) { supprimerBadgeById('dateTo'); dateToEl.value = ''; }
         }
 
         ajouterBadge(badgeLabel, () => {
@@ -655,23 +624,39 @@ function initSidebarBadges(token) {
             const datesMemoisees = datesSaisonModifiees[idRestant];
             const fromVal = datesMemoisees?.from || saisonRestante.from;
             const toVal = datesMemoisees?.to || saisonRestante.to;
-            supprimerBadgeById('dateFrom'); remplirDatePicker('dateFrom', fromVal);
-            supprimerBadgeById('dateTo'); remplirDatePicker('dateTo', toVal);
+            const dateFromEl = document.getElementById('dateFrom');
+            const dateToEl = document.getElementById('dateTo');
+            if (dateFromEl) {
+              supprimerBadgeById('dateFrom');
+              dateFromEl.value = fromVal;
+              dateFromEl.dispatchEvent(new Event('input', { bubbles: true }));
+              dateFromEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            if (dateToEl) {
+              supprimerBadgeById('dateTo');
+              dateToEl.value = toVal;
+              dateToEl.dispatchEvent(new Event('input', { bubbles: true }));
+              dateToEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
             const annee = document.getElementById('selectAnnee')?.value;
             const badgeLabel = annee ? `${saisonRestante.label} ${annee}` : saisonRestante.label;
             mettreAJourBadgeSaison(idRestant, badgeLabel, !!datesMemoisees);
           } else if (saisonsRestantes.length === 0) {
-            supprimerBadgeById('dateFrom'); remplirDatePicker('dateFrom', '');
-            supprimerBadgeById('dateTo'); remplirDatePicker('dateTo', '');
+            const dateFromEl = document.getElementById('dateFrom');
+            const dateToEl = document.getElementById('dateTo');
+            if (dateFromEl) { supprimerBadgeById('dateFrom'); dateFromEl.value = ''; dateFromEl.dispatchEvent(new Event('change', { bubbles: true })); }
+            if (dateToEl) { supprimerBadgeById('dateTo'); dateToEl.value = ''; dateToEl.dispatchEvent(new Event('change', { bubbles: true })); }
           }
 
           mettreAJourListeParDate();
         }, id, () => {
+          const dateFromEl = document.getElementById('dateFrom');
+          const dateToEl = document.getElementById('dateTo');
           const datesMemoisees = datesSaisonModifiees[id];
           const fromVal = datesMemoisees?.from || saison.from;
           const toVal = datesMemoisees?.to || saison.to;
-          remplirDatePicker('dateFrom', fromVal);
-          remplirDatePicker('dateTo', toVal);
+          if (dateFromEl) { dateFromEl.value = fromVal; dateFromEl.dispatchEvent(new CustomEvent('input', { bubbles: true, detail: { programmatic: true } })); }
+          if (dateToEl) { dateToEl.value = toVal; dateToEl.dispatchEvent(new CustomEvent('input', { bubbles: true, detail: { programmatic: true } })); }
         });
         if (datesMemoisees) {
           mettreAJourBadgeSaison(id, badgeLabel, true);
@@ -687,14 +672,28 @@ function initSidebarBadges(token) {
           const datesMemoisees = datesSaisonModifiees[idRestant];
           const fromVal = datesMemoisees?.from || saisonRestante.from;
           const toVal = datesMemoisees?.to || saisonRestante.to;
-          supprimerBadgeById('dateFrom'); remplirDatePicker('dateFrom', fromVal);
-          supprimerBadgeById('dateTo'); remplirDatePicker('dateTo', toVal);
+          const dateFromEl = document.getElementById('dateFrom');
+          const dateToEl = document.getElementById('dateTo');
+          if (dateFromEl) {
+            supprimerBadgeById('dateFrom');
+            dateFromEl.value = fromVal;
+            dateFromEl.dispatchEvent(new Event('input', { bubbles: true }));
+            dateFromEl.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          if (dateToEl) {
+            supprimerBadgeById('dateTo');
+            dateToEl.value = toVal;
+            dateToEl.dispatchEvent(new Event('input', { bubbles: true }));
+            dateToEl.dispatchEvent(new Event('change', { bubbles: true }));
+          }
           const annee = document.getElementById('selectAnnee')?.value;
           const badgeLabel = annee ? `${saisonRestante.label} ${annee}` : saisonRestante.label;
           mettreAJourBadgeSaison(idRestant, badgeLabel, !!datesMemoisees);
         } else if (saisonsRestantes.length === 0) {
-          supprimerBadgeById('dateFrom'); remplirDatePicker('dateFrom', '');
-          supprimerBadgeById('dateTo'); remplirDatePicker('dateTo', '');
+          const dateFromEl = document.getElementById('dateFrom');
+          const dateToEl = document.getElementById('dateTo');
+          if (dateFromEl) { supprimerBadgeById('dateFrom'); dateFromEl.value = ''; dateFromEl.dispatchEvent(new Event('change', { bubbles: true })); }
+          if (dateToEl) { supprimerBadgeById('dateTo'); dateToEl.value = ''; dateToEl.dispatchEvent(new Event('change', { bubbles: true })); }
         }
       }
 
@@ -916,11 +915,6 @@ async function reinitialiserTousLesFiltres() {
     if (searchIndividu) searchIndividu.value = '';
 
     ['dateFrom', 'dateTo'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
-
-    ['dateFromJJ', 'dateFromMM', 'dateToJJ', 'dateToMM'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
