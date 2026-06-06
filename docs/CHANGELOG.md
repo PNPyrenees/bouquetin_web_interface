@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## [0.21.0] - 2026-06-06
+
+### Ajouts
+- Filtrage liste individus en temps réel à la sélection année seule via fetchAnimalIdsParPeriode
+- Filtrage liste individus en temps réel à la sélection saison + année via union des plages API
+- Filtrage liste individus en temps réel à la sélection saison sans année via union toutes années
+- Filtre année seule sur la carte au clic Appliquer
+- Mode Positions avec filtre temporel utilise fetchLastLocationsParPeriode pour afficher la dernière position dans la période au lieu de la dernière position absolue
+- Mécanisme anti-requête-obsolète via _derniereRequeteId pour éviter les écrasements de liste
+
+### Modifications
+- applyFilters mode Positions : bascule automatique entre fetchAllLastLocations et fetchLastLocationsParPeriode selon les filtres actifs
+- mettreAJourListeParDate refactorisé avec gestion année seule, saison+année, saison sans année, dates seules
+- TomSelect onChange selectAnnee appelle directement mettreAJourListeParDate via setTimeout
+- reinitialiserTousLesFiltres réécrite pour garantir un état initial complet
+
+### Corrections
+- Badge-modifie saison préserve le listener onClick via manipulation nœuds texte
+- Restauration dates mémorisées quand on revient à une seule saison cochée
+- Filtre saison cumulatif correct en mode Positions
+- Réinitialisation TomSelect selectAnnee via setValue vide
+
+### Connu — à corriger
+- Saison sans année : liste individus correcte mais carte peut manquer certains animaux (fetchLastLocationsParPeriode incomplet sur toutes années)
+
 ## [0.20.0] - 2026-06-04
 
 ### Ajouts
