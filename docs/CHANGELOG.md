@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.21.1] - 2026-06-08
+
+### Corrections
+- Refonte complète du filtrage temporel via fonction getPeriodesActives() partagée entre mettreAJourListeParDate et applyFilters
+- Multi-saisons + année : union correcte des individus et positions par saison au lieu de la dernière saison seulement
+- Liste individus et carte toujours cohérentes en nombre et en individus
+- applyFilters mode Positions : utilise getPeriodesActives pour construire les périodes, fetchLastLocationsParPeriode par période puis fusion avec position la plus récente par animal
+
 ## [0.21.0] - 2026-06-06
 
 ### Ajouts
