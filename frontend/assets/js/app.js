@@ -732,25 +732,7 @@ function initSidebarBadges(token) {
         }
       }
 
-      const anneeSelectionnee = document.getElementById('selectAnnee')?.value;
-      const dateFromVal = document.getElementById('dateFrom')?.value;
-      const dateToVal = document.getElementById('dateTo')?.value;
-
-      if (anneeSelectionnee && dateFromVal && dateToVal &&
-          /^\d{2}\/\d{2}$/.test(dateFromVal) && /^\d{2}\/\d{2}$/.test(dateToVal)) {
-        const [jFrom, mFrom] = dateFromVal.split('/');
-        const [jTo, mTo] = dateToVal.split('/');
-        fetchAnimalIdsParPeriode(getCurrentToken(), {
-          date_from: `${anneeSelectionnee}-${mFrom}-${jFrom}`,
-          date_to: `${anneeSelectionnee}-${mTo}-${jTo}`,
-          include_outliers: false
-        }).then(ids => {
-          window._filtreListeDirectIds = new Set(ids.map(String));
-          mettreAJourListeParDate();
-        });
-      } else {
-        mettreAJourListeParDate();
-      }
+      mettreAJourListeParDate();
     });
   });
 

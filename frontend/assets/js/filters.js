@@ -11,6 +11,127 @@ import {
   ajouterBadge, supprimerBadgeById, mettreAJourFiltresActifs
 } from './app.js';
 
+export function getPeriodesActives() {
+  const annee = document.getElementById('selectAnnee')?.value || '';
+  const dateFrom = document.getElementById('dateFrom')?.value || '';
+  const dateTo = document.getElementById('dateTo')?.value || '';
+
+  const saisons = {
+    hiver: document.getElementById('checkHiver')?.checked || false,
+    printemps: document.getElementById('checkPrintemps')?.checked || false,
+    ete: document.getElementById('checkEte')?.checked || false,
+    rut: document.getElementById('checkRut')?.checked || false
+  };
+
+  const SAISONS_BORNES = {
+    hiver: { from: '01-01', to: '03-31' },
+    printemps: { from: '04-01', to: '06-30' },
+    ete: { from: '07-01', to: '10-15' },
+    rut: { from: '10-16', to: '12-31' }
+  };
+
+  const saisonsCochees = Object.entries(saisons).filter(([, v]) => v).map(([k]) => k);
+  const saisonActive = saisonsCochees.length > 0;
+
+  if (saisonActive && saisonsCochees.length > 1) {
+    if (annee) {
+      return saisonsCochees.map(k => ({
+        from: `${annee}-${SAISONS_BORNES[k].from}`,
+        to: `${annee}-${SAISONS_BORNES[k].to}`,
+        source: k
+      }));
+    }
+
+    const anneeOptions = Array.from(
+      document.querySelectorAll('#selectAnnee option')
+    ).map(o => o.value).filter(v => v !== '');
+    const periodes = [];
+    anneeOptions.forEach(a => {
+      saisonsCochees.forEach(k => {
+        periodes.push({
+          from: `${a}-${SAISONS_BORNES[k].from}`,
+          to: `${a}-${SAISONS_BORNES[k].to}`,
+          source: k
+        });
+      });
+    });
+    return periodes;
+  }
+
+  if (saisonActive && saisonsCochees.length === 1 && dateFrom && dateTo &&
+      /^\d{2}\/\d{2}$/.test(dateFrom) && /^\d{2}\/\d{2}$/.test(dateTo)) {
+    if (annee) {
+      const [jFrom, mFrom] = dateFrom.split('/');
+      const [jTo, mTo] = dateTo.split('/');
+      return [{ from: `${annee}-${mFrom}-${jFrom}`, to: `${annee}-${mTo}-${jTo}`, source: 'custom' }];
+    }
+
+    const anneeOptions = Array.from(
+      document.querySelectorAll('#selectAnnee option')
+    ).map(o => o.value).filter(v => v !== '');
+    return anneeOptions.map(a => {
+      const [jFrom, mFrom] = dateFrom.split('/');
+      const [jTo, mTo] = dateTo.split('/');
+      return { from: `${a}-${mFrom}-${jFrom}`, to: `${a}-${mTo}-${jTo}`, source: 'custom' };
+    });
+  }
+
+  if (saisonActive && saisonsCochees.length === 1) {
+    const k = saisonsCochees[0];
+    if (annee) {
+      return [{ from: `${annee}-${SAISONS_BORNES[k].from}`, to: `${annee}-${SAISONS_BORNES[k].to}`, source: k }];
+    }
+
+    const anneeOptions = Array.from(
+      document.querySelectorAll('#selectAnnee option')
+    ).map(o => o.value).filter(v => v !== '');
+    return anneeOptions.map(a => ({
+      from: `${a}-${SAISONS_BORNES[k].from}`,
+      to: `${a}-${SAISONS_BORNES[k].to}`,
+      source: k
+    }));
+  }
+
+  if (dateFrom || dateTo) {
+    if (annee) {
+      let from = null;
+      let to = null;
+      if (dateFrom && /^\d{2}\/\d{2}$/.test(dateFrom)) {
+        const [j, m] = dateFrom.split('/');
+        from = `${annee}-${m}-${j}`;
+      }
+      if (dateTo && /^\d{2}\/\d{2}$/.test(dateTo)) {
+        const [j, m] = dateTo.split('/');
+        to = `${annee}-${m}-${j}`;
+      }
+      return [{ from, to, source: 'dates' }];
+    }
+
+    const anneeOptions = Array.from(
+      document.querySelectorAll('#selectAnnee option')
+    ).map(o => o.value).filter(v => v !== '');
+    return anneeOptions.map(a => {
+      let from = null;
+      let to = null;
+      if (dateFrom && /^\d{2}\/\d{2}$/.test(dateFrom)) {
+        const [j, m] = dateFrom.split('/');
+        from = `${a}-${m}-${j}`;
+      }
+      if (dateTo && /^\d{2}\/\d{2}$/.test(dateTo)) {
+        const [j, m] = dateTo.split('/');
+        to = `${a}-${m}-${j}`;
+      }
+      return { from, to, source: 'dates' };
+    });
+  }
+
+  if (annee) {
+    return [{ from: `${annee}-01-01`, to: `${annee}-12-31`, source: 'annee' }];
+  }
+
+  return [];
+}
+
 /**
  * APPLICATION DES FILTRES
  * Récupère les données filtrées depuis l'API et met à jour la carte.
@@ -32,13 +153,6 @@ export async function applyFilters(token) {
     programmation: document.getElementById('selectProgrammation').value
   };
 
-  const saisons = {
-  rut: document.getElementById('checkRut')?.checked || false,
-  hiver: document.getElementById('checkHiver')?.checked || false,
-  printemps: document.getElementById('checkPrintemps')?.checked || false,
-  ete: document.getElementById('checkEte')?.checked || false
-};
-
   if (btnApply) {
     btnApply.disabled = true;
     btnApply.textContent = 'Chargement...';
@@ -55,117 +169,54 @@ export async function applyFilters(token) {
     const aDateFrom = dateFromRaw && /^\d{2}\/\d{2}$/.test(dateFromRaw);
     const aDateTo = dateToRaw && /^\d{2}\/\d{2}$/.test(dateToRaw);
 
-    const saisonActive = Object.values(saisons).some(v => v);
-    const aFiltreTemporel = saisonActive || aDateFrom || aDateTo || anneeSelectionnee;
-
     let locations;
 
     if (isPositionMode) {
-      if (aFiltreTemporel) {
-        let dateFromApi = null;
-        let dateToApi = null;
-        const anneeRequete = anneeSelectionnee || '';
+      const idsVisibles = Array.from(
+        document.querySelectorAll('#listeIndividus .checkbox-label')
+      ).filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true')
+       .map(l => l.querySelector('input')?.value)
+       .filter(Boolean);
 
-        if (saisonActive && !aDateFrom && !aDateTo) {
-          const SAISONS_BORNES = {
-            hiver:     { from: '01-01', to: '03-31' },
-            printemps: { from: '04-01', to: '06-30' },
-            ete:       { from: '07-01', to: '10-15' },
-            rut:       { from: '10-16', to: '12-31' }
-          };
-          const saisonsCochees = Object.entries(saisons).filter(([, v]) => v).map(([k]) => k);
-          const bornes = saisonsCochees.map(k => SAISONS_BORNES[k]);
-          const fromMin = bornes.map(b => b.from).sort()[0];
-          const toMax = bornes.map(b => b.to).sort().reverse()[0];
-          if (anneeRequete) {
-            dateFromApi = `${anneeRequete}-${fromMin}`;
-            dateToApi = `${anneeRequete}-${toMax}`;
-          }
-        } else if (aDateFrom || aDateTo) {
-          const annee = anneeRequete || new Date().getFullYear();
-          if (aDateFrom) {
-            const [j, m] = dateFromRaw.split('/');
-            dateFromApi = `${annee}-${m}-${j}`;
-          }
-          if (aDateTo) {
-            const [j, m] = dateToRaw.split('/');
-            dateToApi = `${annee}-${m}-${j}`;
-          }
-        } else if (anneeSelectionnee) {
-          dateFromApi = `${anneeSelectionnee}-01-01`;
-          dateToApi = `${anneeSelectionnee}-12-31`;
-        }
+      const idsAChercher = selectedIds.length > 0 ? selectedIds : idsVisibles;
+      const periodes = getPeriodesActives();
 
-        const idsVisibles = Array.from(
-          document.querySelectorAll('#listeIndividus .checkbox-label')
-        ).filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true')
-         .map(l => l.querySelector('input')?.value)
-         .filter(Boolean);
-
-        const idsAChercher = selectedIds.length > 0 ? selectedIds : idsVisibles;
-
-        if (idsAChercher.length === 0) {
-          locations = [];
-        } else if (dateFromApi && dateToApi) {
-          locations = await fetchLastLocationsParPeriode(token, {
-            ani_id: idsAChercher,
-            date_from: dateFromApi,
-            date_to: dateToApi,
-            include_outliers: filters.include_outliers
-          });
-        } else {
-          // Saison sans année → une requête par année × saison cochée, garder la plus récente par animal
-          const anneeOptions = Array.from(
-            document.querySelectorAll('#selectAnnee option')
-          ).map(o => o.value).filter(v => v !== '');
-
-          if (anneeOptions.length > 0) {
-            const SAISONS_BORNES = {
-              hiver:     { from: '01-01', to: '03-31' },
-              printemps: { from: '04-01', to: '06-30' },
-              ete:       { from: '07-01', to: '10-15' },
-              rut:       { from: '10-16', to: '12-31' }
-            };
-            const saisonsCochees = Object.entries(saisons).filter(([, v]) => v).map(([k]) => k);
-            const promises = [];
-            anneeOptions.forEach(annee => {
-              saisonsCochees.forEach(saisonKey => {
-                const bornes = SAISONS_BORNES[saisonKey];
-                promises.push(
-                  fetchLastLocationsParPeriode(token, {
-                    ani_id: idsAChercher,
-                    date_from: `${annee}-${bornes.from}`,
-                    date_to: `${annee}-${bornes.to}`,
-                    include_outliers: filters.include_outliers
-                  })
-                );
-              });
-            });
-            const results = await Promise.all(promises);
-            const locParAnimal = new Map();
-            results.flat().forEach(loc => {
-              const existing = locParAnimal.get(String(loc.ani_id));
-              const dateNew = loc.loc_datetime_local || loc.loc_date_local || '';
-              const dateExisting = existing ? (existing.loc_datetime_local || existing.loc_date_local || '') : '';
-              if (!existing || dateNew > dateExisting) {
-                locParAnimal.set(String(loc.ani_id), loc);
-              }
-            });
-            locations = Array.from(locParAnimal.values());
-          } else {
-            locations = await fetchAllLastLocations(token, {
-              population: filters.population,
-              include_outliers: filters.include_outliers
-            });
-          }
-        }
-      } else {
+      if (idsAChercher.length === 0) {
+        locations = [];
+      } else if (periodes.length === 0) {
         locations = await fetchAllLastLocations(token, {
           population: filters.population,
           include_outliers: filters.include_outliers
         });
+      } else if (periodes.length === 1) {
+        locations = await fetchLastLocationsParPeriode(token, {
+          ani_id: idsAChercher,
+          date_from: periodes[0].from,
+          date_to: periodes[0].to,
+          include_outliers: filters.include_outliers
+        });
+      } else {
+        // Plusieurs periodes: union, garder la plus recente par animal.
+        const promises = periodes.map(p =>
+          fetchLastLocationsParPeriode(token, {
+            ani_id: idsAChercher,
+            date_from: p.from,
+            date_to: p.to,
+            include_outliers: filters.include_outliers
+          })
+        );
+        const results = await Promise.all(promises);
+        const locParAnimal = new Map();
+        results.flat().forEach(loc => {
+          const existing = locParAnimal.get(String(loc.ani_id));
+          const dateNew = loc.loc_datetime_local || loc.loc_date_local || '';
+          const dateExisting = existing ? (existing.loc_datetime_local || existing.loc_date_local || '') : '';
+          if (!existing || dateNew > dateExisting) {
+            locParAnimal.set(String(loc.ani_id), loc);
+          }
+        });
+        locations = Array.from(locParAnimal.values());
       }
-
       // Filtres côté JS (sexe, gestionnaire, programmation, suivis)
       if (filters.sexe) {
         locations = locations.filter(l => {
@@ -445,163 +496,31 @@ export async function mettreAJourListeParDate() {
   }
 
   const requeteId = ++_derniereRequeteId;
-  const dateFrom = document.getElementById('dateFrom').value;
-  const dateTo = document.getElementById('dateTo').value;
-  const annee = document.getElementById('selectAnnee')?.value;
+  const periodes = getPeriodesActives();
 
-  const saisons = {
-    rut: document.getElementById('checkRut')?.checked || false,
-    hiver: document.getElementById('checkHiver')?.checked || false,
-    printemps: document.getElementById('checkPrintemps')?.checked || false,
-    ete: document.getElementById('checkEte')?.checked || false
-  };
-  const saisonActive = Object.values(saisons).some(v => v);
-
-  if (!dateFrom && !dateTo && !saisonActive && !annee) {
+  if (periodes.length === 0) {
     if (requeteId !== _derniereRequeteId) return;
     filtrerListeIndividus();
     return;
   }
 
-  if (annee && !dateFrom && !dateTo && !saisonActive) {
-    try {
-      const idsAvecDonnees = new Set(
-        await fetchAnimalIdsParPeriode(getCurrentToken(), {
-          date_from: `${annee}-01-01`,
-          date_to: `${annee}-12-31`,
-          include_outliers: false
-        })
-      );
-      if (requeteId !== _derniereRequeteId) return;
-      _appliquerFiltreListeAvecIds(idsAvecDonnees);
-    } catch (err) {
-      console.error('Erreur mise à jour liste par date:', err);
-    }
-    return;
-  }
-
-  if (annee) {
-    try {
-      let dateFromApi = null;
-      let dateToApi = null;
-
-      if (dateFrom && /^\d{2}\/\d{2}$/.test(dateFrom)) {
-        const [j, m] = dateFrom.split('/');
-        dateFromApi = `${annee}-${m}-${j}`;
-      }
-      if (dateTo && /^\d{2}\/\d{2}$/.test(dateTo)) {
-        const [j, m] = dateTo.split('/');
-        dateToApi = `${annee}-${m}-${j}`;
-      }
-
-      if (saisonActive && !dateFromApi && !dateToApi) {
-        const SAISONS_BORNES = {
-          hiver:     { from: `${annee}-01-01`, to: `${annee}-03-31` },
-          printemps: { from: `${annee}-04-01`, to: `${annee}-06-30` },
-          ete:       { from: `${annee}-07-01`, to: `${annee}-10-15` },
-          rut:       { from: `${annee}-10-16`, to: `${annee}-12-31` }
-        };
-        const idsUnion = new Set();
-        const promises = Object.entries(saisons)
-          .filter(([, cochee]) => cochee)
-          .map(([key]) => {
-            const bornes = SAISONS_BORNES[key];
-            return fetchAnimalIdsParPeriode(getCurrentToken(), {
-              date_from: bornes.from,
-              date_to: bornes.to,
-              include_outliers: false
-            });
-          });
-        const results = await Promise.all(promises);
-        results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
-        if (requeteId !== _derniereRequeteId) return;
-        _appliquerFiltreListeAvecIds(idsUnion);
-        return;
-      }
-
-      if (dateFromApi || dateToApi) {
-        const idsAvecDonnees = new Set(
-          await fetchAnimalIdsParPeriode(getCurrentToken(), {
-            date_from: dateFromApi,
-            date_to: dateToApi,
-            include_outliers: false
-          })
-        );
-        if (requeteId !== _derniereRequeteId) return;
-        _appliquerFiltreListeAvecIds(idsAvecDonnees);
-        return;
-      }
-
-    } catch (err) {
-      console.error('Erreur mise à jour liste par date:', err);
-    }
-  } else {
-    // Sans année → fetchAnimalIdsParPeriode union sur toutes les années disponibles
-    try {
-      const SAISONS_BORNES = {
-        hiver:     { from: '01-01', to: '03-31' },
-        printemps: { from: '04-01', to: '06-30' },
-        ete:       { from: '07-01', to: '10-15' },
-        rut:       { from: '10-16', to: '12-31' }
-      };
-
-      const anneeOptions = Array.from(
-        document.querySelectorAll('#selectAnnee option')
-      ).map(o => o.value).filter(v => v !== '');
-
-      const aDateFrom = dateFrom && /^\d{2}\/\d{2}$/.test(dateFrom);
-      const aDateTo = dateTo && /^\d{2}\/\d{2}$/.test(dateTo);
-      const idsUnion = new Set();
-
-      if (saisonActive && anneeOptions.length > 0) {
-        const saisonsCochees = Object.entries(saisons).filter(([, v]) => v).map(([k]) => k);
-        const promises = [];
-        anneeOptions.forEach(annee => {
-          saisonsCochees.forEach(saisonKey => {
-            const bornes = SAISONS_BORNES[saisonKey];
-            promises.push(
-              fetchAnimalIdsParPeriode(getCurrentToken(), {
-                date_from: `${annee}-${bornes.from}`,
-                date_to: `${annee}-${bornes.to}`,
-                include_outliers: false
-              })
-            );
-          });
-        });
-        const results = await Promise.all(promises);
-        results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
-
-      } else if (aDateFrom || aDateTo) {
-        const promises = anneeOptions.map(annee => {
-          let dateFromApi = null;
-          let dateToApi = null;
-          if (aDateFrom) {
-            const [j, m] = dateFrom.split('/');
-            dateFromApi = `${annee}-${m}-${j}`;
-          }
-          if (aDateTo) {
-            const [j, m] = dateTo.split('/');
-            dateToApi = `${annee}-${m}-${j}`;
-          }
-          return fetchAnimalIdsParPeriode(getCurrentToken(), {
-            date_from: dateFromApi,
-            date_to: dateToApi,
-            include_outliers: false
-          });
-        });
-        const results = await Promise.all(promises);
-        results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
-      }
-
-      if (requeteId !== _derniereRequeteId) return;
-      _appliquerFiltreListeAvecIds(idsUnion);
-
-    } catch (err) {
-      console.error('Erreur mise à jour liste par date:', err);
-    }
+  try {
+    const idsUnion = new Set();
+    const promises = periodes.map(p =>
+      fetchAnimalIdsParPeriode(getCurrentToken(), {
+        date_from: p.from,
+        date_to: p.to,
+        include_outliers: false
+      })
+    );
+    const results = await Promise.all(promises);
+    results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
+    if (requeteId !== _derniereRequeteId) return;
+    _appliquerFiltreListeAvecIds(idsUnion);
+  } catch (err) {
+    console.error('Erreur mise a jour liste par date:', err);
   }
 }
-
 function _appliquerFiltreListeAvecIds(idsAvecDonnees) {
   const searchVal = document.getElementById('searchIndividu')?.value?.toLowerCase()?.trim() || '';
   document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
