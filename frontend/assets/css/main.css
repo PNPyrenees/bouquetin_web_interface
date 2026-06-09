@@ -104,13 +104,21 @@ header {
   height: 64px;
   width: auto;
   margin-left: -20px;
+   margin-right: 16px;
 }
 
 .logo-bqt {
   height: 70px;
   width: auto;
   object-fit: contain;
-  margin-right: 20px;
+  margin-right: 16px;
+}
+
+.logo-rf {
+  height: 70px;
+  width: auto;
+  object-fit: contain;
+  margin-right: 6px;
 }
 
 .header-title {
