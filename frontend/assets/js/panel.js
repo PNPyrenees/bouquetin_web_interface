@@ -439,16 +439,9 @@ function rendrePage() {
     const loc = page[index];
     if (!loc) return;
 
-    // Survol — grossir le point (mode Positions uniquement)
-    tr.addEventListener('mouseenter', () => {
-      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-      if (!isTrajectoire && window._highlightPoint) window._highlightPoint(loc.ani_id, true);
-    });
-
-    tr.addEventListener('mouseleave', () => {
-      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-      if (!isTrajectoire && window._highlightPoint) window._highlightPoint(loc.ani_id, false);
-    });
+    // Survol — désactivé (incompatible WebGLPointsLayer)
+    // tr.addEventListener('mouseenter', () => { ... window._highlightPoint(loc.ani_id, true) });
+    // tr.addEventListener('mouseleave', () => { ... window._highlightPoint(loc.ani_id, false) });
 
     tr.addEventListener('click', () => {
       document.querySelectorAll('.panel-table-row.selected-carte').forEach(r => r.classList.remove('selected-carte'));
@@ -748,15 +741,9 @@ function rendrePageIndividus() {
   tbody.querySelectorAll('.panel-individu-row').forEach(tr => {
     const aniId = tr.dataset.aniId;
 
-    tr.addEventListener('mouseenter', () => {
-      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-      if (!isTrajectoire && window._highlightPoint) window._highlightPoint(aniId, true);
-    });
-
-    tr.addEventListener('mouseleave', () => {
-      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-      if (!isTrajectoire && window._highlightPoint) window._highlightPoint(aniId, false);
-    });
+    // Survol — désactivé (incompatible WebGLPointsLayer)
+    // tr.addEventListener('mouseenter', () => { ... window._highlightPoint(aniId, true) });
+    // tr.addEventListener('mouseleave', () => { ... window._highlightPoint(aniId, false) });
 
     tr.addEventListener('click', () => {
       document.querySelectorAll('.panel-table-row.selected-carte').forEach(r => r.classList.remove('selected-carte'));
