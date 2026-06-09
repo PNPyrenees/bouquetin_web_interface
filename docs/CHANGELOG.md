@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [0.22.0] - 2026-06-09
+
+### Ajouts
+- Fonction `getPeriodesActives()` exportée dans `filters.js` — source unique de vérité pour tous les filtres temporels (liste individus et carte)
+- Variable globale `window._anneeOptions` stockée au chargement pour éviter la dépendance au DOM TomSelect
+- Variable globale `window._saisonDatesModifiees` pour distinguer dates auto-remplies par saison et dates modifiées manuellement
+- Filtre saison sans année dans `mettreAJourListeParDate` via `fetchAnimalIdsParPeriode` par année × saison en parallèle
+
+### Modifications
+- `applyFilters` mode Positions : utilise `fetchLastLocationsParPeriode` pour afficher la dernière position dans la période (année, année+saison)
+- `applyFilters` mode Positions saison sans année : 13 requêtes parallèles `fetchLastLocationsParPeriode` par année × saison, fusion avec position la plus récente par animal
+- `fetchLastLocationsParPeriode` dans `api.js` : refactorisée en une seule requête `ani_id=in.(...)` + `limit=999999` + déduplication JS au lieu de N requêtes une par animal
+- `getPeriodesActives()` Cas 3 saison sans année : retourne une période large unique pour `mettreAJourListeParDate` via `fetchAnimalIdsParPeriode`
+- `mettreAJourListeParDate` : bloc spécial saison sans année traité en dehors de `getPeriodesActives()` avec union par année × saison
+
+### Corrections
+- Liste individus cohérente avec la carte pour tous les cas : année seule, année+saison, saison seule
+- Saison sans année : liste affiche ~177 animaux (animaux ayant eu une position en hiver sur toutes les années)
+- `window._anneeOptions` résout le bug TomSelect qui vidait les `<option>` du DOM natif
+- Arbizon (558) absent de la carte : géométrie null dans `v_animal_last_loc` + date aberrante 2068 → à corriger côté base par Ludovic
+- Blanca (120) et Nat (140) absents : `loc_datetime_local` null dans `v_localisation` pour leurs positions 2025 → à corriger côté base par Ludovic
+
+### Connu — à implémenter
+- Popup d'avertissement si COUNT > 10 000 positions avant chargement
+- Nouvelle logique mode Positions : toutes les positions (comme trajectoire sans traits) au lieu de dernière position par animal
+- Vue PostgreSQL `v_last_loc_par_saison` avec `DISTINCT ON` à créer avec Ludovic pour optimiser les performances
+- `fetchLastLocationsParPeriode` toujours lente pour saison sans année (13 × `limit=999999`) en attendant la vue
+
 ## [0.21.1] - 2026-06-08
 
 ### Corrections

@@ -241,48 +241,70 @@ export async function fetchAllLastLocations(token, filters = {}) {
  * Utilisé en mode Positions quand une date est sélectionnée.
  */
 export async function fetchLastLocationsParPeriode(token, filters = {}) {
+  // Vérification du cache — si même requête déjà faite, retourner résultat en mémoire
   const cle = _cleCache('v_localisation_periode', filters);
   const cached = _getCache(cle);
   if (cached) return cached;
 
   const ids = filters.ani_id || [];
-  if (ids.length === 0) return [];
+  if (ids.length === 0) return []; // Rien à chercher
 
-  const qualiteParams = !filters.include_outliers
-    ? '&loc_anomalie=not.is.true&loc_outlier=is.null'
-    : '';
+  const params = new URLSearchParams();
 
-  const dateFromParam = filters.date_from
-    ? `&loc_datetime_local=gte.${filters.date_from}`
-    : '';
+  // Une seule requête pour tous les animaux — ani_id=in.(548,543,542,...)
+  // Au lieu de 200 requêtes une par animal comme avant
+  params.append('ani_id', `in.(${ids.join(',')})`);
+  params.append('geom', 'not.is.null'); // Exclure positions sans coordonnées
 
-  const dateToParam = filters.date_to
-    ? `&loc_datetime_local=lte.${filters.date_to}`
-    : '';
-
-  const sexeParam = filters.sexe ? `&ani_sexe=eq.${filters.sexe}` : '';
-  const gestionnaireParam = filters.gestionnaire ? `&ani_gestionnaire=eq.${filters.gestionnaire}` : '';
-  const populationParam = filters.population ? `&ani_pop_rattach=eq.${filters.population}` : '';
-
-  const promises = ids.map(ani_id =>
-    fetch(
-      `${API_URL}/v_localisation?ani_id=eq.${ani_id}&geom=not.is.null${qualiteParams}${dateFromParam}${dateToParam}${sexeParam}${gestionnaireParam}${populationParam}&order=loc_datetime_local.desc&limit=1`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept-Profile': 'bouquetin'
-        }
-      }
-    )
-    .then(r => r.ok ? r.json() : [])
-    .catch(() => [])
-  );
-
-  const results = await Promise.all(promises);
-  const locations = results.flat().filter(l => l != null);
-  if (locations.length > 0) {
-    _setCache(cle, locations);
+  // Qualité des données — exclure anomalies et outliers par défaut
+  if (!filters.include_outliers) {
+    params.append('loc_anomalie', 'not.is.true');
+    params.append('loc_outlier', 'is.null');
   }
+
+  // Filtre temporel — bornes de la période demandée
+  if (filters.date_from) params.append('loc_datetime_local', `gte.${filters.date_from}`);
+  if (filters.date_to) params.append('loc_datetime_local', `lte.${filters.date_to}`);
+
+  // limit=999999 : on ne peut pas faire DISTINCT ON via PostgREST (pas supporté en URL).
+  // On récupère donc TOUTES les positions de la période pour tous les animaux,
+  // puis on déduplique côté JS. C'est le principal goulot de performance :
+  // sur une saison sans année (ex: Hiver 2014→2026), cela peut représenter
+  // des dizaines de milliers de lignes téléchargées pour être réduites à ~200.
+  // Une vraie vue PostgreSQL avec DISTINCT ON serait 100× plus efficace.
+  params.append('order', 'loc_datetime_local.desc');
+  params.append('limit', '999999'); // ← PROBLÈME DE PERFORMANCE : tout télécharger pour dédupliquer
+
+  const res = await fetch(`${API_URL}/v_localisation?${params.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=none' // Ne pas demander le COUNT(*) total — évite un second parcours côté serveur
+    }
+  });
+
+  if (!res.ok) throw new Error('Échec chargement positions par période');
+  const data = await res.json();
+
+  // Déduplication côté JavaScript avec une Map keyed par ani_id.
+  // Pourquoi une Map et pas un simple filtre ? Parce qu'on veut garder UNE seule entrée
+  // par animal (la plus récente), en comparant les dates au fil du parcours.
+  // Le tri desc côté serveur aide mais n'est pas suffisant : plusieurs animaux
+  // peuvent avoir leur première ligne à des dates différentes, et le tri est global.
+  const locParAnimal = new Map();
+  data.forEach(loc => {
+    const existing = locParAnimal.get(String(loc.ani_id));
+    const dateNew = loc.loc_datetime_local || loc.loc_date_local || '';
+    const dateExisting = existing ? (existing.loc_datetime_local || existing.loc_date_local || '') : '';
+    if (!existing || dateNew > dateExisting) {
+      locParAnimal.set(String(loc.ani_id), loc); // Remplace si la nouvelle date est plus récente
+    }
+  });
+
+  const locations = Array.from(locParAnimal.values());
+  // Ne mettre en cache que si on a des résultats — évite de cacher une réponse vide
+  // qui pourrait masquer une erreur transitoire
+  if (locations.length > 0) _setCache(cle, locations);
   return locations;
 }
 
@@ -344,4 +366,4 @@ export async function fetchProgrammations(token) {
   if (!res.ok) throw new Error('Échec chargement programmations');
   return res.json();
 }
-
+

@@ -42,9 +42,7 @@ export function getPeriodesActives() {
       }));
     }
 
-    const anneeOptions = Array.from(
-      document.querySelectorAll('#selectAnnee option')
-    ).map(o => o.value).filter(v => v !== '');
+    const anneeOptions = (window._anneeOptions || []).map(String);
     const periodes = [];
     anneeOptions.forEach(a => {
       saisonsCochees.forEach(k => {
@@ -59,7 +57,8 @@ export function getPeriodesActives() {
   }
 
   if (saisonActive && saisonsCochees.length === 1 && dateFrom && dateTo &&
-      /^\d{2}\/\d{2}$/.test(dateFrom) && /^\d{2}\/\d{2}$/.test(dateTo)) {
+      /^\d{2}\/\d{2}$/.test(dateFrom) && /^\d{2}\/\d{2}$/.test(dateTo) &&
+      window._saisonDatesModifiees === true) {
     if (annee) {
       const [jFrom, mFrom] = dateFrom.split('/');
       const [jTo, mTo] = dateTo.split('/');
@@ -76,21 +75,31 @@ export function getPeriodesActives() {
     });
   }
 
-  if (saisonActive && saisonsCochees.length === 1) {
-    const k = saisonsCochees[0];
-    if (annee) {
-      return [{ from: `${annee}-${SAISONS_BORNES[k].from}`, to: `${annee}-${SAISONS_BORNES[k].to}`, source: k }];
-    }
+if (saisonActive && saisonsCochees.length === 1) {
+  const k = saisonsCochees[0];
 
-    const anneeOptions = Array.from(
-      document.querySelectorAll('#selectAnnee option')
-    ).map(o => o.value).filter(v => v !== '');
-    return anneeOptions.map(a => ({
-      from: `${a}-${SAISONS_BORNES[k].from}`,
-      to: `${a}-${SAISONS_BORNES[k].to}`,
+  // Si une année est choisie → comportement actuel
+  if (annee) {
+    return [{
+      from: `${annee}-${SAISONS_BORNES[k].from}`,
+      to: `${annee}-${SAISONS_BORNES[k].to}`,
       source: k
-    }));
+    }];
   }
+
+  // Sinon une seule période globale au lieu de 13 requêtes
+  const annees = (window._anneeOptions || [])
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  if (annees.length === 0) return [];
+
+  return [{
+    from: `${annees[0]}-${SAISONS_BORNES[k].from}`,
+    to: `${annees[annees.length - 1]}-${SAISONS_BORNES[k].to}`,
+    source: k
+  }];
+}
 
   if (dateFrom || dateTo) {
     if (annee) {
@@ -107,9 +116,7 @@ export function getPeriodesActives() {
       return [{ from, to, source: 'dates' }];
     }
 
-    const anneeOptions = Array.from(
-      document.querySelectorAll('#selectAnnee option')
-    ).map(o => o.value).filter(v => v !== '');
+    const anneeOptions = (window._anneeOptions || []).map(String);
     return anneeOptions.map(a => {
       let from = null;
       let to = null;
@@ -181,6 +188,20 @@ export async function applyFilters(token) {
       const idsAChercher = selectedIds.length > 0 ? selectedIds : idsVisibles;
       const periodes = getPeriodesActives();
 
+      const saisonActive = Object.values({
+        hiver: document.getElementById('checkHiver')?.checked || false,
+        printemps: document.getElementById('checkPrintemps')?.checked || false,
+        ete: document.getElementById('checkEte')?.checked || false,
+        rut: document.getElementById('checkRut')?.checked || false
+      }).some(Boolean);
+
+      const saisons = {
+        hiver: document.getElementById('checkHiver')?.checked || false,
+        printemps: document.getElementById('checkPrintemps')?.checked || false,
+        ete: document.getElementById('checkEte')?.checked || false,
+        rut: document.getElementById('checkRut')?.checked || false
+      };
+
       if (idsAChercher.length === 0) {
         locations = [];
       } else if (periodes.length === 0) {
@@ -188,6 +209,67 @@ export async function applyFilters(token) {
           population: filters.population,
           include_outliers: filters.include_outliers
         });
+      } else if (saisonActive && !anneeSelectionnee) {
+        // CAS : saison cochée SANS année sélectionnée → ex: "Hiver" toutes années
+
+        const SAISONS_BORNES_CARTE = {
+          hiver:     { from: '01-01', to: '03-31' },
+          printemps: { from: '04-01', to: '06-30' },
+          ete:       { from: '07-01', to: '10-15' },
+          rut:       { from: '10-16', to: '12-31' }
+        };
+
+        const saisonsCochees = Object.entries(saisons)
+          .filter(([, v]) => v).map(([k]) => k); // Ex: ['hiver']
+
+        // Années disponibles triées de la plus récente à la plus ancienne
+        // Vient de window._anneeOptions stocké au chargement de l'appli
+        const anneesSorted = (window._anneeOptions || [])
+          .map(Number).sort((a, b) => b - a); // [2026, 2025, ..., 2014]
+
+        // Tous les animaux visibles dans la liste (non masqués, avec géométrie)
+        const tousLesIds = Array.from(
+          document.querySelectorAll('#listeIndividus .checkbox-label')
+        ).filter(l => l.dataset.sansGeom !== 'true')
+         .map(l => l.querySelector('input')?.value)
+         .filter(Boolean);
+
+        // Si des individus sont cochés manuellement → utiliser seulement ceux-là
+        const idsSource = selectedIds.length > 0 ? selectedIds : tousLesIds;
+
+        // Construire toutes les requêtes : 13 années × N saisons cochées
+        // Ex: Hiver → 13 requêtes (2026-01-01/03-31, 2025-01-01/03-31, ..., 2014-01-01/03-31)
+        const promises = [];
+        anneesSorted.forEach(annee => {
+          saisonsCochees.forEach(k => {
+            promises.push(
+              fetchLastLocationsParPeriode(token, {
+                ani_id: idsSource,
+                date_from: `${annee}-${SAISONS_BORNES_CARTE[k].from}`,
+                date_to: `${annee}-${SAISONS_BORNES_CARTE[k].to}`,
+                include_outliers: filters.include_outliers
+              })
+            );
+          });
+        });
+
+        // Lancer toutes les requêtes EN PARALLÈLE — plus rapide que séquentiel
+        // Mais toujours lourd : 13 requêtes × limit=999999 chacune
+        const resultats = await Promise.all(promises);
+
+        // Fusionner tous les résultats — garder la position la plus récente par animal
+        const locParAnimal = new Map();
+        resultats.flat().forEach(loc => {
+          const key = String(loc.ani_id);
+          const existing = locParAnimal.get(key);
+          const dateNew = loc.loc_datetime_local || loc.loc_date_local || '';
+          const dateExisting = existing ? (existing.loc_datetime_local || existing.loc_date_local || '') : '';
+          if (!existing || dateNew > dateExisting) {
+            locParAnimal.set(key, loc); // Garder la plus récente toutes années confondues
+          }
+        });
+        locations = Array.from(locParAnimal.values());
+        // Résultat : 177 animaux avec leur dernière position en hiver
       } else if (periodes.length === 1) {
         locations = await fetchLastLocationsParPeriode(token, {
           ani_id: idsAChercher,
@@ -196,7 +278,7 @@ export async function applyFilters(token) {
           include_outliers: filters.include_outliers
         });
       } else {
-        // Plusieurs periodes: union, garder la plus recente par animal.
+        // Plusieurs périodes → union, garder la plus récente par animal
         const promises = periodes.map(p =>
           fetchLastLocationsParPeriode(token, {
             ani_id: idsAChercher,
@@ -217,6 +299,7 @@ export async function applyFilters(token) {
         });
         locations = Array.from(locParAnimal.values());
       }
+
       // Filtres côté JS (sexe, gestionnaire, programmation, suivis)
       if (filters.sexe) {
         locations = locations.filter(l => {
@@ -496,15 +579,66 @@ export async function mettreAJourListeParDate() {
   }
 
   const requeteId = ++_derniereRequeteId;
+
+  const annee = document.getElementById('selectAnnee')?.value || '';
+  const saisons = {
+    hiver: document.getElementById('checkHiver')?.checked || false,
+    printemps: document.getElementById('checkPrintemps')?.checked || false,
+    ete: document.getElementById('checkEte')?.checked || false,
+    rut: document.getElementById('checkRut')?.checked || false
+  };
+  const saisonActive = Object.values(saisons).some(Boolean);
+
+  if (saisonActive && !annee) {
+    try {
+      const SAISONS_BORNES = {
+        hiver:     { from: '01-01', to: '03-31' },
+        printemps: { from: '04-01', to: '06-30' },
+        ete:       { from: '07-01', to: '10-15' },
+        rut:       { from: '10-16', to: '12-31' }
+      };
+      const saisonsCochees = Object.entries(saisons)
+        .filter(([, v]) => v).map(([k]) => k);
+      const anneesSorted = (window._anneeOptions || []).map(String);
+
+      const promises = [];
+      anneesSorted.forEach(a => {
+        saisonsCochees.forEach(k => {
+          promises.push(
+            fetchAnimalIdsParPeriode(getCurrentToken(), {
+              date_from: `${a}-${SAISONS_BORNES[k].from}`,
+              date_to: `${a}-${SAISONS_BORNES[k].to}`,
+              include_outliers: false
+            })
+          );
+        });
+      });
+
+      const results = await Promise.all(promises);
+      const idsUnion = new Set();
+      results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
+      if (requeteId !== _derniereRequeteId) return;
+      _appliquerFiltreListeAvecIds(idsUnion);
+    } catch (err) {
+      console.error('Erreur mettreAJourListeParDate saison sans année:', err);
+    }
+    return;
+  }
+
   const periodes = getPeriodesActives();
+
+  console.log('[mettreAJourListeParDate] requeteId:', requeteId, '_derniereRequeteId:', _derniereRequeteId);
+  console.log('[mettreAJourListeParDate] periodes:', JSON.stringify(periodes));
 
   if (periodes.length === 0) {
     if (requeteId !== _derniereRequeteId) return;
+    console.log('[mettreAJourListeParDate] → aucune période, filtrerListeIndividus');
     filtrerListeIndividus();
     return;
   }
 
   try {
+    console.log('[mettreAJourListeParDate] → lancement', periodes.length, 'requête(s) fetchAnimalIdsParPeriode');
     const idsUnion = new Set();
     const promises = periodes.map(p =>
       fetchAnimalIdsParPeriode(getCurrentToken(), {
@@ -514,11 +648,17 @@ export async function mettreAJourListeParDate() {
       })
     );
     const results = await Promise.all(promises);
+    console.log('[mettreAJourListeParDate] → résultats reçus, tailles:', results.map(r => r.length));
     results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
-    if (requeteId !== _derniereRequeteId) return;
+    console.log('[mettreAJourListeParDate] → idsUnion.size:', idsUnion.size);
+    if (requeteId !== _derniereRequeteId) {
+      console.log('[mettreAJourListeParDate] → requête obsolète, abandon');
+      return;
+    }
     _appliquerFiltreListeAvecIds(idsUnion);
+    console.log('[mettreAJourListeParDate] → liste mise à jour');
   } catch (err) {
-    console.error('Erreur mise a jour liste par date:', err);
+    console.error('[mettreAJourListeParDate] Erreur:', err);
   }
 }
 function _appliquerFiltreListeAvecIds(idsAvecDonnees) {

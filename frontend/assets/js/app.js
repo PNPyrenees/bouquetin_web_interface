@@ -220,6 +220,7 @@ async function startApp(token) {
         selectAnnee.appendChild(opt);
       });
     }
+    window._anneeOptions = annees.map(String);
 
     // Identifier tous les animaux qui ont au moins une géométrie
     const idsAvecGeom = new Set(locations.map(l => String(l.ani_id)));
@@ -495,6 +496,10 @@ function initSidebarBadges(token) {
       const saisonsCochees = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut']
         .filter(sid => document.getElementById(sid)?.checked);
 
+      if (!enCoursDeRestauration && saisonsCochees.length > 0) {
+        window._saisonDatesModifiees = true;
+      }
+
       if (!enCoursDeRestauration) {
         // Déterminer quelle saison mettre à jour :
         // - 1 saison cochée : c'est elle
@@ -626,6 +631,7 @@ function initSidebarBadges(token) {
         const dateToEl = document.getElementById('dateTo');
         const fromVal = datesMemoisees?.from || saison.from;
         const toVal = datesMemoisees?.to || saison.to;
+        window._saisonDatesModifiees = false;
         if (dateFromEl) { supprimerBadgeById('dateFrom'); dateFromEl.value = fromVal; }
         if (dateToEl) { supprimerBadgeById('dateTo'); dateToEl.value = toVal; }
         saisonEnEdition = id;
@@ -725,6 +731,7 @@ function initSidebarBadges(token) {
           mettreAJourBadgeSaison(prochaineSaisonId, badgeLabel, !!datesMemoiseesSuivante);
         } else {
           saisonEnEdition = null;
+          window._saisonDatesModifiees = false;
           const dateFromEl = document.getElementById('dateFrom');
           const dateToEl = document.getElementById('dateTo');
           if (dateFromEl) { supprimerBadgeById('dateFrom'); dateFromEl.value = ''; dateFromEl.dispatchEvent(new Event('change', { bubbles: true })); }
@@ -810,6 +817,7 @@ function initSidebarBadges(token) {
     datesSaisonModifiees.checkEte = null;
     datesSaisonModifiees.checkRut = null;
     saisonEnEdition = null;
+    window._saisonDatesModifiees = false;
   };
 
 }
