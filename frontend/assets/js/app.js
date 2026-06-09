@@ -756,7 +756,17 @@ function initSidebarBadges(token) {
 
   document.querySelectorAll('input[name="modeCouleur"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      applyFilters(currentToken);
+      const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+      const features = window._getGpsFeatures?.() || [];
+      if (features.length > 0) {
+        const locations = features
+          .filter(f => f.get('ani_id'))
+          .map(f => f.getProperties());
+        const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+        clearMapPoints();
+        renderPoints(locations, true, isTrajectoire, modeCouleur);
+        if (isTrajectoire) renderTrajectoire(locations, modeCouleur);
+      }
       mettreAJourLegende();
     });
   });
