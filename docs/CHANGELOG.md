@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [0.23.0] - 2026-06-09
+
+### Ajouts
+- `fetchCountLocations` dans `api.js` — requête COUNT sans téléchargement de données via `Prefer: count=exact` et header `Content-Range`
+- Popup d'avertissement volume de données dans `applyFilters` — se déclenche si COUNT > 10 000 positions, 3 boutons : Annuler / Afficher les 10 000 dernières / Afficher tout
+- Migration OpenLayers 8.2.0 → 10.9.0 CDN
+
+### Modifications
+- Mode Positions avec filtre temporel : affiche désormais toutes les positions de la période (comme trajectoire sans traits) au lieu de la dernière position par animal
+- Mode Positions sans filtre temporel : comportement inchangé — dernière position par animal via `fetchAllLastLocations`
+- Changement de symbologie (sexe/gestionnaire/individu) : re-rendu des features existantes sans nouvelle requête API
+- Migration `gpsLayer` de `ol.layer.Vector` vers `ol.layer.WebGLPoints` pour améliorer les performances de rendu avec de nombreux points
+- Couleurs WebGL stockées comme 4 attributs scalaires séparés (`fillR`, `fillG`, `fillB`, `fillA`, `strokeR`, `strokeG`, `strokeB`, `strokeA`) pour compatibilité avec le pipeline attribute-buffer WebGL
+- Désactivation de l'effet de grossissement au survol dans la table attributaire (`highlightPoint`) — trop coûteux avec de nombreux points
+
+### Corrections
+- `DEFAULT_LIMIT` dans `config.js` mis à 10 000
+- Suppression des logs de debug dans `mettreAJourListeParDate`
+
 ## [0.22.0] - 2026-06-09
 
 ### Ajouts
