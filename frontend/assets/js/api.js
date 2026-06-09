@@ -59,7 +59,9 @@ export async function fetchLocations(token, filters = {}) {
   const cached = _getCache(cle);
   if (cached) return cached;
 
-  const params = new URLSearchParams();
+
+  const params  = new URLSearchParams();
+
 
   // Filtrage par ID d'individus (multi-sélection ou individuel)
   // Syntaxe PostgREST : in.(val1,val2,...) pour plusieurs valeurs
@@ -67,6 +69,7 @@ export async function fetchLocations(token, filters = {}) {
     params.append('ani_id', `in.(${filters.ani_id.join(',')})`);
   } else if (filters.ani_id && !Array.isArray(filters.ani_id)) {
     params.append('ani_id', `eq.${filters.ani_id}`);
+    
   }
 
   // Filtrage par date (gte: greater than or equal, lte: lower than or equal)
@@ -266,45 +269,36 @@ export async function fetchLastLocationsParPeriode(token, filters = {}) {
   if (filters.date_from) params.append('loc_datetime_local', `gte.${filters.date_from}`);
   if (filters.date_to) params.append('loc_datetime_local', `lte.${filters.date_to}`);
 
-  // limit=999999 : on ne peut pas faire DISTINCT ON via PostgREST (pas supporté en URL).
-  // On récupère donc TOUTES les positions de la période pour tous les animaux,
-  // puis on déduplique côté JS. C'est le principal goulot de performance :
-  // sur une saison sans année (ex: Hiver 2014→2026), cela peut représenter
-  // des dizaines de milliers de lignes téléchargées pour être réduites à ~200.
-  // Une vraie vue PostgreSQL avec DISTINCT ON serait 100× plus efficace.
+  // Tri décroissant + limit très élevé pour récupérer toutes les positions
+  // Nécessaire car PostgreSQL/PostgREST ne supporte pas DISTINCT ON via URL
   params.append('order', 'loc_datetime_local.desc');
-  params.append('limit', '999999'); // ← PROBLÈME DE PERFORMANCE : tout télécharger pour dédupliquer
+  params.append('limit', '999999'); // ← PROBLÈME DE PERFORMANCE ici
 
   const res = await fetch(`${API_URL}/v_localisation?${params.toString()}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
       'Accept-Profile': 'bouquetin',
-      'Prefer': 'count=none' // Ne pas demander le COUNT(*) total — évite un second parcours côté serveur
+      'Prefer': 'count=none' // Ne pas compter le total — plus rapide
     }
   });
 
   if (!res.ok) throw new Error('Échec chargement positions par période');
   const data = await res.json();
 
-  // Déduplication côté JavaScript avec une Map keyed par ani_id.
-  // Pourquoi une Map et pas un simple filtre ? Parce qu'on veut garder UNE seule entrée
-  // par animal (la plus récente), en comparant les dates au fil du parcours.
-  // Le tri desc côté serveur aide mais n'est pas suffisant : plusieurs animaux
-  // peuvent avoir leur première ligne à des dates différentes, et le tri est global.
+  // Déduplication côté JavaScript — garder uniquement la dernière position par animal
+  // Car PostgREST ne peut pas faire DISTINCT ON (ani_id) directement
   const locParAnimal = new Map();
   data.forEach(loc => {
     const existing = locParAnimal.get(String(loc.ani_id));
     const dateNew = loc.loc_datetime_local || loc.loc_date_local || '';
     const dateExisting = existing ? (existing.loc_datetime_local || existing.loc_date_local || '') : '';
     if (!existing || dateNew > dateExisting) {
-      locParAnimal.set(String(loc.ani_id), loc); // Remplace si la nouvelle date est plus récente
+      locParAnimal.set(String(loc.ani_id), loc); // Garder la plus récente
     }
   });
 
   const locations = Array.from(locParAnimal.values());
-  // Ne mettre en cache que si on a des résultats — évite de cacher une réponse vide
-  // qui pourrait masquer une erreur transitoire
-  if (locations.length > 0) _setCache(cle, locations);
+  if (locations.length > 0) _setCache(cle, locations); // Mettre en cache
   return locations;
 }
 
@@ -347,6 +341,39 @@ export async function fetchAnimalIdsParPeriode(token, filters = {}) {
     _setCache(cle, ids);
   }
   return ids;
+}
+
+export async function fetchCountLocations(token, filters = {}) {
+  const params = new URLSearchParams();
+
+  if (Array.isArray(filters.ani_id) && filters.ani_id.length > 0) {
+    params.append('ani_id', `in.(${filters.ani_id.join(',')})`);
+  }
+
+  if (filters.date_from) params.append('loc_datetime_local', `gte.${filters.date_from}`);
+  if (filters.date_to) params.append('loc_datetime_local', `lte.${filters.date_to}`);
+
+  if (!filters.include_outliers) {
+    params.append('loc_anomalie', 'not.is.true');
+    params.append('loc_outlier', 'is.null');
+  }
+
+  params.append('geom', 'not.is.null');
+  params.append('limit', '0');
+
+  const res = await fetch(`${API_URL}/v_localisation?${params.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=exact'
+    }
+  });
+
+  if (!res.ok) throw new Error('Échec comptage positions');
+
+  const contentRange = res.headers.get('Content-Range');
+  const total = contentRange ? parseInt(contentRange.split('/')[1]) : 0;
+  return total;
 }
 
 /**
