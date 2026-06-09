@@ -91,15 +91,14 @@ export function initMap(targetId, popupId) {
   trajectoireSource = new ol.source.Vector();
 
   // Création de la couche des points GPS
-  const gpsLayer = new ol.layer.Vector({
+  const gpsLayer = new ol.layer.WebGLPoints({
     source: gpsSource,
-    style: new ol.style.Style({
-      image: new ol.style.Circle({
-        radius: 6,
-        fill: new ol.style.Fill({ color: '#2D6A4F' }),
-        stroke: new ol.style.Stroke({ color: 'white', width: 2 })
-      })
-    })
+    style: {
+      'circle-radius': ['get', 'radius'],
+      'circle-fill-color': ['color', ['get', 'fillR'], ['get', 'fillG'], ['get', 'fillB'], ['get', 'fillA']],
+      'circle-stroke-color': ['color', ['get', 'strokeR'], ['get', 'strokeG'], ['get', 'strokeB'], ['get', 'strokeA']],
+      'circle-stroke-width': ['get', 'strokeWidth']
+    }
   });
 
   // Création de la couche des lignes (trajectoires)
@@ -115,7 +114,7 @@ export function initMap(targetId, popupId) {
         url: `https://data.geopf.fr/private/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&apikey=${IGN_API_KEY}&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN25TOUR&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}`,
         attributions: '©IGN'
       }),
-      visible: true
+      visible: false
     }),
     // OpenTopoMap
     new ol.layer.Tile({
@@ -128,7 +127,7 @@ export function initMap(targetId, popupId) {
     // OpenStreetMap
     new ol.layer.Tile({
       source: new ol.source.OSM(),
-      visible: false
+      visible: true
     })
   ];
 
@@ -238,6 +237,16 @@ export function initMap(targetId, popupId) {
   return map;
 }
 
+function cssToRgba(css) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.fillStyle = css;
+  ctx.fillRect(0, 0, 1, 1);
+  const d = ctx.getImageData(0, 0, 1, 1).data;
+  return [d[0], d[1], d[2], d[3] / 255];
+}
+
 /**
  * Dessine les points GPS sur la carte.
  * @param {Array} locations - Liste des positions (Lambert-93)
@@ -274,49 +283,41 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
     const estPremier = modeTrajectoire &&
       premiereParIndividu[loc.ani_id]?.date === (loc.loc_datetime_local || loc.loc_date_local);
 
-    const feature = new ol.Feature({
-      geometry: new ol.geom.Point(coord),
-      ...loc
-    });
-
     const couleur = getCouleur(loc, modeCouleur);
+    const [cR, cG, cB, cA] = cssToRgba(couleur);
+
+    let radius, fillR, fillG, fillB, fillA, strokeR, strokeG, strokeB, strokeA, strokeWidth;
 
     if (modeTrajectoire && estPremier && !estDernier) {
-      // Point de départ — cercle creux
-      feature.setStyle(new ol.style.Style({
-        image: new ol.style.Circle({
-          radius: 6,
-          fill: new ol.style.Fill({ color: 'white' }),
-          stroke: new ol.style.Stroke({ color: couleur, width: 2.5 })
-        })
-      }));
+      radius = 6;
+      fillR = 255; fillG = 255; fillB = 255; fillA = 1;
+      strokeR = cR; strokeG = cG; strokeB = cB; strokeA = cA;
+      strokeWidth = 2.5;
     } else if (modeTrajectoire && estDernier) {
-      // Dernière position — cercle plein plus grand
-      feature.setStyle(new ol.style.Style({
-        image: new ol.style.Circle({
-          radius: 8,
-          fill: new ol.style.Fill({ color: couleur }),
-        })
-      }));
+      radius = 8;
+      fillR = cR; fillG = cG; fillB = cB; fillA = cA;
+      strokeR = 0; strokeG = 0; strokeB = 0; strokeA = 0;
+      strokeWidth = 0;
     } else if (modeTrajectoire) {
-      // Points intermédiaires — petit cercle discret
-      feature.setStyle(new ol.style.Style({
-        image: new ol.style.Circle({
-          radius: 4,
-          fill: new ol.style.Fill({ color: couleur }),
-          stroke: new ol.style.Stroke({ color: 'white', width: 1 })
-        })
-      }));
+      radius = 4;
+      fillR = cR; fillG = cG; fillB = cB; fillA = cA;
+      strokeR = 255; strokeG = 255; strokeB = 255; strokeA = 1;
+      strokeWidth = 1;
     } else {
-      // Mode Positions classique
-      feature.setStyle(new ol.style.Style({
-        image: new ol.style.Circle({
-          radius: 6,
-          fill: new ol.style.Fill({ color: couleur }),
-           stroke: new ol.style.Stroke({ color: 'white', width: 2 })
-        })
-      }));
+      radius = 6;
+      fillR = cR; fillG = cG; fillB = cB; fillA = cA;
+      strokeR = 255; strokeG = 255; strokeB = 255; strokeA = 1;
+      strokeWidth = 2;
     }
+
+    const feature = new ol.Feature({
+      geometry: new ol.geom.Point(coord),
+      ...loc,
+      radius,
+      fillR, fillG, fillB, fillA,
+      strokeR, strokeG, strokeB, strokeA,
+      strokeWidth
+    });
 
     gpsSource.addFeature(feature);
   });
@@ -463,24 +464,11 @@ export function highlightPoint(ani_id, actif) {
   const features = gpsSource.getFeatures();
   features.forEach(f => {
     if (String(f.get('ani_id')) === String(ani_id)) {
-      const style = f.getStyle() || f.get('_styleOriginal');
-      if (!f.get('_styleOriginal')) f.set('_styleOriginal', f.getStyle());
-
       if (actif) {
-        const original = f.get('_styleOriginal');
-        const image = original?.getImage?.();
-        if (image) {
-          const newStyle = new ol.style.Style({
-            image: new ol.style.Circle({
-              radius: (image.getRadius?.() || 6) + 3,
-              fill: image.getFill?.(),
-              stroke: image.getStroke?.()
-            })
-          });
-          f.setStyle(newStyle);
-        }
+        f.set('_originalRadius', f.get('radius'));
+        f.set('radius', (f.get('radius') || 6) + 3);
       } else {
-        f.setStyle(f.get('_styleOriginal'));
+        f.set('radius', f.get('_originalRadius') || 6);
       }
     }
   });
