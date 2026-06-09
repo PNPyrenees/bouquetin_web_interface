@@ -1,4 +1,4 @@
-import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations } from './api.js';
+import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
 import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI } from './config.js';
@@ -179,125 +179,138 @@ export async function applyFilters(token) {
     let locations;
 
     if (isPositionMode) {
-      const idsVisibles = Array.from(
-        document.querySelectorAll('#listeIndividus .checkbox-label')
-      ).filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true')
-       .map(l => l.querySelector('input')?.value)
-       .filter(Boolean);
-
-      const idsAChercher = selectedIds.length > 0 ? selectedIds : idsVisibles;
       const periodes = getPeriodesActives();
 
-      const saisonActive = Object.values({
-        hiver: document.getElementById('checkHiver')?.checked || false,
-        printemps: document.getElementById('checkPrintemps')?.checked || false,
-        ete: document.getElementById('checkEte')?.checked || false,
-        rut: document.getElementById('checkRut')?.checked || false
-      }).some(Boolean);
-
-      const saisons = {
-        hiver: document.getElementById('checkHiver')?.checked || false,
-        printemps: document.getElementById('checkPrintemps')?.checked || false,
-        ete: document.getElementById('checkEte')?.checked || false,
-        rut: document.getElementById('checkRut')?.checked || false
-      };
-
-      if (idsAChercher.length === 0) {
-        locations = [];
-      } else if (periodes.length === 0) {
+      if (periodes.length === 0) {
+        // Sans filtre temporel → dernière position par animal (comportement initial)
         locations = await fetchAllLastLocations(token, {
           population: filters.population,
           include_outliers: filters.include_outliers
         });
-      } else if (saisonActive && !anneeSelectionnee) {
-        // CAS : saison cochée SANS année sélectionnée → ex: "Hiver" toutes années
-
-        const SAISONS_BORNES_CARTE = {
-          hiver:     { from: '01-01', to: '03-31' },
-          printemps: { from: '04-01', to: '06-30' },
-          ete:       { from: '07-01', to: '10-15' },
-          rut:       { from: '10-16', to: '12-31' }
+        if (selectedIds.length > 0) {
+          const selectedSet = new Set(selectedIds.map(String));
+          locations = locations.filter(l => selectedSet.has(String(l.ani_id)));
+        }
+      } else {
+        // Avec filtre temporel → toutes les positions (comme trajectoire mais sans traits)
+        const periode = periodes.length === 1 ? periodes[0] : {
+          from: periodes.reduce((min, p) => p.from < min ? p.from : min, periodes[0].from),
+          to: periodes.reduce((max, p) => p.to > max ? p.to : max, periodes[0].to)
         };
 
-        const saisonsCochees = Object.entries(saisons)
-          .filter(([, v]) => v).map(([k]) => k); // Ex: ['hiver']
+        const idsAChercher = selectedIds.length > 0 ? selectedIds :
+          Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
+            .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
+            .map(l => l.querySelector('input')?.value)
+            .filter(Boolean);
 
-        // Années disponibles triées de la plus récente à la plus ancienne
-        // Vient de window._anneeOptions stocké au chargement de l'appli
-        const anneesSorted = (window._anneeOptions || [])
-          .map(Number).sort((a, b) => b - a); // [2026, 2025, ..., 2014]
-
-        // Tous les animaux visibles dans la liste (non masqués, avec géométrie)
-        const tousLesIds = Array.from(
-          document.querySelectorAll('#listeIndividus .checkbox-label')
-        ).filter(l => l.dataset.sansGeom !== 'true')
-         .map(l => l.querySelector('input')?.value)
-         .filter(Boolean);
-
-        // Si des individus sont cochés manuellement → utiliser seulement ceux-là
-        const idsSource = selectedIds.length > 0 ? selectedIds : tousLesIds;
-
-        // Construire toutes les requêtes : 13 années × N saisons cochées
-        // Ex: Hiver → 13 requêtes (2026-01-01/03-31, 2025-01-01/03-31, ..., 2014-01-01/03-31)
-        const promises = [];
-        anneesSorted.forEach(annee => {
-          saisonsCochees.forEach(k => {
-            promises.push(
-              fetchLastLocationsParPeriode(token, {
-                ani_id: idsSource,
-                date_from: `${annee}-${SAISONS_BORNES_CARTE[k].from}`,
-                date_to: `${annee}-${SAISONS_BORNES_CARTE[k].to}`,
-                include_outliers: filters.include_outliers
-              })
-            );
-          });
-        });
-
-        // Lancer toutes les requêtes EN PARALLÈLE — plus rapide que séquentiel
-        // Mais toujours lourd : 13 requêtes × limit=999999 chacune
-        const resultats = await Promise.all(promises);
-
-        // Fusionner tous les résultats — garder la position la plus récente par animal
-        const locParAnimal = new Map();
-        resultats.flat().forEach(loc => {
-          const key = String(loc.ani_id);
-          const existing = locParAnimal.get(key);
-          const dateNew = loc.loc_datetime_local || loc.loc_date_local || '';
-          const dateExisting = existing ? (existing.loc_datetime_local || existing.loc_date_local || '') : '';
-          if (!existing || dateNew > dateExisting) {
-            locParAnimal.set(key, loc); // Garder la plus récente toutes années confondues
-          }
-        });
-        locations = Array.from(locParAnimal.values());
-        // Résultat : 177 animaux avec leur dernière position en hiver
-      } else if (periodes.length === 1) {
-        locations = await fetchLastLocationsParPeriode(token, {
+        const countFilters = {
           ani_id: idsAChercher,
-          date_from: periodes[0].from,
-          date_to: periodes[0].to,
+          date_from: periode.from,
+          date_to: periode.to,
           include_outliers: filters.include_outliers
-        });
-      } else {
-        // Plusieurs périodes → union, garder la plus récente par animal
-        const promises = periodes.map(p =>
-          fetchLastLocationsParPeriode(token, {
-            ani_id: idsAChercher,
-            date_from: p.from,
-            date_to: p.to,
-            include_outliers: filters.include_outliers
-          })
-        );
-        const results = await Promise.all(promises);
-        const locParAnimal = new Map();
-        results.flat().forEach(loc => {
-          const existing = locParAnimal.get(String(loc.ani_id));
-          const dateNew = loc.loc_datetime_local || loc.loc_date_local || '';
-          const dateExisting = existing ? (existing.loc_datetime_local || existing.loc_date_local || '') : '';
-          if (!existing || dateNew > dateExisting) {
-            locParAnimal.set(String(loc.ani_id), loc);
+        };
+
+        // Étape 1 — Compter les résultats AVANT de télécharger
+        const totalPositions = await fetchCountLocations(token, countFilters);
+        const SEUIL = 10000;
+        let confirmed = 999999;
+
+        if (totalPositions > SEUIL) {
+          confirmed = await new Promise(resolve => {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+              position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+              background: rgba(0,0,0,0.5); z-index: 9999;
+              display: flex; align-items: center; justify-content: center;
+            `;
+            overlay.innerHTML = `
+              <div style="
+                background: white; border-radius: 2px; padding: 24px;
+                max-width: 440px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+              ">
+                <h3 style="margin: 0 0 12px; color: #2D6A4F; font-size: 16px;">
+                  Volume de données important
+                </h3>
+                <p style="margin: 0 0 8px; color: #333; font-size: 14px;">
+                  Votre requête retourne <strong>${totalPositions.toLocaleString('fr-FR')} positions</strong>.
+                </p>
+                <p style="margin: 0 0 20px; color: #666; font-size: 13px;">
+                  L'affichage de ce volume peut entraîner des lenteurs importantes selon les performances de votre ordinateur.
+                  Nous vous recommandons d'affiner vos filtres (période, individus, saison) pour réduire le nombre de résultats.
+                </p>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
+                  <button id="popupAnnuler" style="
+                    padding: 8px 16px; border: 1px solid #ccc;
+                    border-radius: 4px; background: white; cursor: pointer;
+                    font-size: 13px; color: #666;
+                  ">Annuler</button>
+                  <button id="popupLimiter" style="
+                    padding: 8px 16px; border: none;
+                    border-radius: 4px; background: #E07B39; cursor: pointer;
+                    font-size: 13px; color: white;
+                  ">Afficher les 10 000 dernières</button>
+                  <button id="popupConfirmer" style="
+                    padding: 8px 16px; border: none;
+                    border-radius: 4px; background: #2D6A4F; cursor: pointer;
+                    font-size: 13px; color: white;
+                  ">Afficher tout</button>
+                </div>
+              </div>
+            `;
+            document.body.appendChild(overlay);
+            document.getElementById('popupAnnuler').onclick = () => {
+              overlay.remove();
+              resolve(null);
+            };
+            document.getElementById('popupLimiter').onclick = () => {
+              overlay.remove();
+              resolve(10000);
+            };
+            document.getElementById('popupConfirmer').onclick = () => {
+              overlay.remove();
+              resolve(999999);
+            };
+          });
+
+          if (confirmed === null) {
+            hideMapLoading();
+            unlockSidebar();
+            if (btnApply) {
+              btnApply.disabled = false;
+              btnApply.textContent = 'Appliquer les filtres';
+            }
+            return;
           }
+        }
+
+        // Étape 2 — Télécharger toutes les positions
+        locations = await fetchLocations(token, {
+          ...countFilters,
+          limit: confirmed
         });
-        locations = Array.from(locParAnimal.values());
+
+        // Filtrer par saisons cochées si nécessaire (pour saison sans année)
+        const saisonActive = Object.values({
+          hiver: document.getElementById('checkHiver')?.checked || false,
+          printemps: document.getElementById('checkPrintemps')?.checked || false,
+          ete: document.getElementById('checkEte')?.checked || false,
+          rut: document.getElementById('checkRut')?.checked || false
+        }).some(Boolean);
+
+        if (saisonActive) {
+          const saisons = {
+            hiver: document.getElementById('checkHiver')?.checked || false,
+            printemps: document.getElementById('checkPrintemps')?.checked || false,
+            ete: document.getElementById('checkEte')?.checked || false,
+            rut: document.getElementById('checkRut')?.checked || false
+          };
+          locations = locations.filter(loc => {
+            const d = loc.loc_datetime_local || loc.loc_date_local;
+            if (!d) return false;
+            return correspondALaSaisonJS(new Date(d), saisons);
+          });
+        }
       }
 
       // Filtres côté JS (sexe, gestionnaire, programmation, suivis)
@@ -318,9 +331,9 @@ export async function applyFilters(token) {
           String(getProgrammationsMap().get(String(l.ani_id))) === filters.programmation
         );
       }
-
       if (suivisSeulement) locations = locations.filter(l => l.cor_date_fin === null);
 
+      // Rendu carte
       locations = enrichirLocations(locations);
       clearMapPoints();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
@@ -352,7 +365,7 @@ export async function applyFilters(token) {
         } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
           getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
         }
-      }, 400); // augmenté de 0 à 400ms pour laisser le temps au redimensionnement
+      }, 400);
     } else {
       // Mode Trajectoire — on ne vide pas les points existants
       let dateFromApi = null;
