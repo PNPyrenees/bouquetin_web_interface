@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## [0.24.0] - 2026-06-10
+
+### Ajouts
+- Écran de login production dans `index.html` — layout deux colonnes : image bouquetin ibérique (Cabra_montés_2.jpg) à gauche sur fond vert, formulaire à droite avec logos PNP et République Française
+- Formulaire `#loginForm` avec champs `#username` / `#password`, message d'erreur `#loginError` et bouton "Se connecter"
+- Flag `loginEnCours` dans le bloc login pour bloquer les soumissions concurrentes — réinitialisé uniquement en cas d'erreur
+- Guard `if (el.tomselect) return` dans la boucle TomSelect pour éviter la double initialisation
+
+### Modifications
+- `DEV_MODE` passé à `false` dans `app.js` — l'application démarre désormais en mode production avec authentification par formulaire
+- `startApp()` masque `#loginScreen` en tout début d'exécution après authentification réussie
+- Zoom initial dynamique dans `startApp()` — `getView().fit()` sur l'emprise réelle des données (padding 80px, maxZoom 13, délai 600 ms pour WebGL) avec fallback sur les Pyrénées si aucun point
+- `#loginScreen` en `position: fixed; width: 100vw; height: 100vh; z-index: 99999; background: #2D6A4F` — couverture complète de la page pendant la phase de login
+
+### Corrections
+- Suppression du `<div id="loginScreen" style="display:none">` en double dans `index.html` qui faisait pointer `getElementById` vers le mauvais élément
+- Couleur du titre `.login-card h2` corrigée — `#2D6A4F` → `#423d3c` (cohérent avec `.header-title`)
+- Logo PNP corrigé — `logo_pnp.png` (inexistant) → `logo-parc.svg`
+- Suppression de l'ancien bloc CSS login dans `map.css` (lignes 2-102) — `#loginScreen`, `.login-box`, `.login-logo`, `#loginError` — qui écrasait les styles de `main.css` et affichait l'ancienne image `Bouquetin+ibérique+_+Arnaud+Saguer.webp` en fond
+
 ## [0.23.0] - 2026-06-09
 
 ### Ajouts
