@@ -4,7 +4,7 @@ import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchB
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse } from './filters.js';
 
-const DEV_MODE = true;
+const DEV_MODE = false;
 
 /** 
  * VARIABLES GLOBALES
@@ -148,6 +148,9 @@ function initSidebarRight() {
  */
 async function startApp(token) {
   initSidebarRight();
+  // Masquer l'écran de login après authentification réussie
+  const loginScreen = document.getElementById('loginScreen');
+  if (loginScreen) loginScreen.style.display = 'none';
   showGlobalLoading();
   lockSidebar();
   try {
@@ -332,6 +335,7 @@ async function startApp(token) {
       let initialized = false;
       const initTS = () => {
         if (initialized) return;
+        if (el.tomselect) return; // Déjà initialisé — éviter double init
         initialized = true;
         new TomSelect(el, {
           create: false,
@@ -450,6 +454,25 @@ async function startApp(token) {
     // Déclencheurs progressifs pour sécuriser la mise en page après masquage des overlays
     setTimeout(() => updateMapSize(), 150);
     setTimeout(() => updateMapSize(), 350);
+
+    // Zoom dynamique sur l'emprise des données — s'adapte à PNP, PNRPA ou les deux
+    setTimeout(() => {
+      const extent = getGpsSource().getExtent();
+      if (extent && !ol.extent.isEmpty(extent)) {
+        getMap().getView().fit(extent, {
+          padding: [80, 80, 80, 80],
+          maxZoom: 13,
+          duration: 600
+        });
+      } else {
+        // Fallback — aucune donnée → centrer sur les Pyrénées
+        getMap().getView().animate({
+          center: ol.proj.fromLonLat([0.2, 42.9]),
+          zoom: 9,
+          duration: 400
+        });
+      }
+    }, 600); // 600ms pour laisser WebGL rendre les points avant de calculer l'emprise
   }
 }
 
@@ -1076,8 +1099,11 @@ window.addEventListener('resize', () => {
 if (DEV_MODE) {
   login(ROLES.READER, DEV_PASSWORD).then(token => startApp(token));
 } else {
+  let loginEnCours = false;
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (loginEnCours) return;
+    loginEnCours = true;
     const username = document.getElementById('username').value.trim();
     const password = document.getElementById('password').value.trim();
     const errorEl = document.getElementById('loginError');
@@ -1088,6 +1114,7 @@ if (DEV_MODE) {
     } catch (err) {
       errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';
       console.error(err);
+      loginEnCours = false;
     }
   });
 }
