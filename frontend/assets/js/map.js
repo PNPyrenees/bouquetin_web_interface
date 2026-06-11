@@ -338,22 +338,33 @@ function showPopup(feature, coordinate, popupEl) {
       ? p.loc_date_local.replace('T', ' ').slice(0, 16)
       : '—';
 
-  popupEl.innerHTML = isTrajectoire ? `
-    <div class="popup-content">
-      <strong>${p.ani_nom || '—'}</strong>
-      <div class="popup-info">
-        <span>${dateStr}</span>
-      </div>
-    </div>
-  ` : `
-    <div class="popup-content">
-      <strong>${p.ani_nom || '—'}</strong>
-      <div class="popup-info">
-        <span>Dernière position :</span>
-        <div class="date-value">${dateStr}</div>
-      </div>
-    </div>
-  `;
+  popupEl.innerHTML = '';
+  const content = document.createElement('div');
+  content.className = 'popup-content';
+
+  const strong = document.createElement('strong');
+  strong.textContent = p.ani_nom || '—';
+  content.appendChild(strong);
+
+  const info = document.createElement('div');
+  info.className = 'popup-info';
+
+  if (isTrajectoire) {
+    const span = document.createElement('span');
+    span.textContent = dateStr;
+    info.appendChild(span);
+  } else {
+    const labelEl = document.createElement('span');
+    labelEl.textContent = 'Dernière position :';
+    const dateDiv = document.createElement('div');
+    dateDiv.className = 'date-value';
+    dateDiv.textContent = dateStr;
+    info.appendChild(labelEl);
+    info.appendChild(dateDiv);
+  }
+
+  content.appendChild(info);
+  popupEl.appendChild(content);
 
   popupOverlay.setPosition(coordinate);
   popupEl.style.display = 'block';
