@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.25.0] - 2026-06-11
+
+### Ajouts
+- Dropdown session utilisateur dans le header — avatar avec initiales (AD/LC selon le rôle), nom de session, bouton Se déconnecter
+- Persistance du token dans sessionStorage — rechargement de page sans retour au login
+- Déconnexion automatique après 30 minutes d'inactivité (mousemove, keydown, click, scroll)
+- Déconnexion manuelle via le dropdown — vide le token et ramène au login
+
+### Corrections
+- Listeners dropdown déclarés une seule fois au niveau module pour éviter les doublons
+- deconnecter() ne détruit plus le DOM HTML statique du dropdown
+- Token expiré au refresh → deconnecter() appelé proprement
+
 ## [0.24.0] - 2026-06-10
 
 ### Ajouts
