@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [0.26.0] - 2026-06-11
+
+### Corrections
+- Guard mapInitialized ajouté - initMap() n'est plus appelée qu'une seule fois, la même instance ol.Map est réutilisée à chaque reconnexion
+- Conflit de contexte WebGL au deuxième login résolu - points GPS de nouveau visibles après reconnexion
+- Barre d'échelle ScaleLine ne s'accumule plus dans #scaleTarget à chaque reconnexion
+- Options selectAnnee vidées avant d'être repeuplées - plus d'accumulation des années à la reconnexion
+- Guards sidebarRightInitialized, sidebarBadgesInitialized, basemapInitialized, mapListenersInitialized ajoutés - listeners ne s'accumulent plus à chaque reconnexion
+- listeIndividus vidé avant d'être repeuplé - plus de doublons d'individus à la reconnexion
+- État DOM panneau attributaire remis à zéro à la déconnexion - classe visible, width, panel-open, icône toggle
+- Carte nettoyée avant setCurrentToken(null) dans deconnecter() - plus de flash de l'ancienne session
+- Suppression complète de DEV_MODE, DEV_PASSWORD, ROLES et config.local.js - login toujours via formulaire
+- Filtres et interface remis à zéro à la déconnexion - nouvelle session propre
+
 ## [0.25.0] - 2026-06-11
 
 ### Sécurité
