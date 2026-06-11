@@ -293,6 +293,69 @@ header {
   color: white;
 }
 
+.modal-volume-card {
+  background: white;
+  border-radius: 2px;
+  padding: 24px;
+  max-width: 440px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-volume-titre {
+  margin: 0 0 12px;
+  color: var(--color-primary);
+  font-size: 16px;
+  font-family: var(--font-family);
+}
+
+.modal-volume-texte {
+  margin: 0 0 8px;
+  color: #333;
+  font-size: 14px;
+  font-family: var(--font-family);
+}
+
+.modal-volume-sous {
+  margin: 0 0 20px;
+  color: #666;
+  font-size: 13px;
+  font-family: var(--font-family);
+}
+
+.modal-volume-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.modal-volume-actions button {
+  padding: 8px 16px;
+  border-radius: 2px;
+  font-size: 13px;
+  font-family: var(--font-family);
+  cursor: pointer;
+}
+
+#modalVolumeBtnAnnuler {
+  border: 1px solid #ccc;
+  background: white;
+  color: #666;
+}
+
+#modalVolumeBtnLimiter {
+  border: none;
+  background: #E07B39;
+  color: white;
+}
+
+#modalVolumeBtnConfirmer {
+  border: none;
+  background: var(--color-primary);
+  color: white;
+}
+
 .custom-dropdown {
   position: relative;
   display: inline-block;
