@@ -49,8 +49,17 @@
         <a href="#" id="btnAjouter" class="nav-link nav-link-add" style="display: none;">+ Ajouter</a>
       </nav>
       <div class="header-top-right">
-        <div class="user-chip" id="userChip" style="display: none;">
-          CONNEXION
+        <div class="session-dropdown" id="userChip" style="display:none">
+          <button class="session-trigger" id="sessionTrigger">
+            <span class="session-avatar" id="sessionAvatar">--</span>
+            <span class="session-chevron" id="sessionChevron">∧</span>
+          </button>
+          <div class="session-menu" id="sessionMenu" style="display:none">
+            <div class="session-menu-header">Session</div>
+            <div class="session-menu-role" id="sessionRole"></div>
+            <hr class="session-menu-divider">
+            <button class="session-menu-item" id="btnDeconnexion">Se déconnecter</button>
+          </div>
         </div>
       </div>
     </div>
@@ -297,7 +306,10 @@
 
   <div id="loginScreen">
     <div class="login-left">
-      <img src="assets/img/Cabra_montés_2.jpg" alt="Bouquetin ibérique" class="login-bg-img">
+      <img src="assets/img/pnp.jpg" alt="Bouquetin ibérique" class="login-bg-img">
+      <div class="login-photo-credit">
+        © Jean-Paul Crampe
+      </div>
     </div>
     <div class="login-right">
       <div class="login-logos">
