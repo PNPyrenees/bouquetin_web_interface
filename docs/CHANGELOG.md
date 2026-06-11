@@ -13,6 +13,7 @@
 - Carte nettoyée avant setCurrentToken(null) dans deconnecter() - plus de flash de l'ancienne session
 - Suppression complète de DEV_MODE, DEV_PASSWORD, ROLES et config.local.js - login toujours via formulaire
 - Filtres et interface remis à zéro à la déconnexion - nouvelle session propre
+- Accordéons sidebar remis à zéro à la déconnexion - tous fermés sauf Période ouvert par défaut
 
 ## [0.25.0] - 2026-06-11
 
