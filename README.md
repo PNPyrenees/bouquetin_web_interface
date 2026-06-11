@@ -38,9 +38,7 @@ cd bouquetin_web_interface
 
 ## Configuration
 
-Modifier l'URL de l'API dans `frontend/assets/js/config.js` :
+Copier `config.example.js` vers votre fichier de configuration local et renseigner les valeurs nécessaires.
 
-```js
-export const API_URL = 'https://votre-api-postgrest.fr';
-```
+Les fichiers de configuration locaux ne doivent jamais être commités.
 
