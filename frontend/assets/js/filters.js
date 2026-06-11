@@ -217,60 +217,14 @@ export async function applyFilters(token) {
         let confirmed = 999999;
 
         if (totalPositions > SEUIL) {
+          const modal = document.getElementById('modalVolume');
+          document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
+          modal.style.display = 'flex';
+
           confirmed = await new Promise(resolve => {
-            const overlay = document.createElement('div');
-            overlay.style.cssText = `
-              position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-              background: rgba(0,0,0,0.5); z-index: 9999;
-              display: flex; align-items: center; justify-content: center;
-            `;
-            overlay.innerHTML = `
-              <div style="
-                background: white; border-radius: 2px; padding: 24px;
-                max-width: 440px; width: 90%; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-              ">
-                <h3 style="margin: 0 0 12px; color: #2D6A4F; font-size: 16px;">
-                  Volume de données important
-                </h3>
-                <p style="margin: 0 0 8px; color: #333; font-size: 14px;">
-                  Votre requête retourne <strong>${totalPositions.toLocaleString('fr-FR')} positions</strong>.
-                </p>
-                <p style="margin: 0 0 20px; color: #666; font-size: 13px;">
-                  L'affichage de ce volume peut entraîner des lenteurs importantes selon les performances de votre ordinateur.
-                  Nous vous recommandons d'affiner vos filtres (période, individus, saison) pour réduire le nombre de résultats.
-                </p>
-                <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
-                  <button id="popupAnnuler" style="
-                    padding: 8px 16px; border: 1px solid #ccc;
-                    border-radius: 4px; background: white; cursor: pointer;
-                    font-size: 13px; color: #666;
-                  ">Annuler</button>
-                  <button id="popupLimiter" style="
-                    padding: 8px 16px; border: none;
-                    border-radius: 4px; background: #E07B39; cursor: pointer;
-                    font-size: 13px; color: white;
-                  ">Afficher les 10 000 dernières</button>
-                  <button id="popupConfirmer" style="
-                    padding: 8px 16px; border: none;
-                    border-radius: 4px; background: #2D6A4F; cursor: pointer;
-                    font-size: 13px; color: white;
-                  ">Afficher tout</button>
-                </div>
-              </div>
-            `;
-            document.body.appendChild(overlay);
-            document.getElementById('popupAnnuler').onclick = () => {
-              overlay.remove();
-              resolve(null);
-            };
-            document.getElementById('popupLimiter').onclick = () => {
-              overlay.remove();
-              resolve(10000);
-            };
-            document.getElementById('popupConfirmer').onclick = () => {
-              overlay.remove();
-              resolve(999999);
-            };
+            document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
+            document.getElementById('modalVolumeBtnLimiter').onclick = () => { modal.style.display = 'none'; resolve(10000); };
+            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(999999); };
           });
 
           if (confirmed === null) {
