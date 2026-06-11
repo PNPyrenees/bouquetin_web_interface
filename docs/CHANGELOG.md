@@ -2,27 +2,26 @@
 
 ## [0.25.0] - 2026-06-11
 
-### Ajouts
-- Dropdown session utilisateur dans le header — avatar avec initiales (AD/LC selon le rôle), nom de session, bouton Se déconnecter
-- Persistance du token dans sessionStorage — rechargement de page sans retour au login
-- Déconnexion automatique après 30 minutes d'inactivité (mousemove, keydown, click, scroll)
-- Déconnexion manuelle via le dropdown — vide le token et ramène au login
+### Sécurité
+- Mise à jour de la gestion des fichiers de configuration
 
-### Corrections
-- Listeners dropdown déclarés une seule fois au niveau module pour éviter les doublons
-- deconnecter() ne détruit plus le DOM HTML statique du dropdown
-- Token expiré au refresh → deconnecter() appelé proprement
+### Nettoyage
+- Modale volume de données déplacée de filters.js vers index.html - JS ne fait plus que remplir le compteur et gérer les clics
+- Bloc filtreStatutCollier déplacé de app.js vers index.html - plus aucune création de DOM statique en JS
+- label.innerHTML dans la boucle animals remplacé par createElement - élimine le risque XSS sur ani_nom
+- badge.innerHTML dans ajouterBadge() remplacé par createElement/textContent
+- showPopup() dans map.js réécrit avec createElement pour éliminer le risque XSS sur ani_nom et dateStr
 
 ## [0.24.0] - 2026-06-10
 
 ### Ajouts
 - Écran de login production dans `index.html` — layout deux colonnes : image bouquetin ibérique (Cabra_montés_2.jpg) à gauche sur fond vert, formulaire à droite avec logos PNP et République Française
 - Formulaire `#loginForm` avec champs `#username` / `#password`, message d'erreur `#loginError` et bouton "Se connecter"
-- Flag `loginEnCours` dans le bloc login pour bloquer les soumissions concurrentes — réinitialisé uniquement en cas d'erreur
+- Protection contre les soumissions concurrentes du formulaire de connexion
 - Guard `if (el.tomselect) return` dans la boucle TomSelect pour éviter la double initialisation
 
 ### Modifications
-- `DEV_MODE` passé à `false` dans `app.js` — l'application démarre désormais en mode production avec authentification par formulaire
+- L'application démarre en mode production avec authentification par formulaire
 - `startApp()` masque `#loginScreen` en tout début d'exécution après authentification réussie
 - Zoom initial dynamique dans `startApp()` — `getView().fit()` sur l'emprise réelle des données (padding 80px, maxZoom 13, délai 600 ms pour WebGL) avec fallback sur les Pyrénées si aucun point
 - `#loginScreen` en `position: fixed; width: 100vw; height: 100vh; z-index: 99999; background: #2D6A4F` — couverture complète de la page pendant la phase de login
@@ -215,13 +214,13 @@
 
 ### Corrections
 - Retrait des `console.time` et `console.log` de debug dans `filters.js`
-- Retrait de `window._currentToken` temporaire dans `app.js`
+- Retrait d'une variable temporaire de session dans `app.js`
 
 ## [0.14.0] - 2026-06-01
 
 ### Ajouts
 - Fonction `fetchAllLastLocations()` dans `api.js` - récupère la dernière position de tous les animaux en une seule requête depuis `v_animal_last_loc`
-- Clé API IGN `IGN_API_KEY` dans `config.js` et `config.example.js` - URL privée SCAN25 activée
+- Intégration de la clé API IGN dans la configuration - fond SCAN25 activé
 - Index `idx_localisation_date` et `idx_localisation_capt_id` créés sur `t_localisation` côté serveur
 - Champ `cor_date_fin` ajouté dans `v_animal_last_loc` - permet de calculer `activeIds` sans requête supplémentaire
 
@@ -265,7 +264,7 @@
 ### Ajouts
 - Sélecteur de fonds de carte style Google Maps - vignette active toujours visible, menu qui s'ouvre vers la gauche avec transition scale + opacity
 - Vignettes agrandies (64px), bordure verte sur le fond actif, noms réels affichés : IGN SCAN25, OpenTopoMap, OpenStreetMap
-- Mise à jour `config.example.js` - ajout constantes de zoom et DEV_PASSWORD
+- Mise à jour `config.example.js` - ajout constantes de zoom et paramètres de développement
 - Nouveau module `filters.js` - regroupe toute la logique de filtrage extraite de `app.js`
 
 ### Modifications
@@ -349,7 +348,7 @@
   - Filtres textuels par colonne en temps réel, fusionnés dans la même cellule que le titre
   - Pagination avec sélecteur de taille de page (25 / 50 / Tous)
   - En-têtes de tableau épinglés en haut (`position: sticky`) pendant le défilement
-- **Sélecteur de fonds de carte** (`initBasemapSelector`) avec modal et vignettes : SCAN25 IGN (clé `ign_scan_ws` à demander), OpenTopoMap, OpenStreetMap
+- **Sélecteur de fonds de carte** (`initBasemapSelector`) avec modal et vignettes : SCAN25 IGN, OpenTopoMap, OpenStreetMap
 - **Sidebar droite redimensionnable** par glisser depuis le bord gauche, avec snap-close en dessous de 150px
 - **Filtre Programmation GPS** dans `applyFilters()` et `filtrerListeIndividus()` - map `ani_id → prog_id` chargée au démarrage via `fetchProgrammations()`
 - **Toast de notification** (`showToast`) pour les erreurs de sélection (trajectoire sans individu, outliers sans période)
@@ -505,7 +504,7 @@
 ### Changed
 - Refonte visuelle du header selon la maquette finale (icons, typographie Bebas Neue)
 - Amélioration de la navigation : liens centrés avec icônes
-- Préparation de la gestion des rôles : masquage par défaut du bouton "+ Ajouter" et de la session admin (display:none pour pilotage via JWT)
+- Préparation de la gestion des droits : masquage par défaut du bouton "+ Ajouter" selon le profil connecté
 - Optimisation du bandeau vert : image bouquetin (bqt_header.png) redimensionnée et contenue, filtres rapides avec style semi-transparent blanc
 - Mise à jour des couleurs et espacements pour une meilleure cohérence "nature/faune"
 
@@ -533,14 +532,12 @@
 ### Added
 - Header double bande : navigation blanc + bandeau vert "Plateforme de suivi des bouquetins"
 - Filtres rapides (Individu + Saison) dans la bande verte
-- Page de connexion JWT (login/mot de passe)
-- Mode DEV_MODE dans app.js (connexion automatique sans formulaire)
+- Écran de connexion (identifiant/mot de passe)
 - Prototype maquette
 
 ### Changed
 - Arborescence projet complète initialisée
-- config.js retiré du dépôt Git (.gitignore)
-- postgrest.conf retiré du dépôt Git (.gitignore)
+- Fichiers de configuration locaux exclus du dépôt Git
 
 ---
 
@@ -549,7 +546,7 @@
 ### Added
 - Structure initiale du projet (frontend / backend / tests / docs)
 - Test carte OpenLayers avec vraies données GPS (test_map.html)
-- Authentification JWT via PostgREST /rpc/login
+- Authentification via l'API
 - Conversion coordonnées EPSG:2154 → WGS84 via proj4js
 - Affichage points GPS sur fond OSM
 - Popup au clic (nom, date, altitude, température, DOP)
