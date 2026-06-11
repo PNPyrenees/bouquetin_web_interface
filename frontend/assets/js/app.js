@@ -1151,7 +1151,7 @@ document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
   const chevron = document.getElementById('sessionChevron');
   const isOpen = menu.style.display !== 'none';
   menu.style.display = isOpen ? 'none' : 'block';
-  chevron.textContent = isOpen ? '∧' : '∨';
+  chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
 });
 
 document.addEventListener('click', () => {
@@ -1159,7 +1159,7 @@ document.addEventListener('click', () => {
   const chevron = document.getElementById('sessionChevron');
   if (menu && menu.style.display !== 'none') {
     menu.style.display = 'none';
-    if (chevron) chevron.textContent = '∧';
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
   }
 });
 
