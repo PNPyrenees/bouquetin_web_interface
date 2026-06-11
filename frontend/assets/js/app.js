@@ -4,7 +4,7 @@ import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchB
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse } from './filters.js';
 
-const DEV_MODE = false;
+const DEV_MODE = false ;
 
 /** 
  * VARIABLES GLOBALES
@@ -151,6 +151,27 @@ async function startApp(token) {
   // Masquer l'écran de login après authentification réussie
   const loginScreen = document.getElementById('loginScreen');
   if (loginScreen) loginScreen.style.display = 'none';
+
+  // Afficher la session utilisateur et le bouton déconnexion
+  const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+  const role = tokenPayload.role || tokenPayload.sub || 'Utilisateur';
+  const labelMap = {
+    'role_lecture': 'Utilisateur',
+    'role_ecriture': 'Administrateur',
+  };
+  const userChip = document.getElementById('userChip');
+  if (userChip) {
+    const initiales = role === 'role_ecriture' ? 'AD' : 'LC';
+    document.getElementById('sessionAvatar').textContent = initiales;
+    document.getElementById('sessionRole').textContent = labelMap[role] || role;
+    userChip.style.display = 'flex';
+  }
+
+  ['mousemove', 'keydown', 'click', 'scroll'].forEach(event => {
+    document.addEventListener(event, resetInactivityTimer, { passive: true });
+  });
+  resetInactivityTimer();
+
   showGlobalLoading();
   lockSidebar();
   try {
@@ -174,6 +195,7 @@ async function startApp(token) {
     // Récupération des données depuis l'API via le module api.js
     setAnimals(await fetchAnimals(token));
     setCurrentToken(token);
+    sessionStorage.setItem('bqt_token', token);
 
     const programmations = await fetchProgrammations(token);
     programmations.forEach(p => {
@@ -1096,10 +1118,61 @@ window.addEventListener('resize', () => {
   updateMapSize();
 });
 
+let loginEnCours = false;
+
+let inactivityTimer = null;
+const INACTIVITY_DELAY = 30 * 60 * 1000;
+
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(() => {
+    deconnecter();
+  }, INACTIVITY_DELAY);
+}
+
+function deconnecter() {
+  sessionStorage.removeItem('bqt_token');
+  setCurrentToken(null);
+  viderCache();
+  const userChip = document.getElementById('userChip');
+  if (userChip) userChip.style.display = 'none';
+  const loginScreen = document.getElementById('loginScreen');
+  if (loginScreen) loginScreen.style.display = 'flex';
+  document.getElementById('username').value = '';
+  document.getElementById('password').value = '';
+  document.getElementById('loginError').textContent = '';
+  loginEnCours = false;
+  clearTimeout(inactivityTimer);
+}
+
+document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const menu = document.getElementById('sessionMenu');
+  const chevron = document.getElementById('sessionChevron');
+  const isOpen = menu.style.display !== 'none';
+  menu.style.display = isOpen ? 'none' : 'block';
+  chevron.textContent = isOpen ? '∧' : '∨';
+});
+
+document.addEventListener('click', () => {
+  const menu = document.getElementById('sessionMenu');
+  const chevron = document.getElementById('sessionChevron');
+  if (menu && menu.style.display !== 'none') {
+    menu.style.display = 'none';
+    if (chevron) chevron.textContent = '∧';
+  }
+});
+
+document.getElementById('btnDeconnexion')?.addEventListener('click', deconnecter);
+
+const tokenSauvegarde = sessionStorage.getItem('bqt_token');
+if (tokenSauvegarde && !DEV_MODE) {
+  startApp(tokenSauvegarde).catch(() => deconnecter());
+}
+
 if (DEV_MODE) {
   login(ROLES.READER, DEV_PASSWORD).then(token => startApp(token));
 } else {
-  let loginEnCours = false;
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (loginEnCours) return;
