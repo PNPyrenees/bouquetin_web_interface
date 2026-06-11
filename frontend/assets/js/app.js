@@ -1,5 +1,6 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, viderCache } from './api.js';
-import { ROLES, DEV_PASSWORD, ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL } from './config.js';
+import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES } from './config.js';
+import { ROLES, DEV_PASSWORD } from './config.local.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse } from './filters.js';
@@ -155,15 +156,12 @@ async function startApp(token) {
   // Afficher la session utilisateur et le bouton déconnexion
   const tokenPayload = JSON.parse(atob(token.split('.')[1]));
   const role = tokenPayload.role || tokenPayload.sub || 'Utilisateur';
-  const labelMap = {
-    'role_lecture': 'Utilisateur',
-    'role_ecriture': 'Administrateur',
-  };
+  const initiales = ROLE_INITIALES[role] || role.slice(0, 2).toUpperCase();
+  const sessionLabel = ROLE_LABELS[role] || role;
   const userChip = document.getElementById('userChip');
   if (userChip) {
-    const initiales = role === 'role_ecriture' ? 'AD' : 'LC';
     document.getElementById('sessionAvatar').textContent = initiales;
-    document.getElementById('sessionRole').textContent = labelMap[role] || role;
+    document.getElementById('sessionRole').textContent = sessionLabel;
     userChip.style.display = 'flex';
   }
 
@@ -276,10 +274,14 @@ async function startApp(token) {
             if (dateStr) label.dataset.derniereDatePos = dateStr;
           }
 
-          label.innerHTML = `<input type="checkbox" value="${ani.ani_id}"> ${ani.ani_nom}`;
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = ani.ani_id;
+          const texte = document.createTextNode(' ' + (ani.ani_nom || ''));
+          label.appendChild(checkbox);
+          label.appendChild(texte);
 
           // Gestion du clic sur une checkbox d'individu
-          const checkbox = label.querySelector('input');
           checkbox.addEventListener('change', () => {
             if (checkbox.checked) {
               // Ajout d'un badge visuel dans la zone de filtres actifs
@@ -303,16 +305,6 @@ async function startApp(token) {
 
       listeIndividus.style.maxHeight = '300px';
       listeIndividus.style.overflowY = 'auto';
-
-      // Injection du filtre statut collier (checkbox)
-      const filtreStatut = document.createElement('div');
-      filtreStatut.style.cssText = 'margin-bottom:6px;';
-      filtreStatut.innerHTML = `
-        <label class="checkbox-label" id="filtreStatutCollier">
-          <input type="checkbox" id="checkSuivis"> Individus suivis uniquement
-        </label>
-      `;
-      listeIndividus.before(filtreStatut);
 
       // Écouteur pour mettre à jour la liste des individus (masquer inactifs si coché)
       document.getElementById('checkSuivis')?.addEventListener('change', (e) => {
@@ -962,7 +954,11 @@ export function ajouterBadge(label, onRemove, id = null, onClick = null) {
   const badge = document.createElement('div');
   badge.className = 'filtre-badge';
   if (id) badge.dataset.id = id;
-  badge.innerHTML = `${label} <button>×</button>`;
+  const texteNode = document.createTextNode(label + ' ');
+  const btn = document.createElement('button');
+  btn.textContent = '×';
+  badge.appendChild(texteNode);
+  badge.appendChild(btn);
 
   if (onClick) {
     badge.addEventListener('click', (e) => {
@@ -972,7 +968,7 @@ export function ajouterBadge(label, onRemove, id = null, onClick = null) {
     badge.style.cursor = 'pointer';
   }
 
-  badge.querySelector('button').addEventListener('click', () => {
+  btn.addEventListener('click', () => {
     badge.remove();
     onRemove();
     mettreAJourFiltresActifs();
