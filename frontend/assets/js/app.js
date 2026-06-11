@@ -1160,6 +1160,12 @@ async function deconnecter() {
 
   await reinitialiserTousLesFiltres();
 
+  document.querySelectorAll('details').forEach(d => {
+    d.removeAttribute('open');
+  });
+  const detailsPeriode = document.getElementById('detailsPeriode');
+  if (detailsPeriode) detailsPeriode.setAttribute('open', '');
+
   const sidebarRight = document.getElementById('sidebarRight');
   const mapScreen = document.getElementById('mapScreen');
   if (sidebarRight) {
