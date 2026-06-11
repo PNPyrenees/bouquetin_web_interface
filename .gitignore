@@ -4,7 +4,6 @@ Thumbs.db
 
 # Sensitive config
 frontend/assets/js/config.js
-frontend/assets/js/config.local.js
 backend/config/postgrest.conf
 
 # Editors
