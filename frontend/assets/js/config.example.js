@@ -1,15 +1,8 @@
 export const API_URL = 'https://votre-serveur-postgrest:port';
-export const DEV_PASSWORD = 'votre-mot-de-passe';
-
 export const DEFAULT_LIMIT = 300;
 export const DEFAULT_CENTER = [-0.15, 42.9];
 export const DEFAULT_ZOOM = 9;
 export const MAX_ZOOM = 18;
-
-export const ROLES = {
-  READER: 'votre_role_reader',
-  WRITER: 'votre_role_writer',
-};
 
 export const LAMBERT93 =
   '+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 ' +
@@ -25,4 +18,14 @@ export const ZOOM_TRAJECTOIRE_MULTI = 12;
 export const ZOOM_MAX_MANUAL = 18;
 export const ZOOM_MIN_MANUAL = 6;
 
-export const IGN_API_KEY = 'ign_scan_ws'; 
+export const IGN_API_KEY = 'ign_scan_ws';
+
+export const ROLE_LABELS = {
+  'role_lecture': 'Lecteur',
+  'role_ecriture': 'Administrateur',
+};
+
+export const ROLE_INITIALES = {
+  'role_lecture': 'LC',
+  'role_ecriture': 'AD',
+};
