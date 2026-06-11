@@ -1,13 +1,10 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, viderCache } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES } from './config.js';
-import { ROLES, DEV_PASSWORD } from './config.local.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse } from './filters.js';
 
-const DEV_MODE = false ;
-
-/** 
+/**
  * VARIABLES GLOBALES
  * 'animals' stockera la liste complète des individus pour le filtrage
  * 'anneeActuelle' sert de référence pour calculer l'âge des animaux
@@ -18,6 +15,12 @@ let activeIds = new Set();
 let currentToken = null;
 const anneeActuelle = new Date().getFullYear();
 const programmationsMap = new Map(); // ani_id → prog_id
+
+let sidebarRightInitialized = false;
+let sidebarBadgesInitialized = false;
+let basemapInitialized = false;
+let mapListenersInitialized = false;
+let mapInitialized = false;
 
 export function getAnimals() { return animals; }
 export function getActiveIds() { return activeIds; }
@@ -63,6 +66,8 @@ export function enrichirAnimauxAvecPositions(locations) {
 }
 
 function initSidebarRight() {
+  if (sidebarRightInitialized) return;
+  sidebarRightInitialized = true;
   const sidebarRight = document.getElementById('sidebarRight');
   const sidebarRightToggle = document.getElementById('sidebarRightToggle');
 
@@ -173,8 +178,10 @@ async function startApp(token) {
   showGlobalLoading();
   lockSidebar();
   try {
-    // Initialisation de la carte OpenLayers
-    initMap('map', 'popup');
+    if (!mapInitialized) {
+      mapInitialized = true;
+      initMap('map', 'popup');
+    }
     window._highlightPoint = highlightPoint;
     window._zoomToPoint = zoomToPoint;
     window._getMap = getMap;
@@ -236,12 +243,20 @@ async function startApp(token) {
 
     const selectAnnee = document.getElementById('selectAnnee');
     if (selectAnnee) {
-      annees.forEach(annee => {
-        const opt = document.createElement('option');
-        opt.value = annee;
-        opt.textContent = annee;
-        selectAnnee.appendChild(opt);
-      });
+      if (selectAnnee.tomselect) {
+        selectAnnee.tomselect.clearOptions();
+        selectAnnee.tomselect.addOption({ value: '', text: 'Toutes les années' });
+        annees.forEach(annee => selectAnnee.tomselect.addOption({ value: String(annee), text: String(annee) }));
+        selectAnnee.tomselect.refreshOptions(false);
+      } else {
+        while (selectAnnee.options.length > 1) selectAnnee.remove(1);
+        annees.forEach(annee => {
+          const opt = document.createElement('option');
+          opt.value = annee;
+          opt.textContent = annee;
+          selectAnnee.appendChild(opt);
+        });
+      }
     }
     window._anneeOptions = annees.map(String);
 
@@ -252,6 +267,7 @@ async function startApp(token) {
     const searchIndividu = document.getElementById('searchIndividu');
 
     if (listeIndividus) {
+      listeIndividus.innerHTML = '';
       // Tri alphabétique des animaux par nom
       animals.sort((a, b) => (a.ani_nom || '').localeCompare(b.ani_nom || ''))
         .forEach(ani => {
@@ -324,10 +340,6 @@ async function startApp(token) {
       });
     }
 
-    // Champ de recherche textuelle pour filtrer les noms d'individus
-    searchIndividu.addEventListener('input', () => {
-      mettreAJourListeParDate();
-    });
     // Initialisation de la logique des badges pour tous les autres filtres de la sidebar
     initSidebarBadges(token);
     // Initialisation du sélecteur de fond de carte
@@ -397,67 +409,73 @@ async function startApp(token) {
       });
     });
 
-    // Gestion du basculement entre les modes Positions et Trajectoire
-    const btnPos = document.getElementById('btnPositions');
-    const btnTraj = document.getElementById('btnTrajectoire');
-    if (btnPos && btnTraj) {
-      btnPos.addEventListener('click', () => {
-        btnPos.classList.add('active');
-        btnTraj.classList.remove('active');
-        clearTrajectoire();
-        setLabelDatetime('Dernière position');
-        applyFilters(currentToken);
+    if (!mapListenersInitialized) {
+      mapListenersInitialized = true;
+
+      searchIndividu?.addEventListener('input', () => {
+        mettreAJourListeParDate();
       });
-      btnTraj.addEventListener('click', () => {
-        const selectedIds = Array.from(document.querySelectorAll('#listeIndividus input:checked')).map(cb => cb.value);
-        const dateFrom = document.getElementById('dateFrom').value;
-        const dateTo = document.getElementById('dateTo').value;
 
-        // Vérification individu sélectionné
-        if (selectedIds.length === 0) {
-          showToast('Sélectionnez un individu pour afficher sa trajectoire');
-          hideMapLoading();
-          unlockSidebar();
-          return; // Reste en mode Positions
-        }
+      // Gestion du basculement entre les modes Positions et Trajectoire
+      const btnPos = document.getElementById('btnPositions');
+      const btnTraj = document.getElementById('btnTrajectoire');
+      if (btnPos && btnTraj) {
+        btnPos.addEventListener('click', () => {
+          btnPos.classList.add('active');
+          btnTraj.classList.remove('active');
+          clearTrajectoire();
+          setLabelDatetime('Dernière position');
+          applyFilters(currentToken);
+        });
+        btnTraj.addEventListener('click', () => {
+          const selectedIds = Array.from(document.querySelectorAll('#listeIndividus input:checked')).map(cb => cb.value);
+          const dateFrom = document.getElementById('dateFrom').value;
+          const dateTo = document.getElementById('dateTo').value;
 
-        // Bascule en mode Trajectoire
-        btnTraj.classList.add('active');
-        btnPos.classList.remove('active');
-        setLabelDatetime('Date/Heure');
-        applyFilters(currentToken);
+          if (selectedIds.length === 0) {
+            showToast('Sélectionnez un individu pour afficher sa trajectoire');
+            hideMapLoading();
+            unlockSidebar();
+            return;
+          }
 
-        if (selectedIds.length > 0) {
-          setTimeout(() => {
-            const extent = getGpsSource().getExtent();
-            if (!extent || ol.extent.isEmpty(extent)) return;
+          btnTraj.classList.add('active');
+          btnPos.classList.remove('active');
+          setLabelDatetime('Date/Heure');
+          applyFilters(currentToken);
 
-            if (selectedIds.length === 1) {
-              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
-            } else if (selectedIds.length > 1) {
-              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
-            }
-          }, 800);
-        }
+          if (selectedIds.length > 0) {
+            setTimeout(() => {
+              const extent = getGpsSource().getExtent();
+              if (!extent || ol.extent.isEmpty(extent)) return;
+
+              if (selectedIds.length === 1) {
+                getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
+              } else if (selectedIds.length > 1) {
+                getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
+              }
+            }, 800);
+          }
+        });
+      }
+
+      document.getElementById('checkAll')?.addEventListener('change', (e) => {
+        const checked = e.target.checked;
+        document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+          if (label.style.display === 'none') return;
+          const checkbox = label.querySelector('input');
+          if (!checkbox) return;
+          checkbox.checked = checked;
+          if (checked) {
+            ajouterBadge(checkbox.closest('label').textContent.trim(), () => {
+              checkbox.checked = false;
+            }, `ani-${checkbox.value}`);
+          } else {
+            supprimerBadgeById(`ani-${checkbox.value}`);
+          }
+        });
       });
     }
-
-    document.getElementById('checkAll')?.addEventListener('change', (e) => {
-      const checked = e.target.checked;
-      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-        if (label.style.display === 'none') return;
-        const checkbox = label.querySelector('input');
-        if (!checkbox) return;
-        checkbox.checked = checked;
-        if (checked) {
-          ajouterBadge(checkbox.closest('label').textContent.trim(), () => {
-            checkbox.checked = false;
-          }, `ani-${checkbox.value}`);
-        } else {
-          supprimerBadgeById(`ani-${checkbox.value}`);
-        }
-      });
-    });
 
   } catch (err) {
     console.error('Erreur chargement individus:', err);
@@ -491,6 +509,8 @@ async function startApp(token) {
 }
 
 function initSidebarBadges(token) {
+  if (sidebarBadgesInitialized) return;
+  sidebarBadgesInitialized = true;
   const SAISONS_DATES = {
     checkHiver:     { from: '01/01', to: '31/03', label: 'Hiver' },
     checkPrintemps: { from: '01/04', to: '30/06', label: 'Printemps' },
@@ -902,6 +922,8 @@ export function unlockSidebar() {
 }
 
 function initBasemapSelector() {
+  if (basemapInitialized) return;
+  basemapInitialized = true;
   const basemaps = [
     { index: 0, nom: 'IGN SCAN25',    apercu: 'assets/img/ign.png' },
     { index: 1, nom: 'OpenTopoMap',   apercu: 'assets/img/opentopomap.png' },
@@ -1126,19 +1148,43 @@ function resetInactivityTimer() {
   }, INACTIVITY_DELAY);
 }
 
-function deconnecter() {
+async function deconnecter() {
+  clearTimeout(inactivityTimer);
   sessionStorage.removeItem('bqt_token');
+
+  clearMapPoints();
+  clearTrajectoire();
+
   setCurrentToken(null);
   viderCache();
+
+  await reinitialiserTousLesFiltres();
+
+  const sidebarRight = document.getElementById('sidebarRight');
+  const mapScreen = document.getElementById('mapScreen');
+  if (sidebarRight) {
+    sidebarRight.classList.remove('visible');
+    sidebarRight.style.width = '';
+  }
+  if (mapScreen) {
+    mapScreen.style.right = '';
+    mapScreen.classList.remove('panel-open');
+  }
+  const toggleIcon = document.querySelector('#sidebarRightToggle .toggle-icon');
+  if (toggleIcon) toggleIcon.textContent = '›';
+  setPanneauFermeManuel(false);
+
   const userChip = document.getElementById('userChip');
   if (userChip) userChip.style.display = 'none';
+  const menu = document.getElementById('sessionMenu');
+  if (menu) menu.style.display = 'none';
+
   const loginScreen = document.getElementById('loginScreen');
   if (loginScreen) loginScreen.style.display = 'flex';
   document.getElementById('username').value = '';
   document.getElementById('password').value = '';
   document.getElementById('loginError').textContent = '';
   loginEnCours = false;
-  clearTimeout(inactivityTimer);
 }
 
 document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
@@ -1162,31 +1208,27 @@ document.addEventListener('click', () => {
 document.getElementById('btnDeconnexion')?.addEventListener('click', deconnecter);
 
 const tokenSauvegarde = sessionStorage.getItem('bqt_token');
-if (tokenSauvegarde && !DEV_MODE) {
+if (tokenSauvegarde) {
   startApp(tokenSauvegarde).catch(() => deconnecter());
 }
 
-if (DEV_MODE) {
-  login(ROLES.READER, DEV_PASSWORD).then(token => startApp(token));
-} else {
-  document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (loginEnCours) return;
-    loginEnCours = true;
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value.trim();
-    const errorEl = document.getElementById('loginError');
-    errorEl.textContent = '';
-    try {
-      const token = await login(username, password);
-      await startApp(token);
-    } catch (err) {
-      errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';
-      console.error(err);
-      loginEnCours = false;
-    }
-  });
-}
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (loginEnCours) return;
+  loginEnCours = true;
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value.trim();
+  const errorEl = document.getElementById('loginError');
+  errorEl.textContent = '';
+  try {
+    const token = await login(username, password);
+    await startApp(token);
+  } catch (err) {
+    errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';
+    console.error(err);
+    loginEnCours = false;
+  }
+});
 
 /**
  * MISE À JOUR DE LA LÉGENDE
