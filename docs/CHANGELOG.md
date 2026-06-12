@@ -13,6 +13,11 @@
 - Bouton Afficher tout charge réellement l'intégralité des résultats sans plafond fonctionnel - garde-fou serveur à 500 000 uniquement
 - Texte de la modale enrichi - invite à affiner la recherche par date, saison, sexe, population ou individu
 - Retrait du bouton intermédiaire Afficher les 10 000 dernières
+- Uniformisation du mode Positions sans période (point 3.1) - dès qu'un ou plusieurs filtres attributaires sont actifs (sexe, gestionnaire, population, classe d'âge, programmation GPS, individu, suivis, qualité GPS), l'affichage bascule sur toutes les positions historiques correspondantes au lieu de la seule dernière position par animal
+- Même mécanisme de comptage préalable et avertissement à 15 000 positions (modale Annuler/Afficher tout) appliqué à ce nouveau cas
+- Garde-fou ajouté - si aucun individu ne correspond aux filtres actifs, affichage direct de 0 résultat sans requête de comptage
+- Seul le cas sans aucun filtre actif conserve le comportement initial (dernière position par animal, ~51 lignes, sans avertissement)
+- Validation croisée avec la base - filtre cumulé Sexe=Femelle + Programmation 12 locs/j (180s) + Année 2025 + Population Cauterets retourne 16 876 positions, cohérent entre frontend et base
 
 ### Investigation
 - Validation du filtre Programmation GPS - chaîne base vers frontend cohérente (49 individus pour 12 locs/j 180s)
