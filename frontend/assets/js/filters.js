@@ -182,14 +182,67 @@ export async function applyFilters(token) {
       const periodes = getPeriodesActives();
 
       if (periodes.length === 0) {
-        // Sans filtre temporel → dernière position par animal (comportement initial)
-        locations = await fetchAllLastLocations(token, {
-          population: filters.population,
-          include_outliers: filters.include_outliers
-        });
-        if (selectedIds.length > 0) {
-          const selectedSet = new Set(selectedIds.map(String));
-          locations = locations.filter(l => selectedSet.has(String(l.ani_id)));
+        const filtreAttributaireActif =
+          !!filters.sexe || !!filters.gestionnaire || !!filters.population ||
+          !!document.getElementById('selectClasseAge')?.value ||
+          !!filters.programmation ||
+          selectedIds.length > 0 ||
+          suivisSeulement ||
+          !!filters.include_outliers;
+
+        if (!filtreAttributaireActif) {
+          // Aucun filtre → dernière position par animal (comportement initial, léger)
+          locations = await fetchAllLastLocations(token, {
+            population: filters.population,
+            include_outliers: filters.include_outliers
+          });
+        } else {
+          // Un ou plusieurs filtres actifs → toutes les positions historiques correspondantes
+          const idsAChercher = selectedIds.length > 0 ? selectedIds :
+            Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
+              .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
+              .map(l => l.querySelector('input')?.value)
+              .filter(Boolean);
+
+          if (idsAChercher.length === 0) {
+            // Aucun individu ne correspond aux filtres actifs → aucun résultat
+            locations = [];
+          } else {
+            const countFilters = {
+              ani_id: idsAChercher,
+              include_outliers: filters.include_outliers
+            };
+
+            const totalPositions = await fetchCountLocations(token, countFilters);
+            const SEUIL = 15000;
+            let confirmed = 500000;
+
+            if (totalPositions > SEUIL) {
+              const modal = document.getElementById('modalVolume');
+              document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
+              modal.style.display = 'flex';
+
+              confirmed = await new Promise(resolve => {
+                document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
+                document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
+              });
+
+              if (confirmed === null) {
+                hideMapLoading();
+                unlockSidebar();
+                if (btnApply) {
+                  btnApply.disabled = false;
+                  btnApply.textContent = 'Appliquer les filtres';
+                }
+                return;
+              }
+            }
+
+            locations = await fetchLocations(token, {
+              ...countFilters,
+              limit: confirmed
+            });
+          }
         }
       } else {
         // Avec filtre temporel → toutes les positions (comme trajectoire mais sans traits)
