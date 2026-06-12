@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, viderCache } from './api.js';
+import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -202,12 +202,52 @@ async function startApp(token) {
     setCurrentToken(token);
     sessionStorage.setItem('bqt_token', token);
 
+    const [populations, gestionnaires] = await Promise.all([
+      fetchPopulations(token),
+      fetchGestionnaires(token)
+    ]);
+    const selectPop = document.getElementById('selectPopulation');
+    if (selectPop) {
+      if (selectPop.tomselect) {
+        selectPop.tomselect.clearOptions();
+        selectPop.tomselect.addOption({ value: '', text: 'Toutes les populations' });
+        populations.forEach(p => selectPop.tomselect.addOption({ value: p, text: p }));
+        selectPop.tomselect.refreshOptions(false);
+      } else {
+        while (selectPop.options.length > 1) selectPop.remove(1);
+        populations.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p; opt.textContent = p;
+          selectPop.appendChild(opt);
+        });
+      }
+    }
+    const selectGest = document.getElementById('selectGestionnaire');
+    if (selectGest) {
+      if (selectGest.tomselect) {
+        selectGest.tomselect.clearOptions();
+        selectGest.tomselect.addOption({ value: '', text: 'Tous' });
+        gestionnaires.forEach(g => selectGest.tomselect.addOption({ value: g, text: g }));
+        selectGest.tomselect.refreshOptions(false);
+      } else {
+        while (selectGest.options.length > 1) selectGest.remove(1);
+        gestionnaires.forEach(g => {
+          const opt = document.createElement('option');
+          opt.value = g; opt.textContent = g;
+          selectGest.appendChild(opt);
+        });
+      }
+    }
+
     const programmations = await fetchProgrammations(token);
     programmations.forEach(p => {
       if (!programmationsMap.has(String(p.ani_id))) {
         programmationsMap.set(String(p.ani_id), p.prog_id);
       }
     });
+
+    await chargerProgrammationsGPS(token);
+    
     // ← initPanneau() ici — après les données, avant le rendu
     initPanneau();
     window._scrollToAniId = scrollToAniId;
@@ -1298,6 +1338,66 @@ export function mettreAJourLegende() {
     ${legendeCouleur}
   `;
 }
+
+function calculerLocsParJour(frequence) {
+  const heures = parseInt(
+    String(frequence).replace('h', ''),
+    10
+  );
+
+  if (!heures || heures <= 0) {
+    return null;
+  }
+
+  return Math.round(24 / heures);
+}
+
+async function chargerProgrammationsGPS(token) {
+  const select = document.getElementById('selectProgrammation');
+  if (!select) return;
+
+  try {
+    const programmations = await fetchBibliothequeProgrammations(token);
+
+    if (select.tomselect) {
+      select.tomselect.clearOptions();
+      select.tomselect.addOption({ value: '', text: 'Toutes' });
+      programmations.forEach(prog => {
+        const locsParJour = calculerLocsParJour(prog.prog_frequence);
+        const duree = prog.prog_duree_acquisition ?? '?';
+        select.tomselect.addOption({
+          value: String(prog.prog_id),
+          text: `${locsParJour} locs/j (${duree}s)`
+        });
+      });
+      select.tomselect.refreshOptions(false);
+    } else {
+      select.innerHTML = '';
+      const optDefault = document.createElement('option');
+      optDefault.value = '';
+      optDefault.textContent = 'Toutes';
+      select.appendChild(optDefault);
+
+      programmations.forEach(prog => {
+        const opt = document.createElement('option');
+        const locsParJour = calculerLocsParJour(prog.prog_frequence);
+        const duree = prog.prog_duree_acquisition ?? '?';
+        opt.value = prog.prog_id;
+        opt.textContent = `${locsParJour} locs/j (${duree}s)`;
+        select.appendChild(opt);
+      });
+    }
+  } catch (err) {
+    console.error('Erreur chargement programmations GPS:', err);
+    select.innerHTML = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'Indisponible';
+    select.appendChild(opt);
+  }
+}
+
+
 
 function showGlobalLoading() {
   showMapLoading();
