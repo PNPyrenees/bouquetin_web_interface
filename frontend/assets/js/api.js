@@ -394,3 +394,43 @@ export async function fetchProgrammations(token) {
   return res.json();
 }
 
+export async function fetchPopulations(token) {
+  const res = await fetch(
+    `${API_URL}/t_animal?select=ani_pop_rattach&ani_pop_rattach=not.is.null&order=ani_pop_rattach.asc`,
+    { headers: { Authorization: `Bearer ${token}`, 'Accept-Profile': 'bouquetin' } }
+  );
+  if (!res.ok) throw new Error('Erreur fetchPopulations');
+  const data = await res.json();
+  return [...new Set(data.map(d => d.ani_pop_rattach))];
+}
+
+export async function fetchGestionnaires(token) {
+  const res = await fetch(
+    `${API_URL}/t_animal?select=ani_gestionnaire&ani_gestionnaire=not.is.null&order=ani_gestionnaire.asc`,
+    { headers: { Authorization: `Bearer ${token}`, 'Accept-Profile': 'bouquetin' } }
+  );
+  if (!res.ok) throw new Error('Erreur fetchGestionnaires');
+  const data = await res.json();
+  return [...new Set(data.map(d => d.ani_gestionnaire))];
+}
+
+/**
+ * Récupère les programmations GPS depuis bib_programmation
+ */
+export async function fetchBibliothequeProgrammations(token) {
+  const res = await fetch(
+    `${API_URL}/bib_programmation?select=prog_id,prog_frequence,prog_duree_acquisition&order=prog_id`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin'
+      }
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error('Échec chargement bibliotheque programmations');
+  }
+
+  return res.json();
+}
