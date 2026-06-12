@@ -213,8 +213,8 @@ export async function applyFilters(token) {
 
         // Étape 1 — Compter les résultats AVANT de télécharger
         const totalPositions = await fetchCountLocations(token, countFilters);
-        const SEUIL = 10000;
-        let confirmed = 999999;
+        const SEUIL = 15000;
+        let confirmed = 500000;
 
         if (totalPositions > SEUIL) {
           const modal = document.getElementById('modalVolume');
@@ -223,8 +223,7 @@ export async function applyFilters(token) {
 
           confirmed = await new Promise(resolve => {
             document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
-            document.getElementById('modalVolumeBtnLimiter').onclick = () => { modal.style.display = 'none'; resolve(10000); };
-            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(999999); };
+            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
           });
 
           if (confirmed === null) {
