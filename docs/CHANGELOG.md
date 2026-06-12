@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.27.0] - 2026-06-12
+
+### Ajouts
+- Populations et gestionnaires chargés dynamiquement depuis t_animal (fetchPopulations, fetchGestionnaires) - plus de valeurs codées en dur dans index.html
+- Programmations GPS chargées dynamiquement depuis bib_programmation (fetchBibliothequeProgrammations) - libellés calculés depuis prog_frequence et prog_duree_acquisition
+- fetchProgrammations() associe à chaque animal sa programmation actuelle (cor_date_debut le plus récent)
+
+### Investigation
+- Validation du filtre Programmation GPS - chaîne base vers frontend cohérente (49 individus pour 12 locs/j 180s)
+- Anomalie de données identifiée pour Arbizon (ani_id=558) - position aberrante datée 2068 avec geom NULL dans v_localisation, masque ses positions réelles dans v_animal_last_loc
+
 ## [0.26.0] - 2026-06-11
 
 ### Corrections
