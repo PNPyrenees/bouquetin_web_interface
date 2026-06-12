@@ -7,6 +7,13 @@
 - Programmations GPS chargées dynamiquement depuis bib_programmation (fetchBibliothequeProgrammations) - libellés calculés depuis prog_frequence et prog_duree_acquisition
 - fetchProgrammations() associe à chaque animal sa programmation actuelle (cor_date_debut le plus récent)
 
+### Modifications
+- Modale volume de données simplifiée à deux boutons : Annuler / Afficher tout
+- Seuil de déclenchement de l'avertissement relevé de 10 000 à 15 000 positions, basé sur une analyse de performance WebGLPoints (rendu fluide jusqu'à 100 000+ points, goulot réseau réel autour de 15-20k lignes JSON)
+- Bouton Afficher tout charge réellement l'intégralité des résultats sans plafond fonctionnel - garde-fou serveur à 500 000 uniquement
+- Texte de la modale enrichi - invite à affiner la recherche par date, saison, sexe, population ou individu
+- Retrait du bouton intermédiaire Afficher les 10 000 dernières
+
 ### Investigation
 - Validation du filtre Programmation GPS - chaîne base vers frontend cohérente (49 individus pour 12 locs/j 180s)
 - Anomalie de données identifiée pour Arbizon (ani_id=558) - position aberrante datée 2068 avec geom NULL dans v_localisation, masque ses positions réelles dans v_animal_last_loc
