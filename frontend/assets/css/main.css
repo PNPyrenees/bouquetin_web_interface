@@ -344,12 +344,6 @@ header {
   color: #666;
 }
 
-#modalVolumeBtnLimiter {
-  border: none;
-  background: #E07B39;
-  color: white;
-}
-
 #modalVolumeBtnConfirmer {
   border: none;
   background: var(--color-primary);
