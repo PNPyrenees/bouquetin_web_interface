@@ -9,7 +9,7 @@ import {
   lockSidebar, unlockSidebar,
   showToast, mettreAJourLegende,
   ajouterBadge, supprimerBadgeById, mettreAJourFiltresActifs,
-  mettreAJourSelectN
+  mettreAJourSelectN, mettreAJourBoutonAppliquer
 } from './app.js';
 
 export function getPeriodesActives() {
@@ -144,14 +144,19 @@ if (saisonActive && saisonsCochees.length === 1) {
  * APPLICATION DES FILTRES
  * Récupère les données filtrées depuis l'API et met à jour la carte.
  */
-export async function applyFilters(token) {
+export async function applyFilters(token, modeForce = null) {
   const btnApply = document.getElementById('btnApplyFilters');
   showMapLoading();
   lockSidebar();
 
   // Collecte des filtres
   const filters = {
-    ani_id: Array.from(document.querySelectorAll('#listeIndividus input:checked')).map(cb => cb.value),
+    ani_id: Array.from(document.querySelectorAll('#listeIndividus input:checked'))
+      .filter(cb => {
+        const label = cb.closest('label');
+        return !label || label.dataset.cocheAuto !== 'init';
+      })
+      .map(cb => cb.value),
     date_from: document.getElementById('dateFrom').value,
     date_to: document.getElementById('dateTo').value,
     sexe: document.getElementById('selectSexe').value,
@@ -167,7 +172,9 @@ export async function applyFilters(token) {
   }
 
   try {
-    const isPositionMode = document.getElementById('btnPositions').classList.contains('active');
+    const isPositionMode = modeForce !== null
+      ? modeForce === 'positions'
+      : document.getElementById('btnPositions').classList.contains('active');
     const selectedIds = filters.ani_id;
     const suivisSeulement = document.getElementById('checkSuivis')?.checked || false;
 
@@ -218,8 +225,9 @@ export async function applyFilters(token) {
               if (confirmed === null) {
                 hideMapLoading();
                 unlockSidebar();
-                if (btnApply) { btnApply.disabled = false; btnApply.textContent = 'Appliquer les filtres'; }
-                return;
+                if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+                mettreAJourBoutonAppliquer();
+                return false;
               }
             }
             locations = await fetchLocations(token, { ...countFilters, limit: confirmed });
@@ -268,11 +276,9 @@ export async function applyFilters(token) {
               if (confirmed === null) {
                 hideMapLoading();
                 unlockSidebar();
-                if (btnApply) {
-                  btnApply.disabled = false;
-                  btnApply.textContent = 'Appliquer les filtres';
-                }
-                return;
+                if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+                mettreAJourBoutonAppliquer();
+                return false;
               }
             }
 
@@ -320,11 +326,9 @@ export async function applyFilters(token) {
           if (confirmed === null) {
             hideMapLoading();
             unlockSidebar();
-            if (btnApply) {
-              btnApply.disabled = false;
-              btnApply.textContent = 'Appliquer les filtres';
-            }
-            return;
+            if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+            mettreAJourBoutonAppliquer();
+            return false;
           }
         }
 
@@ -393,7 +397,9 @@ export async function applyFilters(token) {
             label.dataset.cocheAuto = 'false';
           }, `ani-${aniId}`);
         }
+        // Si déjà coché en mode init, ne pas reposer de badge
       });
+      clearTrajectoire();
       clearMapPoints();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
       const count = renderPoints(locations, true, false, modeCouleur);
@@ -462,53 +468,56 @@ export async function applyFilters(token) {
         }
       });
 
-      const trajCountFilters = {
-        ani_id: idsAChercher,
-        date_from: dateFromApi,
-        date_to: dateToApi,
-        include_outliers: false
-      };
+      const inputNTraj = document.getElementById('inputNDernieres');
+      const toutesPositionsTraj = inputNTraj?.disabled || inputNTraj?.value === 'toutes';
+      const nTraj = toutesPositionsTraj ? null : (parseInt(inputNTraj?.value) || 1);
 
-      const totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
-      const SEUIL = 15000;
-      let confirmedTraj = 500000;
+      if (!dateFromApi && !dateToApi && !toutesPositionsTraj) {
+        // N dernières localisations par individu sans période — pas de COUNT ni modale
+        locations = await fetchNDernieresLocalisations(token, idsAChercher, nTraj);
+      } else {
+        const trajCountFilters = {
+          ani_id: idsAChercher,
+          date_from: dateFromApi,
+          date_to: dateToApi,
+          include_outliers: false
+        };
 
-      if (totalTrajPositions > SEUIL) {
-        const modal = document.getElementById('modalVolume');
-        document.getElementById('modalVolumeCount').textContent = totalTrajPositions.toLocaleString('fr-FR');
+        const totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
+        const SEUIL = 15000;
+        let confirmedTraj = 500000;
 
-        const sousTexte = modal.querySelector('.modal-volume-sous');
-        const texteOriginalSous = sousTexte.textContent;
-        sousTexte.textContent = 'Afficher un grand nombre de trajectoires peut rendre la carte illisible avec de nombreux traits superposés, en plus d\'entraîner des lenteurs importantes. Vous pouvez affiner votre recherche avec les filtres de date, saison, sexe, population ou individu pour réduire le nombre de résultats.';
+        if (totalTrajPositions > SEUIL) {
+          const modal = document.getElementById('modalVolume');
+          document.getElementById('modalVolumeCount').textContent = totalTrajPositions.toLocaleString('fr-FR');
 
-        modal.style.display = 'flex';
+          const sousTexte = modal.querySelector('.modal-volume-sous');
+          const texteOriginalSous = sousTexte.textContent;
+          sousTexte.textContent = 'Afficher un grand nombre de trajectoires peut rendre la carte illisible avec de nombreux traits superposés, en plus d\'entraîner des lenteurs importantes. Vous pouvez affiner votre recherche avec les filtres de date, saison, sexe, population ou individu pour réduire le nombre de résultats.';
 
-        confirmedTraj = await new Promise(resolve => {
-          document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
-          document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
-        });
+          modal.style.display = 'flex';
 
-        sousTexte.textContent = texteOriginalSous;
+          confirmedTraj = await new Promise(resolve => {
+            document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
+            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
+          });
 
-        if (confirmedTraj === null) {
-          hideMapLoading();
-          unlockSidebar();
-          if (btnApply) {
-            btnApply.disabled = false;
-            btnApply.textContent = 'Appliquer les filtres';
+          sousTexte.textContent = texteOriginalSous;
+
+          if (confirmedTraj === null) {
+            hideMapLoading();
+            unlockSidebar();
+            if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+            mettreAJourBoutonAppliquer();
+            return false;
           }
-          return;
         }
-      }
 
-      // Requête principale - positions valides
-      console.log('[TRAJ DEBUG] trajCountFilters complet:', JSON.stringify(trajCountFilters));
-      locations = await fetchLocations(token, {
-        ...trajCountFilters,
-        limit: confirmedTraj
-      });
-      console.log('[TRAJ DEBUG] nb positions reçues:', locations.length);
-      console.log('[TRAJ DEBUG] exemples loc_anomalie/loc_outlier:', locations.slice(0, 5).map(l => ({ani_id: l.ani_id, loc_anomalie: l.loc_anomalie, loc_outlier: l.loc_outlier, lon: l.geom})));
+        locations = await fetchLocations(token, {
+          ...trajCountFilters,
+          limit: confirmedTraj
+        });
+      }
 
       // Outliers - requête séparée, inchangée
       if (filters.include_outliers) {
@@ -567,9 +576,9 @@ export async function applyFilters(token) {
     hideMapLoading();
     unlockSidebar();
     if (btnApply) {
-      btnApply.disabled = false;
       btnApply.textContent = 'Appliquer les filtres';
     }
+    mettreAJourBoutonAppliquer();
   }
 
 }
@@ -626,7 +635,7 @@ function correspondALaSaisonJS(date, saisons) {
 }
 
 export function decocherCochesAutomatiques() {
-  document.querySelectorAll('#listeIndividus .checkbox-label[data-coche-auto="true"]').forEach(label => {
+  document.querySelectorAll('#listeIndividus .checkbox-label[data-coche-auto="true"], #listeIndividus .checkbox-label[data-coche-auto="init"]').forEach(label => {
     const checkbox = label.querySelector('input');
     if (checkbox) checkbox.checked = false;
     label.dataset.cocheAuto = 'false';
@@ -634,6 +643,7 @@ export function decocherCochesAutomatiques() {
     if (aniId) supprimerBadgeById(`ani-${aniId}`);
   });
   mettreAJourSelectN();
+  mettreAJourBoutonAppliquer();
 }
 
 export function filtrerListeIndividus() {
