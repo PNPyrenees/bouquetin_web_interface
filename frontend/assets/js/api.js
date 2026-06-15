@@ -434,3 +434,18 @@ export async function fetchBibliothequeProgrammations(token) {
 
   return res.json();
 }
+
+/**
+ * Récupère les N dernières localisations de chaque animal spécifié
+ */
+export async function fetchNDernieresLocalisations(token, ids, n) {
+  const promises = ids.map(id =>
+    fetchLocations(token, {
+      ani_id: id,
+      limit: n,
+      include_outliers: false
+    })
+  );
+  const results = await Promise.all(promises);
+  return results.flat();
+}
