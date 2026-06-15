@@ -6,6 +6,14 @@
 - Populations et gestionnaires chargés dynamiquement depuis t_animal (fetchPopulations, fetchGestionnaires) - plus de valeurs codées en dur dans index.html
 - Programmations GPS chargées dynamiquement depuis bib_programmation (fetchBibliothequeProgrammations) - libellés calculés depuis prog_frequence et prog_duree_acquisition
 - fetchProgrammations() associe à chaque animal sa programmation actuelle (cor_date_debut le plus récent)
+- Chargement initial limité aux animaux en cours de suivi (cor_date_fin IS NULL) - carte et liste filtrées dès l'ouverture
+- Checkbox Individus en cours de suivi cochée par défaut avec son badge au chargement
+- Sélecteur N dernières localisations sous la checkbox - valeurs 1/5/10/15/20/Toutes
+- Verrouillage automatique du sélecteur sur Toutes dès qu'un filtre ou individu est actif
+- Mémorisation de la valeur choisie - restaurée quand les filtres sont retirés
+- Coche automatique des individus affichés après application des filtres avec badges
+- Mécanique cocheAuto pour distinguer coches manuelles et automatiques
+- decocherCochesAutomatiques appelé à chaque changement de filtre pour nettoyer l'état précédent
 
 ### Modifications
 - Modale volume de données simplifiée à deux boutons : Annuler / Afficher tout
@@ -18,6 +26,10 @@
 - Garde-fou ajouté - si aucun individu ne correspond aux filtres actifs, affichage direct de 0 résultat sans requête de comptage
 - Seul le cas sans aucun filtre actif conserve le comportement initial (dernière position par animal, ~51 lignes, sans avertissement)
 - Validation croisée avec la base - filtre cumulé Sexe=Femelle + Programmation 12 locs/j (180s) + Année 2025 + Population Cauterets retourne 16 876 positions, cohérent entre frontend et base
+- reinitialiserTousLesFiltres ramène exactement à l'état initial - checkbox suivis cochée, sélecteur N à 1, carte avec animaux suivis
+- Mode Trajectoire harmonisé avec mode Positions - mêmes filtres, même logique, même système COUNT modal
+- Retrait du blocage obligatoire d'un individu pour le mode Trajectoire
+- Cohérence temporelle entre mode Positions et mode Trajectoire via getPeriodesActives
 
 ### Investigation
 - Validation du filtre Programmation GPS - chaîne base vers frontend cohérente (49 individus pour 12 locs/j 180s)
