@@ -1117,7 +1117,7 @@ export function mettreAJourSelectN() {
   if (filtreActif) {
     inputN.value = 'toutes';
     inputN.disabled = true;
-    labelN.textContent = 'toutes les positions';
+    labelN.textContent = 'les positions';
   } else {
     inputN.disabled = false;
     const valeursValides = ['1', '5', '10', '15', '20', 'toutes'];
@@ -1126,7 +1126,7 @@ export function mettreAJourSelectN() {
     }
     const val = inputN.value;
     if (val === 'toutes') {
-      labelN.textContent = 'toutes les positions';
+      labelN.textContent = 'les positions';
     } else {
       const n = parseInt(val) || 1;
       labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
