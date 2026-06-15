@@ -341,16 +341,26 @@ async function startApp(token) {
 
           // Gestion du clic sur une checkbox d'individu
           checkbox.addEventListener('change', () => {
-            label.dataset.cocheAuto = 'false';
-            if (checkbox.checked) {
+            if (!checkbox.checked) {
+              // Décochage d'un individu -> reset complet de toutes les coches
+              document.querySelectorAll('#listeIndividus .checkbox-label').forEach(lbl => {
+                const cb = lbl.querySelector('input');
+                if (!cb) return;
+                cb.checked = false;
+                lbl.dataset.cocheAuto = 'false';
+                supprimerBadgeById(`ani-${cb.value}`);
+              });
+            } else {
+              // Cochage manuel d'un individu
+              label.dataset.cocheAuto = 'false';
               ajouterBadge(ani.ani_nom, () => {
                 checkbox.checked = false;
-                mettreAJourSelectN();
+                label.dataset.cocheAuto = 'false';
+                supprimerBadgeById(`ani-${ani.ani_id}`);
               }, `ani-${ani.ani_id}`);
-            } else {
-              supprimerBadgeById(`ani-${ani.ani_id}`);
             }
             mettreAJourSelectN();
+            mettreAJourBoutonAppliquer();
           });
 
           listeIndividus.appendChild(label);
@@ -381,6 +391,7 @@ async function startApp(token) {
 
         decocherCochesAutomatiques();
         mettreAJourListeParDate();
+        mettreAJourBoutonAppliquer();
       });
     }
 
@@ -406,8 +417,10 @@ async function startApp(token) {
     if (inputN) {
       inputN.addEventListener('change', () => {
         inputN.dataset.valeurManuelle = inputN.value;
+        inputN.dataset.modifieParUtilisateur = 'true';
         mettreAJourLabelN();
         decocherCochesAutomatiques();
+        mettreAJourBoutonAppliquer();
       });
     }
 
@@ -423,6 +436,24 @@ async function startApp(token) {
 
     mettreAJourFiltresActifs();
     filtrerListeIndividus();
+
+    // Cocher tous les animaux suivis sans badge individuel
+    const idsActifsInit = getActiveIds();
+    document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+      if (label.dataset.sansGeom === 'true') return;
+      const checkbox = label.querySelector('input');
+      if (!checkbox) return;
+      if (idsActifsInit.has(Number(checkbox.value))) {
+        checkbox.checked = true;
+        label.dataset.cocheAuto = 'init';
+      }
+    });
+
+    const btnApply = document.getElementById('btnApplyFilters');
+    if (btnApply) {
+      btnApply.disabled = true;
+      btnApply.classList.add('btn-disabled');
+    }
 
     // Initialisation de la logique des badges pour tous les autres filtres de la sidebar
     initSidebarBadges(token);
@@ -499,6 +530,7 @@ async function startApp(token) {
       searchIndividu?.addEventListener('input', () => {
         decocherCochesAutomatiques();
         mettreAJourListeParDate();
+        mettreAJourBoutonAppliquer();
       });
 
       // Gestion du basculement entre les modes Positions et Trajectoire
@@ -506,30 +538,62 @@ async function startApp(token) {
       const btnTraj = document.getElementById('btnTrajectoire');
       if (btnPos && btnTraj) {
         btnPos.addEventListener('click', () => {
-          btnPos.classList.add('active');
-          btnTraj.classList.remove('active');
-          clearTrajectoire();
           setLabelDatetime('Dernière position');
-          applyFilters(currentToken);
+          decocherCochesAutomatiques();
+
+          // Restaurer coches initiales sans badges
+          const idsActifs = getActiveIds();
+          document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+            if (label.dataset.sansGeom === 'true') return;
+            const checkbox = label.querySelector('input');
+            if (!checkbox) return;
+            if (idsActifs.has(Number(checkbox.value))) {
+              checkbox.checked = true;
+              label.dataset.cocheAuto = 'init';
+            }
+          });
+
+          const inputN = document.getElementById('inputNDernieres');
+          if (inputN && !inputN.dataset.modifieParUtilisateur) {
+            inputN.value = '1';
+            inputN.dataset.valeurManuelle = '1';
+            const labelN = document.getElementById('labelNDernieres');
+            if (labelN) labelN.textContent = 'dernière position';
+          }
+          applyFilters(currentToken, 'positions').then(confirme => {
+            if (confirme !== false) {
+              btnPos.classList.add('active');
+              btnTraj.classList.remove('active');
+              clearTrajectoire();
+            }
+          });
         });
         btnTraj.addEventListener('click', () => {
-          btnTraj.classList.add('active');
-          btnPos.classList.remove('active');
-          setLabelDatetime('Date/Heure');
-          applyFilters(currentToken);
-
-          setTimeout(() => {
-            const ids = window._idsAChercherTraj || [];
-            if (ids.length === 0) return;
-            const extent = getGpsSource().getExtent();
-            if (!extent || ol.extent.isEmpty(extent)) return;
-
-            if (ids.length === 1) {
-              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
-            } else {
-              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
+          const inputN = document.getElementById('inputNDernieres');
+          if (inputN && !inputN.dataset.modifieParUtilisateur) {
+            inputN.value = '20';
+            inputN.dataset.valeurManuelle = '20';
+            const labelN = document.getElementById('labelNDernieres');
+            if (labelN) labelN.textContent = 'dernières positions';
+          }
+          applyFilters(currentToken, 'trajectoire').then(confirme => {
+            if (confirme !== false) {
+              btnTraj.classList.add('active');
+              btnPos.classList.remove('active');
+              setLabelDatetime('Date/Heure');
+              setTimeout(() => {
+                const ids = window._idsAChercherTraj || [];
+                if (ids.length === 0) return;
+                const extent = getGpsSource().getExtent();
+                if (!extent || ol.extent.isEmpty(extent)) return;
+                if (ids.length === 1) {
+                  getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
+                } else {
+                  getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
+                }
+              }, 800);
             }
-          }, 800);
+          });
         });
       }
 
@@ -556,6 +620,7 @@ async function startApp(token) {
   } finally {
     hideGlobalLoading();
     unlockSidebar();
+    mettreAJourBoutonAppliquer();
     updateMapSize();
     // Déclencheurs progressifs pour sécuriser la mise en page après masquage des overlays
     setTimeout(() => updateMapSize(), 150);
@@ -666,6 +731,7 @@ function initSidebarBadges(token) {
       }
       decocherCochesAutomatiques();
       mettreAJourListeParDate();
+      mettreAJourBoutonAppliquer();
     });
   });
 
@@ -690,6 +756,7 @@ function initSidebarBadges(token) {
       } else {
         supprimerBadgeById('checkAberrantes');
       }
+      mettreAJourBoutonAppliquer();
     });
   }
 
@@ -708,6 +775,7 @@ function initSidebarBadges(token) {
       }
       decocherCochesAutomatiques();
       mettreAJourListeParDate();
+      mettreAJourBoutonAppliquer();
     });
   });
 
@@ -741,6 +809,7 @@ function initSidebarBadges(token) {
     } else {
       filtrerListeIndividus();
     }
+    mettreAJourBoutonAppliquer();
   });
 
   // Saisons
@@ -875,6 +944,7 @@ function initSidebarBadges(token) {
 
       decocherCochesAutomatiques();
       mettreAJourListeParDate();
+      mettreAJourBoutonAppliquer();
     });
   });
 
@@ -1092,6 +1162,7 @@ export function mettreAJourFiltresActifs() {
   if (filterCountEl) {
     filterCountEl.textContent = `${count} filtre${count > 1 ? 's' : ''} actif${count > 1 ? 's' : ''}`;
   }
+  mettreAJourBoutonAppliquer();
 }
 
 export function mettreAJourSelectN() {
@@ -1132,6 +1203,32 @@ export function mettreAJourSelectN() {
       labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
     }
   }
+}
+
+export function mettreAJourBoutonAppliquer() {
+  const btn = document.getElementById('btnApplyFilters');
+  if (!btn) return;
+
+  const actionManuelle =
+    !!document.getElementById('selectSexe')?.value ||
+    !!document.getElementById('selectGestionnaire')?.value ||
+    !!document.getElementById('selectPopulation')?.value ||
+    !!document.getElementById('selectClasseAge')?.value ||
+    !!document.getElementById('selectProgrammation')?.value ||
+    !!document.getElementById('selectAnnee')?.value ||
+    document.getElementById('checkHiver')?.checked ||
+    document.getElementById('checkPrintemps')?.checked ||
+    document.getElementById('checkEte')?.checked ||
+    document.getElementById('checkRut')?.checked ||
+    !!(document.getElementById('dateFrom')?.value) ||
+    !!(document.getElementById('dateTo')?.value) ||
+    document.getElementById('checkAberrantes')?.checked ||
+    Array.from(document.querySelectorAll('#listeIndividus input:checked'))
+      .some(cb => cb.closest('label')?.dataset.cocheAuto !== 'init') ||
+    (document.getElementById('inputNDernieres')?.dataset.modifieParUtilisateur === 'true');
+
+  btn.disabled = !actionManuelle;
+  btn.classList.toggle('btn-disabled', !actionManuelle);
 }
 
 let isResetting = false;
@@ -1205,6 +1302,7 @@ async function reinitialiserTousLesFiltres() {
       inputNReinit.value = '1';
       inputNReinit.disabled = false;
       delete inputNReinit.dataset.valeurManuelle;
+      delete inputNReinit.dataset.modifieParUtilisateur;
     }
     const labelNReinit = document.getElementById('labelNDernieres');
     if (labelNReinit) labelNReinit.textContent = 'dernière position';
@@ -1237,6 +1335,18 @@ async function reinitialiserTousLesFiltres() {
         mettreAJourLegende();
         setLabelDatetime('Dernière position');
         filtrerListeIndividus();
+
+        // Recocher tous les animaux suivis sans badge individuel
+        const idsActifsReset = new Set(locationsSuivies.map(l => l.ani_id));
+        document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+          if (label.dataset.sansGeom === 'true') return;
+          const checkbox = label.querySelector('input');
+          if (!checkbox) return;
+          if (idsActifsReset.has(Number(checkbox.value))) {
+            checkbox.checked = true;
+            label.dataset.cocheAuto = 'init';
+          }
+        });
       } catch (err) {
         console.error('Erreur reset map:', err);
       }
@@ -1244,6 +1354,7 @@ async function reinitialiserTousLesFiltres() {
   } finally {
     hideMapLoading();
     unlockSidebar();
+    mettreAJourBoutonAppliquer();
     isResetting = false;
   }
 }
@@ -1384,58 +1495,38 @@ export function mettreAJourLegende() {
   const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
   const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
 
-  // Couleur de la pastille selon le mode
-  let couleurPastille = '#2D6A4F';
-  let legendeCouleur = '';
+  contenu.classList.toggle('legende-mode-trajectoire', isTrajectoire);
+  contenu.classList.toggle('legende-mode-positions', !isTrajectoire);
 
-  switch (modeCouleur) {
-    case 'sexe':
-      legendeCouleur = `
-        <div class="legende-section-titre">Sexe</div>
-        <div class="legende-item"><div class="legende-pastille" style="background:#3A86FF"></div><span>Mâle</span></div>
-        <div class="legende-item"><div class="legende-pastille" style="background:#FF006E"></div><span>Femelle</span></div>
-      `;
-      break;
-    case 'gestionnaire':
-      legendeCouleur = `
-        <div class="legende-section-titre">Gestionnaire</div>
-        <div class="legende-item"><div class="legende-pastille" style="background:#2D6A4F"></div><span>PNP</span></div>
-        <div class="legende-item"><div class="legende-pastille" style="background:#E07B39"></div><span>PNRPA</span></div>
-      `;
-      break;
-    // case 'saison': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
-    // case 'date': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
-    default:
-      legendeCouleur = ''; // Individu — pas de légende couleur
-      break;
+  const titreModeEl = document.getElementById('legendeModeTitre');
+  if (titreModeEl) titreModeEl.textContent = isTrajectoire ? 'Trajectoire' : 'Positions';
+
+  const sectionCouleur = document.getElementById('legendeCouleur');
+  const titreCouleur = document.getElementById('legendeCouleurTitre');
+  const pastille1 = document.getElementById('legendeCouleurPastille1');
+  const label1 = document.getElementById('legendeCouleurLabel1');
+  const pastille2 = document.getElementById('legendeCouleurPastille2');
+  const label2 = document.getElementById('legendeCouleurLabel2');
+
+  if (modeCouleur === 'sexe') {
+    sectionCouleur?.classList.add('visible');
+    if (titreCouleur) titreCouleur.textContent = 'Sexe';
+    if (pastille1) pastille1.className = 'legende-pastille legende-pastille-male';
+    if (label1) label1.textContent = 'Mâle';
+    if (pastille2) pastille2.className = 'legende-pastille legende-pastille-femelle';
+    if (label2) label2.textContent = 'Femelle';
+  } else if (modeCouleur === 'gestionnaire') {
+    sectionCouleur?.classList.add('visible');
+    if (titreCouleur) titreCouleur.textContent = 'Gestionnaire';
+    if (pastille1) pastille1.className = 'legende-pastille legende-pastille-pnp';
+    if (label1) label1.textContent = 'PNP';
+    if (pastille2) pastille2.className = 'legende-pastille legende-pastille-pnrpa';
+    if (label2) label2.textContent = 'PNRPA';
+  } else {
+    sectionCouleur?.classList.remove('visible');
   }
-
-  contenu.innerHTML = `
-    ${isTrajectoire ? `
-      <div class="legende-section-titre">Trajectoire</div>
-      <div class="legende-item">
-        <div class="legende-pastille-creux"></div>
-        <span>Point de départ</span>
-      </div>
-      <div class="legende-item">
-        <div class="legende-pastille" style="background:${couleurPastille}"></div>
-        <span>Dernière position</span>
-      </div>
-      <div class="legende-item">
-        <span style="font-size:14px;color:${couleurPastille}">→</span>
-        <span>Direction</span>
-      </div>
-    ` : `
-      <div class="legende-section-titre">Positions</div>
-      <div class="legende-item">
-        <div class="legende-pastille" style="background:${couleurPastille}"></div>
-        <span>Dernière position</span>
-      </div>
-    `}
-    ${legendeCouleur}
-  `;
 }
-
+// Calcule le nombre de localisations par jour à partir de la fréquence d'acquisition
 function calculerLocsParJour(frequence) {
   const heures = parseInt(
     String(frequence).replace('h', ''),
@@ -1493,8 +1584,6 @@ async function chargerProgrammationsGPS(token) {
     select.appendChild(opt);
   }
 }
-
-
 
 function showGlobalLoading() {
   showMapLoading();
