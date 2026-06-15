@@ -12,8 +12,12 @@
 - Verrouillage automatique du sélecteur sur Toutes dès qu'un filtre ou individu est actif
 - Mémorisation de la valeur choisie - restaurée quand les filtres sont retirés
 - Coche automatique des individus affichés après application des filtres avec badges
-- Mécanique cocheAuto pour distinguer coches manuelles et automatiques
-- decocherCochesAutomatiques appelé à chaque changement de filtre pour nettoyer l'état précédent
+- Mécanique cocheAuto=init sans badge et cocheAuto=true avec badge
+- Cochage automatique des animaux suivis sans badge individuel à l'initialisation
+- Décocher un individu décoche tous les autres pour repartir de zéro
+- decocherCochesAutomatiques appelé à chaque changement de filtre
+- Bouton Appliquer grisé au chargement et désactivé tant qu'aucune action manuelle n'est effectuée
+- Annulation modale volume restaure le mode précédent visuellement
 
 ### Modifications
 - Modale volume de données simplifiée à deux boutons : Annuler / Afficher tout
@@ -30,6 +34,11 @@
 - Mode Trajectoire harmonisé avec mode Positions - mêmes filtres, même logique, même système COUNT modal
 - Retrait du blocage obligatoire d'un individu pour le mode Trajectoire
 - Cohérence temporelle entre mode Positions et mode Trajectoire via getPeriodesActives
+- Valeur par défaut N=20 en mode Trajectoire N=1 en mode Positions
+- Passage Trajectoire vers Positions nettoie les coches auto et restaure l'état initial
+- Retour mode Positions depuis Trajectoire sans modale volume
+- Légende refactorisée - structure HTML dans index.html couleurs dans main.css logique dans app.js
+- clearTrajectoire ajouté en mode Positions pour effacer les traits résiduels
 
 ### Investigation
 - Validation du filtre Programmation GPS - chaîne base vers frontend cohérente (49 individus pour 12 locs/j 180s)
