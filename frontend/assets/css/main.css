@@ -569,6 +569,49 @@ select.sidebar-select {
   display: none;
 }
 
+.sidebar-select-inline {
+  display: inline-block;
+  width: auto;
+  padding: 2px 4px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  background: white;
+  cursor: pointer;
+}
+
+.input-group-n {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.spinbox-select {
+  width: auto;
+  height: 28px;
+  padding: 0 4px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: white;
+  cursor: pointer;
+  color: var(--text-color, #333);
+}
+
+.spinbox-select:disabled {
+  background: var(--color-disabled, #f5f5f5);
+  color: var(--text-muted, #999);
+  cursor: not-allowed;
+}
+
+#labelNDernieres {
+  font-family: var(--font-family);
+  font-size: var(--sidebar-font-size);
+  color: var(--color-text);
+}
+
 .input-group label {
   display: block;
   font-size: var(--sidebar-font-size-label);
