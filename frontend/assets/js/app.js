@@ -2,7 +2,7 @@ import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetc
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
-import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse } from './filters.js';
+import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse, decocherCochesAutomatiques } from './filters.js';
 
 /**
  * VARIABLES GLOBALES
@@ -264,11 +264,13 @@ async function startApp(token) {
       locations.filter(l => l.cor_date_fin === null).map(l => l.ani_id)
     ));
 
-    const count = renderPoints(locationsEnrichies);
-    mettreAJourPanneau(locationsEnrichies);
+    const locationsSuivies = locationsEnrichies.filter(l => l.cor_date_fin === null);
+
+    const count = renderPoints(locationsSuivies);
+    mettreAJourPanneau(locationsSuivies);
     const posEl = document.getElementById('positionsCount');
     if (posEl) posEl.textContent = count;
-    mettreAJourIndividus(enrichirAnimauxAvecPositions(locationsEnrichies));
+    mettreAJourIndividus(enrichirAnimauxAvecPositions(locationsSuivies));
     mettreAJourLegende();
     setLabelDatetime('Dernière position');
 
@@ -339,15 +341,16 @@ async function startApp(token) {
 
           // Gestion du clic sur une checkbox d'individu
           checkbox.addEventListener('change', () => {
+            label.dataset.cocheAuto = 'false';
             if (checkbox.checked) {
-              // Ajout d'un badge visuel dans la zone de filtres actifs
               ajouterBadge(ani.ani_nom, () => {
-                checkbox.checked = false; // Callback pour décocher si le badge est supprimé
+                checkbox.checked = false;
+                mettreAJourSelectN();
               }, `ani-${ani.ani_id}`);
             } else {
-              // Suppression du badge si on décoche manuellement
               supprimerBadgeById(`ani-${ani.ani_id}`);
             }
+            mettreAJourSelectN();
           });
 
           listeIndividus.appendChild(label);
@@ -376,9 +379,50 @@ async function startApp(token) {
           supprimerBadgeById('checkSuivis');
         }
 
+        decocherCochesAutomatiques();
         mettreAJourListeParDate();
       });
     }
+
+    // Listener sur le select N dernières localisations
+    const inputN = document.getElementById('inputNDernieres');
+    const labelN = document.getElementById('labelNDernieres');
+
+    function mettreAJourLabelN() {
+      if (!inputN || !labelN) return;
+      if (inputN.disabled) {
+        labelN.textContent = 'les positions';
+        return;
+      }
+      const val = inputN.value;
+      if (val === 'toutes') {
+        labelN.textContent = 'les positions';
+      } else {
+        const n = parseInt(val) || 1;
+        labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
+      }
+    }
+
+    if (inputN) {
+      inputN.addEventListener('change', () => {
+        inputN.dataset.valeurManuelle = inputN.value;
+        mettreAJourLabelN();
+        decocherCochesAutomatiques();
+      });
+    }
+
+    // Cocher 'Individus en cours de suivi' par défaut avec son badge
+    const checkSuivisInit = document.getElementById('checkSuivis');
+    if (checkSuivisInit && !checkSuivisInit.checked) {
+      checkSuivisInit.checked = true;
+      ajouterBadge('Individus en cours de suivi', () => {
+        checkSuivisInit.checked = false;
+        mettreAJourListeParDate();
+      }, 'checkSuivis');
+    }
+
+    mettreAJourFiltresActifs();
+    filtrerListeIndividus();
 
     // Initialisation de la logique des badges pour tous les autres filtres de la sidebar
     initSidebarBadges(token);
@@ -453,6 +497,7 @@ async function startApp(token) {
       mapListenersInitialized = true;
 
       searchIndividu?.addEventListener('input', () => {
+        decocherCochesAutomatiques();
         mettreAJourListeParDate();
       });
 
@@ -468,34 +513,23 @@ async function startApp(token) {
           applyFilters(currentToken);
         });
         btnTraj.addEventListener('click', () => {
-          const selectedIds = Array.from(document.querySelectorAll('#listeIndividus input:checked')).map(cb => cb.value);
-          const dateFrom = document.getElementById('dateFrom').value;
-          const dateTo = document.getElementById('dateTo').value;
-
-          if (selectedIds.length === 0) {
-            showToast('Sélectionnez un individu pour afficher sa trajectoire');
-            hideMapLoading();
-            unlockSidebar();
-            return;
-          }
-
           btnTraj.classList.add('active');
           btnPos.classList.remove('active');
           setLabelDatetime('Date/Heure');
           applyFilters(currentToken);
 
-          if (selectedIds.length > 0) {
-            setTimeout(() => {
-              const extent = getGpsSource().getExtent();
-              if (!extent || ol.extent.isEmpty(extent)) return;
+          setTimeout(() => {
+            const ids = window._idsAChercherTraj || [];
+            if (ids.length === 0) return;
+            const extent = getGpsSource().getExtent();
+            if (!extent || ol.extent.isEmpty(extent)) return;
 
-              if (selectedIds.length === 1) {
-                getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
-              } else if (selectedIds.length > 1) {
-                getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
-              }
-            }, 800);
-          }
+            if (ids.length === 1) {
+              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
+            } else {
+              getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
+            }
+          }, 800);
         });
       }
 
@@ -630,6 +664,7 @@ function initSidebarBadges(token) {
           filtrerListeIndividus();
         }, id);
       }
+      decocherCochesAutomatiques();
       mettreAJourListeParDate();
     });
   });
@@ -671,6 +706,7 @@ function initSidebarBadges(token) {
           mettreAJourListeParDate();
         }, id);
       }
+      decocherCochesAutomatiques();
       mettreAJourListeParDate();
     });
   });
@@ -699,6 +735,7 @@ function initSidebarBadges(token) {
     });
     const dateFrom = document.getElementById('dateFrom')?.value;
     const dateTo = document.getElementById('dateTo')?.value;
+    decocherCochesAutomatiques();
     if (dateFrom || dateTo) {
       mettreAJourListeParDate();
     } else {
@@ -836,6 +873,7 @@ function initSidebarBadges(token) {
         }
       }
 
+      decocherCochesAutomatiques();
       mettreAJourListeParDate();
     });
   });
@@ -1013,6 +1051,10 @@ export function supprimerBadgeById(id) {
  * Affiche un badge amovible pour chaque filtre actif.
  */
 export function ajouterBadge(label, onRemove, id = null, onClick = null) {
+  if (id) {
+    const existing = document.querySelector(`#badgesFiltres .filtre-badge[data-id='${id}']`);
+    if (existing) existing.remove();
+  }
   const badge = document.createElement('div');
   badge.className = 'filtre-badge';
   if (id) badge.dataset.id = id;
@@ -1052,6 +1094,46 @@ export function mettreAJourFiltresActifs() {
   }
 }
 
+export function mettreAJourSelectN() {
+  const inputN = document.getElementById('inputNDernieres');
+  const labelN = document.getElementById('labelNDernieres');
+  if (!inputN || !labelN) return;
+
+  const filtreActif =
+    !!document.getElementById('selectSexe')?.value ||
+    !!document.getElementById('selectGestionnaire')?.value ||
+    !!document.getElementById('selectPopulation')?.value ||
+    !!document.getElementById('selectClasseAge')?.value ||
+    !!document.getElementById('selectProgrammation')?.value ||
+    !!document.getElementById('selectAnnee')?.value ||
+    document.getElementById('checkHiver')?.checked ||
+    document.getElementById('checkPrintemps')?.checked ||
+    document.getElementById('checkEte')?.checked ||
+    document.getElementById('checkRut')?.checked ||
+    !!(document.getElementById('dateFrom')?.value) ||
+    !!(document.getElementById('dateTo')?.value) ||
+    Array.from(document.querySelectorAll('#listeIndividus input:checked')).length > 0;
+
+  if (filtreActif) {
+    inputN.value = 'toutes';
+    inputN.disabled = true;
+    labelN.textContent = 'toutes les positions';
+  } else {
+    inputN.disabled = false;
+    const valeursValides = ['1', '5', '10', '15', '20', 'toutes'];
+    if (!valeursValides.includes(inputN.value)) {
+      inputN.value = inputN.dataset.valeurManuelle || '1';
+    }
+    const val = inputN.value;
+    if (val === 'toutes') {
+      labelN.textContent = 'toutes les positions';
+    } else {
+      const n = parseInt(val) || 1;
+      labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
+    }
+  }
+}
+
 let isResetting = false;
 
 async function reinitialiserTousLesFiltres() {
@@ -1068,6 +1150,11 @@ async function reinitialiserTousLesFiltres() {
 
     // 2. Supprimer tous les badges
     document.querySelectorAll('.filtre-badge').forEach(badge => badge.remove());
+    ajouterBadge('Individus en cours de suivi', () => {
+      const cb = document.getElementById('checkSuivis');
+      if (cb) cb.checked = false;
+      mettreAJourListeParDate();
+    }, 'checkSuivis');
 
     // 3. Mode Positions par défaut
     const btnPos = document.getElementById('btnPositions');
@@ -1111,7 +1198,16 @@ async function reinitialiserTousLesFiltres() {
     const checkOutliers = document.getElementById('checkAberrantes');
     if (checkOutliers) checkOutliers.checked = false;
     const checkSuivis = document.getElementById('checkSuivis');
-    if (checkSuivis) checkSuivis.checked = false;
+    if (checkSuivis) checkSuivis.checked = true;
+
+    const inputNReinit = document.getElementById('inputNDernieres');
+    if (inputNReinit) {
+      inputNReinit.value = '1';
+      inputNReinit.disabled = false;
+      delete inputNReinit.dataset.valeurManuelle;
+    }
+    const labelNReinit = document.getElementById('labelNDernieres');
+    if (labelNReinit) labelNReinit.textContent = 'dernière position';
 
     // 9. Individus
     document.querySelectorAll('#listeIndividus input').forEach(cb => {
@@ -1130,11 +1226,12 @@ async function reinitialiserTousLesFiltres() {
       try {
         const locations = await fetchAllLastLocations(currentToken);
         const locationsEnrichies = enrichirLocations(locations);
+        const locationsSuivies = locationsEnrichies.filter(l => l.cor_date_fin === null);
         clearMapPoints();
         clearTrajectoire();
-        const count = renderPoints(locationsEnrichies, false);
-        mettreAJourPanneau(locationsEnrichies);
-        mettreAJourIndividus(animals.filter(a => locationsEnrichies.some(l => String(l.ani_id) === String(a.ani_id))));
+        const count = renderPoints(locationsSuivies, false);
+        mettreAJourPanneau(locationsSuivies);
+        mettreAJourIndividus(animals.filter(a => locationsSuivies.some(l => String(l.ani_id) === String(a.ani_id))));
         const posEl = document.getElementById('positionsCount');
         if (posEl) posEl.textContent = count;
         mettreAJourLegende();
