@@ -1,4 +1,4 @@
-import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations } from './api.js';
+import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations, fetchNDernieresLocalisations } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
 import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI } from './config.js';
@@ -8,7 +8,8 @@ import {
   showMapLoading, hideMapLoading,
   lockSidebar, unlockSidebar,
   showToast, mettreAJourLegende,
-  ajouterBadge, supprimerBadgeById, mettreAJourFiltresActifs
+  ajouterBadge, supprimerBadgeById, mettreAJourFiltresActifs,
+  mettreAJourSelectN
 } from './app.js';
 
 export function getPeriodesActives() {
@@ -187,15 +188,52 @@ export async function applyFilters(token) {
           !!document.getElementById('selectClasseAge')?.value ||
           !!filters.programmation ||
           selectedIds.length > 0 ||
-          suivisSeulement ||
           !!filters.include_outliers;
 
         if (!filtreAttributaireActif) {
-          // Aucun filtre → dernière position par animal (comportement initial, léger)
-          locations = await fetchAllLastLocations(token, {
-            population: filters.population,
-            include_outliers: filters.include_outliers
-          });
+          const inputN = document.getElementById('inputNDernieres');
+          const toutesPositions = inputN?.disabled || inputN?.value === 'toutes';
+          const n = toutesPositions ? null : (parseInt(inputN?.value) || 1);
+
+          let idsActifs = suivisSeulement
+            ? Array.from(getActiveIds()).map(String)
+            : getAnimals().map(a => String(a.ani_id));
+
+          if (toutesPositions) {
+            const countFilters = {
+              ani_id: idsActifs,
+              include_outliers: filters.include_outliers
+            };
+            const totalPositions = await fetchCountLocations(token, countFilters);
+            const SEUIL = 15000;
+            let confirmed = 500000;
+            if (totalPositions > SEUIL) {
+              const modal = document.getElementById('modalVolume');
+              document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
+              modal.style.display = 'flex';
+              confirmed = await new Promise(resolve => {
+                document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
+                document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
+              });
+              if (confirmed === null) {
+                hideMapLoading();
+                unlockSidebar();
+                if (btnApply) { btnApply.disabled = false; btnApply.textContent = 'Appliquer les filtres'; }
+                return;
+              }
+            }
+            locations = await fetchLocations(token, { ...countFilters, limit: confirmed });
+          } else if (n === 1) {
+            locations = await fetchAllLastLocations(token, {
+              population: filters.population,
+              include_outliers: filters.include_outliers
+            });
+            if (suivisSeulement) {
+              locations = locations.filter(l => getActiveIds().has(Number(l.ani_id)));
+            }
+          } else {
+            locations = await fetchNDernieresLocalisations(token, idsActifs, n);
+          }
         } else {
           // Un ou plusieurs filtres actifs → toutes les positions historiques correspondantes
           const idsAChercher = selectedIds.length > 0 ? selectedIds :
@@ -337,10 +375,25 @@ export async function applyFilters(token) {
           String(getProgrammationsMap().get(String(l.ani_id))) === filters.programmation
         );
       }
-      if (suivisSeulement) locations = locations.filter(l => l.cor_date_fin === null);
+      if (suivisSeulement) locations = locations.filter(l => getActiveIds().has(Number(l.ani_id)));
 
       // Rendu carte
       locations = enrichirLocations(locations);
+      const idsAffiches = new Set(locations.map(l => String(l.ani_id)));
+      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+        const checkbox = label.querySelector('input');
+        if (!checkbox) return;
+        const aniId = String(checkbox.value);
+        if (idsAffiches.has(aniId) && !checkbox.checked) {
+          checkbox.checked = true;
+          label.dataset.cocheAuto = 'true';
+          const nom = label.textContent.trim();
+          ajouterBadge(nom, () => {
+            checkbox.checked = false;
+            label.dataset.cocheAuto = 'false';
+          }, `ani-${aniId}`);
+        }
+      });
       clearMapPoints();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
       const count = renderPoints(locations, true, false, modeCouleur);
@@ -374,31 +427,70 @@ export async function applyFilters(token) {
       }, 400);
     } else {
       // Mode Trajectoire — on ne vide pas les points existants
+      const periodesT = getPeriodesActives();
       let dateFromApi = null;
       let dateToApi = null;
-      const anneeRequete = anneeSelectionnee || new Date().getFullYear();
-      if (aDateFrom) {
-        const [j, m] = dateFromRaw.split('/');
-        dateFromApi = `${anneeRequete}-${m}-${j}`;
-      }
-      if (aDateTo) {
-        const [j, m] = dateToRaw.split('/');
-        dateToApi = `${anneeRequete}-${m}-${j}`;
+      if (periodesT.length > 0) {
+        const p = periodesT.length === 1 ? periodesT[0] : {
+          from: periodesT.reduce((min, p) => p.from < min ? p.from : min, periodesT[0].from),
+          to: periodesT.reduce((max, p) => p.to > max ? p.to : max, periodesT[0].to)
+        };
+        dateFromApi = p.from;
+        dateToApi = p.to;
       }
 
-      if (aDateFrom && aDateTo) {
-        // Avec période → une seule requête, toutes les positions sur la plage
-        const trajFilters = {
-          ...filters,
-          date_from: dateFromApi,
-          date_to: dateToApi,
-          limit: 999999
-        };
-        locations = await fetchLocations(token, trajFilters);
-      } else {
-        // Sans période → 100 dernières positions PAR individu sélectionné
-        if (selectedIds.length === 0) {
-          showToast('Sélectionnez un individu pour afficher sa trajectoire');
+      // idsAChercher : individus cochés, sinon individus visibles après filtres (comme en mode Positions)
+      const idsAChercher = selectedIds.length > 0 ? selectedIds :
+        Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
+          .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
+          .map(l => l.querySelector('input')?.value)
+          .filter(Boolean);
+      window._idsAChercherTraj = idsAChercher;
+      const idsAffiches = new Set(idsAChercher.map(String));
+      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+        const checkbox = label.querySelector('input');
+        if (!checkbox) return;
+        const aniId = String(checkbox.value);
+        if (idsAffiches.has(aniId) && !checkbox.checked) {
+          checkbox.checked = true;
+          label.dataset.cocheAuto = 'true';
+          const nom = label.textContent.trim();
+          ajouterBadge(nom, () => {
+            checkbox.checked = false;
+            label.dataset.cocheAuto = 'false';
+          }, `ani-${aniId}`);
+        }
+      });
+
+      const trajCountFilters = {
+        ani_id: idsAChercher,
+        date_from: dateFromApi,
+        date_to: dateToApi,
+        include_outliers: false
+      };
+
+      const totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
+      const SEUIL = 15000;
+      let confirmedTraj = 500000;
+
+      if (totalTrajPositions > SEUIL) {
+        const modal = document.getElementById('modalVolume');
+        document.getElementById('modalVolumeCount').textContent = totalTrajPositions.toLocaleString('fr-FR');
+
+        const sousTexte = modal.querySelector('.modal-volume-sous');
+        const texteOriginalSous = sousTexte.textContent;
+        sousTexte.textContent = 'Afficher un grand nombre de trajectoires peut rendre la carte illisible avec de nombreux traits superposés, en plus d\'entraîner des lenteurs importantes. Vous pouvez affiner votre recherche avec les filtres de date, saison, sexe, population ou individu pour réduire le nombre de résultats.';
+
+        modal.style.display = 'flex';
+
+        confirmedTraj = await new Promise(resolve => {
+          document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
+          document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
+        });
+
+        sousTexte.textContent = texteOriginalSous;
+
+        if (confirmedTraj === null) {
           hideMapLoading();
           unlockSidebar();
           if (btnApply) {
@@ -407,45 +499,36 @@ export async function applyFilters(token) {
           }
           return;
         }
+      }
 
-        if (filters.include_outliers && (!aDateFrom || !aDateTo)) {
-          showToast('Veuillez sélectionner une période');
-          filters.include_outliers = false;
-        }
+      // Requête principale - positions valides
+      console.log('[TRAJ DEBUG] trajCountFilters complet:', JSON.stringify(trajCountFilters));
+      locations = await fetchLocations(token, {
+        ...trajCountFilters,
+        limit: confirmedTraj
+      });
+      console.log('[TRAJ DEBUG] nb positions reçues:', locations.length);
+      console.log('[TRAJ DEBUG] exemples loc_anomalie/loc_outlier:', locations.slice(0, 5).map(l => ({ani_id: l.ani_id, loc_anomalie: l.loc_anomalie, loc_outlier: l.loc_outlier, lon: l.geom})));
 
-        const promises = selectedIds.map(async id => {
-          // Requête 1 — positions valides
-          const valides = await fetchLocations(token, {
-            ...filters,
-            date_from: dateFromApi,
-            date_to: dateToApi,
-            ani_id: [id],
-            limit: 30,
-            include_outliers: false
-          });
-
-          // Requête 2 — outliers uniquement si case cochée
-          let outliers = [];
-          if (filters.include_outliers) {
+      // Outliers - requête séparée, inchangée
+      if (filters.include_outliers) {
+        if (!dateFromApi || !dateToApi) {
+          showToast('Veuillez sélectionner une période pour inclure les outliers');
+        } else {
+          const outlierPromises = idsAChercher.map(async id => {
             const toutesPositions = await fetchLocations(token, {
-              ...filters,
+              ani_id: [id],
               date_from: dateFromApi,
               date_to: dateToApi,
-              ani_id: [id],
               limit: 999999,
               include_outliers: true,
               only_outliers: true
             });
-            outliers = toutesPositions.filter(l =>
-              l.loc_outlier !== null || l.loc_anomalie === true
-            );
-          }
-
-          return [...valides, ...outliers];
-        });
-
-        const results = await Promise.all(promises);
-        locations = results.flat();
+            return toutesPositions.filter(l => l.loc_outlier !== null || l.loc_anomalie === true);
+          });
+          const outlierResults = await Promise.all(outlierPromises);
+          locations = [...locations, ...outlierResults.flat()];
+        }
       }
       locations = enrichirLocations(locations);
       clearMapPoints();
@@ -469,9 +552,9 @@ export async function applyFilters(token) {
       setTimeout(() => {
         const extent = getGpsSource().getExtent();
         if (!extent || ol.extent.isEmpty(extent)) return;
-        if (selectedIds.length === 1) {
+        if (idsAChercher.length === 1) {
           getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
-        } else if (selectedIds.length > 1) {
+        } else if (idsAChercher.length > 1) {
           getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
         }
       }, 300);
@@ -542,7 +625,19 @@ function correspondALaSaisonJS(date, saisons) {
          (saisons.ete && estEte) || (saisons.rut && estRut);
 }
 
+export function decocherCochesAutomatiques() {
+  document.querySelectorAll('#listeIndividus .checkbox-label[data-coche-auto="true"]').forEach(label => {
+    const checkbox = label.querySelector('input');
+    if (checkbox) checkbox.checked = false;
+    label.dataset.cocheAuto = 'false';
+    const aniId = checkbox?.value;
+    if (aniId) supprimerBadgeById(`ani-${aniId}`);
+  });
+  mettreAJourSelectN();
+}
+
 export function filtrerListeIndividus() {
+  mettreAJourSelectN();
   const sexe = document.getElementById('selectSexe')?.value;
   const gestionnaire = document.getElementById('selectGestionnaire')?.value;
   const population = document.getElementById('selectPopulation')?.value;
@@ -590,6 +685,7 @@ let _derniereRequeteId = 0;
  * sans recharger la carte — appelée au changement de date
  */
 export async function mettreAJourListeParDate() {
+  mettreAJourSelectN();
   if (window._filtreListeDirectIds) {
     const ids = window._filtreListeDirectIds;
     window._filtreListeDirectIds = null;
