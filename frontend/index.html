@@ -265,7 +265,34 @@
           <span>Légende</span>
           <button id="btnLegende">−</button>
         </div>
-        <div id="legendeContenu" class="legende-contenu"></div>
+        <div id="legendeContenu" class="legende-contenu">
+          <div class="legende-section" id="legendeMode">
+            <div class="legende-section-titre" id="legendeModeTitre"></div>
+            <div class="legende-item legende-item-depart">
+              <div class="legende-pastille-creux"></div>
+              <span>Point de départ</span>
+            </div>
+            <div class="legende-item legende-item-derniere">
+              <div class="legende-pastille legende-pastille-default"></div>
+              <span id="legendeDerniereLabel">Positions</span>
+            </div>
+            <div class="legende-item legende-item-direction">
+              <span class="legende-fleche">→</span>
+              <span>Direction</span>
+            </div>
+          </div>
+          <div class="legende-section legende-section-couleur" id="legendeCouleur">
+            <div class="legende-section-titre" id="legendeCouleurTitre"></div>
+            <div class="legende-item" id="legendeCouleurItem1">
+              <div class="legende-pastille" id="legendeCouleurPastille1"></div>
+              <span id="legendeCouleurLabel1"></span>
+            </div>
+            <div class="legende-item" id="legendeCouleurItem2">
+              <div class="legende-pastille" id="legendeCouleurPastille2"></div>
+              <span id="legendeCouleurLabel2"></span>
+            </div>
+          </div>
+        </div>
       </div>
       <div id="scaleTarget"></div>
     </div>
