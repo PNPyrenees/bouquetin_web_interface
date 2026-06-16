@@ -144,7 +144,7 @@ if (saisonActive && saisonsCochees.length === 1) {
  * APPLICATION DES FILTRES
  * Récupère les données filtrées depuis l'API et met à jour la carte.
  */
-export async function applyFilters(token, modeForce = null) {
+export async function applyFilters(token, modeForce = null, nOverride = null) {
   const btnApply = document.getElementById('btnApplyFilters');
   showMapLoading();
   lockSidebar();
@@ -194,13 +194,18 @@ export async function applyFilters(token, modeForce = null) {
           !!filters.sexe || !!filters.gestionnaire || !!filters.population ||
           !!document.getElementById('selectClasseAge')?.value ||
           !!filters.programmation ||
-          selectedIds.length > 0 ||
+          Array.from(document.querySelectorAll('#listeIndividus input:checked'))
+            .filter(cb => {
+              const label = cb.closest('label');
+              return label && label.dataset.cocheAuto !== 'init' && label.dataset.cocheAuto !== 'true';
+            }).length > 0 ||
           !!filters.include_outliers;
 
         if (!filtreAttributaireActif) {
           const inputN = document.getElementById('inputNDernieres');
-          const toutesPositions = inputN?.disabled || inputN?.value === 'toutes';
-          const n = toutesPositions ? null : (parseInt(inputN?.value) || 1);
+          const nVal = nOverride !== null ? String(nOverride) : (document.getElementById('inputNDernieres')?.value || '5');
+          const toutesPositions = inputN?.disabled || nVal === 'toutes';
+          const n = toutesPositions ? null : (parseInt(nVal) || 5);
 
           let idsActifs = suivisSeulement
             ? Array.from(getActiveIds()).map(String)
@@ -212,7 +217,7 @@ export async function applyFilters(token, modeForce = null) {
               include_outliers: filters.include_outliers
             };
             const totalPositions = await fetchCountLocations(token, countFilters);
-            const SEUIL = 15000;
+            const SEUIL = 25000;
             let confirmed = 500000;
             if (totalPositions > SEUIL) {
               const modal = document.getElementById('modalVolume');
@@ -260,7 +265,7 @@ export async function applyFilters(token, modeForce = null) {
             };
 
             const totalPositions = await fetchCountLocations(token, countFilters);
-            const SEUIL = 15000;
+            const SEUIL = 25000;
             let confirmed = 500000;
 
             if (totalPositions > SEUIL) {
@@ -310,7 +315,7 @@ export async function applyFilters(token, modeForce = null) {
 
         // Étape 1 — Compter les résultats AVANT de télécharger
         const totalPositions = await fetchCountLocations(token, countFilters);
-        const SEUIL = 15000;
+        const SEUIL = 25000;
         let confirmed = 500000;
 
         if (totalPositions > SEUIL) {
@@ -469,8 +474,9 @@ export async function applyFilters(token, modeForce = null) {
       });
 
       const inputNTraj = document.getElementById('inputNDernieres');
-      const toutesPositionsTraj = inputNTraj?.disabled || inputNTraj?.value === 'toutes';
-      const nTraj = toutesPositionsTraj ? null : (parseInt(inputNTraj?.value) || 1);
+      const nValTraj = nOverride !== null ? String(nOverride) : (document.getElementById('inputNDernieres')?.value || '25');
+      const toutesPositionsTraj = nValTraj === 'toutes';
+      const nTraj = toutesPositionsTraj ? null : (parseInt(nValTraj) || 25);
 
       if (!dateFromApi && !dateToApi && !toutesPositionsTraj) {
         // N dernières localisations par individu sans période — pas de COUNT ni modale
@@ -484,7 +490,7 @@ export async function applyFilters(token, modeForce = null) {
         };
 
         const totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
-        const SEUIL = 15000;
+        const SEUIL = 25000;
         let confirmedTraj = 500000;
 
         if (totalTrajPositions > SEUIL) {
