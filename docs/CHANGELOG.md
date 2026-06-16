@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [0.28.0] - 2026-06-16
+
+### Ajouts
+- Selecteur N positions avec options differentes selon le mode - Positions 1/5/10/15/20/Toutes et Trajectoire 20/25/50/Toutes
+- Valeur par defaut N=5 en mode Positions et N=25 en mode Trajectoire
+- Flags independants modifieEnPositions et modifieEnTrajectoire pour memoriser les valeurs par mode
+- Chargement initial avec N=5 positions par animal suivi via fetchNDernieresLocalisations
+- Parametre nOverride dans applyFilters pour forcer la valeur N lors du changement de mode
+
+### Corrections
+- Deconnexion affiche le login immediatement sans avoir a actualiser la page
+- Annulation de la modale volume conserve le mode precedent et son selecteur
+- Passage entre modes Positions et Trajectoire utilise le N cible du nouveau mode via nOverride
+- Deuxieme clic sur Appliquer en mode Positions sans filtre conserve la valeur N selectionnee
+- Coches automatiques cocheAuto=true exclues de filtreAttributaireActif pour eviter bascule vers historique complet
+- Recentrage sans zoom au clic sur point GPS et table attributaire
+- forEachFeatureAtPixel utilise layerFilter pour cibler gpsLayer directement
+- Legende refactorisee - structure HTML dans index.html couleurs dans main.css logique dans app.js
+- clearTrajectoire ajoute en mode Positions pour effacer les traits residuels
+- Ajout options selecteur N Positions et Trajectoire dans index.html
+
 ## [0.27.0] - 2026-06-12
 
 ### Ajouts
