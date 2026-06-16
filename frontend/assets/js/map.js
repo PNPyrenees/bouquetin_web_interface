@@ -181,16 +181,14 @@ export function initMap(targetId, popupId) {
   map.on('singleclick', evt => {
     let hit = false;
     let aniId = null;
+    // Utiliser layerFilter pour cibler directement la couche GPS
     map.forEachFeatureAtPixel(evt.pixel, feature => {
       if (hit) return;
-      // Ignorer les lignes de trajectoire et les flèches — uniquement les points GPS
-      const geometry = feature.getGeometry();
-      if (!geometry || geometry.getType() !== 'Point') return;
-      // Ignorer les flèches directionnelles (pas de ani_id)
-      if (!feature.get('ani_id')) return;
       hit = true;
       aniId = String(feature.get('ani_id'));
       showPopup(feature, evt.coordinate, popupEl);
+    }, {
+      layerFilter: layer => layer === gpsLayer
     });
     if (!hit) popupEl.style.display = 'none';
 
@@ -369,7 +367,7 @@ function showPopup(feature, coordinate, popupEl) {
   popupOverlay.setPosition(coordinate);
   popupEl.style.display = 'block';
   isAnimating = true;
-  map.getView().animate({ center: coordinate, zoom: ZOOM_POINT_SINGLE, duration: 400 }, () => {
+  map.getView().animate({ center: coordinate, duration: 400 }, () => {
     isAnimating = false;
   });
 }
@@ -494,5 +492,5 @@ export function zoomToPoint(loc) {
   if (!geom) return;
 
   const coord = geom.getCoordinates();
-  map.getView().animate({ center: coord, zoom: ZOOM_POINT_SINGLE, duration: 400 });
+  map.getView().animate({ center: coord, duration: 400 });
 }
