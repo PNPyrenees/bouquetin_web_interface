@@ -194,7 +194,7 @@ async function startApp(token) {
       const geom = feature.getGeometry();
       if (!geom) return;
       const coord = geom.getCoordinates();
-      getMap().getView().animate({ center: coord, zoom: ZOOM_POINT_SINGLE, duration: 400 });
+      getMap().getView().animate({ center: coord, duration: 400 });
     };
 
     // Récupération des données depuis l'API via le module api.js
