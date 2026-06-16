@@ -44,6 +44,11 @@
 - Validation du filtre Programmation GPS - chaîne base vers frontend cohérente (49 individus pour 12 locs/j 180s)
 - Anomalie de données identifiée pour Arbizon (ani_id=558) - position aberrante datée 2068 avec geom NULL dans v_localisation, masque ses positions réelles dans v_animal_last_loc
 
+### Corrections
+- Clic sur un point GPS recentre sans changer le niveau de zoom actuel
+- Clic sur une ligne de la table attributaire recentre sans changer le niveau de zoom
+- forEachFeatureAtPixel utilise layerFilter pour cibler gpsLayer directement au lieu de verifier les attributs du feature
+
 ## [0.26.0] - 2026-06-11
 
 ### Corrections
