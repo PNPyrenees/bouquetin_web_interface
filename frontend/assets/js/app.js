@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations } from './api.js';
+import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -148,6 +148,70 @@ function initSidebarRight() {
   });
 }
 
+function mettreAJourLabelN() {
+  const inputN = document.getElementById('inputNDernieres');
+  const labelN = document.getElementById('labelNDernieres');
+  if (!inputN || !labelN) return;
+  if (inputN.disabled) {
+    labelN.textContent = 'les positions';
+    return;
+  }
+  const val = inputN.value;
+  if (val === 'toutes') {
+    labelN.textContent = 'les positions';
+  } else {
+    const n = parseInt(val) || 1;
+    labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
+  }
+}
+
+// Adapte les options de #inputNDernieres selon le mode (positions/trajectoire)
+function adapterSelectNPourMode(mode) {
+  const inputN = document.getElementById('inputNDernieres');
+  const labelN = document.getElementById('labelNDernieres');
+  if (!inputN) return;
+
+  inputN.innerHTML = '';
+
+  if (mode === 'trajectoire') {
+    [['20', '20'], ['25', '25'], ['50', '50'], ['toutes', 'Toutes']].forEach(([val, txt]) => {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = txt;
+      inputN.appendChild(opt);
+    });
+    if (!inputN.dataset.modifieEnTrajectoire) {
+      inputN.value = '25';
+      inputN.dataset.valeurManuelle = '25';
+      if (labelN) labelN.textContent = 'dernières positions';
+    } else {
+      // Restaurer valeur manuelle si compatible, sinon défaut
+      const valeursValides = ['20', '25', '50', 'toutes'];
+      inputN.value = valeursValides.includes(inputN.dataset.valeurManuelle)
+        ? inputN.dataset.valeurManuelle
+        : '25';
+    }
+  } else {
+    [['1', '1'], ['5', '5'], ['10', '10'], ['15', '15'], ['20', '20'], ['toutes', 'Toutes']].forEach(([val, txt]) => {
+      const opt = document.createElement('option');
+      opt.value = val;
+      opt.textContent = txt;
+      inputN.appendChild(opt);
+    });
+    if (!inputN.dataset.modifieEnPositions) {
+      inputN.value = '5';
+      inputN.dataset.valeurManuelle = '5';
+      if (labelN) labelN.textContent = 'dernières positions';
+    } else {
+      const valeursValides = ['1', '5', '10', '15', '20', 'toutes'];
+      inputN.value = valeursValides.includes(inputN.dataset.valeurManuelle)
+        ? inputN.dataset.valeurManuelle
+        : '5';
+    }
+  }
+  mettreAJourLabelN();
+}
+
 /**
  * INITIALISATION DE L'APPLICATION
  * Orchestre le chargement des données et la configuration de l'interface.
@@ -255,17 +319,22 @@ async function startApp(token) {
     window._setAniIdSelectionne = setAniIdSelectionne;
     // mettreAJourIndividus(animals);
 
-    // Une seule requête pour tout
-    const locations = await fetchAllLastLocations(currentToken);
-    const locationsEnrichies = enrichirLocations(locations);
+    // Chargement initial via fetchAllLastLocations pour calculer activeIds et idsAvecGeom
+    const locationsAll = await fetchAllLastLocations(currentToken);
+    const locationsEnrichiesAll = enrichirLocations(locationsAll);
 
     // Calculer activeIds directement depuis les données - cor_date_fin null = actif
     setActiveIds(new Set(
-      locations.filter(l => l.cor_date_fin === null).map(l => l.ani_id)
+      locationsAll.filter(l => l.cor_date_fin === null).map(l => l.ani_id)
     ));
 
-    const locationsSuivies = locationsEnrichies.filter(l => l.cor_date_fin === null);
+    // Chargement N dernières positions par animal suivi
+    const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
+    const idsActifsInit2 = Array.from(getActiveIds()).map(String);
+    const locationsN = await fetchNDernieresLocalisations(currentToken, idsActifsInit2, n);
+    const locationsSuivies = enrichirLocations(locationsN);
 
+    adapterSelectNPourMode('positions');
     const count = renderPoints(locationsSuivies);
     mettreAJourPanneau(locationsSuivies);
     const posEl = document.getElementById('positionsCount');
@@ -276,7 +345,7 @@ async function startApp(token) {
 
     // Peupler le select d'années depuis les positions disponibles
     const annees = [...new Set(
-      locationsEnrichies
+      locationsEnrichiesAll
         .map(l => l.loc_datetime_local || l.loc_date_local)
         .filter(Boolean)
         .map(d => new Date(d).getFullYear())
@@ -303,7 +372,7 @@ async function startApp(token) {
     window._anneeOptions = annees.map(String);
 
     // Identifier tous les animaux qui ont au moins une géométrie
-    const idsAvecGeom = new Set(locations.map(l => String(l.ani_id)));
+    const idsAvecGeom = new Set(locationsAll.map(l => String(l.ani_id)));
 
     const listeIndividus = document.getElementById('listeIndividus');
     const searchIndividu = document.getElementById('searchIndividu');
@@ -326,7 +395,7 @@ async function startApp(token) {
           label.dataset.population = ani.ani_pop_rattach || '';
           label.dataset.masqueParDate = 'false';
 
-          const dernierePos = locationsEnrichies.find(l => String(l.ani_id) === String(ani.ani_id));
+          const dernierePos = locationsEnrichiesAll.find(l => String(l.ani_id) === String(ani.ani_id));
           if (dernierePos) {
             const dateStr = dernierePos.loc_datetime_local || dernierePos.loc_date_local;
             if (dateStr) label.dataset.derniereDatePos = dateStr;
@@ -399,25 +468,15 @@ async function startApp(token) {
     const inputN = document.getElementById('inputNDernieres');
     const labelN = document.getElementById('labelNDernieres');
 
-    function mettreAJourLabelN() {
-      if (!inputN || !labelN) return;
-      if (inputN.disabled) {
-        labelN.textContent = 'les positions';
-        return;
-      }
-      const val = inputN.value;
-      if (val === 'toutes') {
-        labelN.textContent = 'les positions';
-      } else {
-        const n = parseInt(val) || 1;
-        labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
-      }
-    }
-
     if (inputN) {
       inputN.addEventListener('change', () => {
         inputN.dataset.valeurManuelle = inputN.value;
-        inputN.dataset.modifieParUtilisateur = 'true';
+        const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+        if (isTrajectoire) {
+          inputN.dataset.modifieEnTrajectoire = 'true';
+        } else {
+          inputN.dataset.modifieEnPositions = 'true';
+        }
         mettreAJourLabelN();
         decocherCochesAutomatiques();
         mettreAJourBoutonAppliquer();
@@ -538,7 +597,6 @@ async function startApp(token) {
       const btnTraj = document.getElementById('btnTrajectoire');
       if (btnPos && btnTraj) {
         btnPos.addEventListener('click', () => {
-          setLabelDatetime('Dernière position');
           decocherCochesAutomatiques();
 
           // Restaurer coches initiales sans badges
@@ -553,31 +611,30 @@ async function startApp(token) {
             }
           });
 
-          const inputN = document.getElementById('inputNDernieres');
-          if (inputN && !inputN.dataset.modifieParUtilisateur) {
-            inputN.value = '1';
-            inputN.dataset.valeurManuelle = '1';
-            const labelN = document.getElementById('labelNDernieres');
-            if (labelN) labelN.textContent = 'dernière position';
-          }
-          applyFilters(currentToken, 'positions').then(confirme => {
+          const inputNPos = document.getElementById('inputNDernieres');
+          const nCiblePos = inputNPos?.dataset.modifieEnPositions === 'true'
+            ? inputNPos.dataset.valeurManuelle
+            : '5';
+
+          applyFilters(currentToken, 'positions', nCiblePos).then(confirme => {
             if (confirme !== false) {
+              adapterSelectNPourMode('positions');
               btnPos.classList.add('active');
               btnTraj.classList.remove('active');
               clearTrajectoire();
+              setLabelDatetime('Dernière position');
             }
           });
         });
         btnTraj.addEventListener('click', () => {
-          const inputN = document.getElementById('inputNDernieres');
-          if (inputN && !inputN.dataset.modifieParUtilisateur) {
-            inputN.value = '20';
-            inputN.dataset.valeurManuelle = '20';
-            const labelN = document.getElementById('labelNDernieres');
-            if (labelN) labelN.textContent = 'dernières positions';
-          }
-          applyFilters(currentToken, 'trajectoire').then(confirme => {
+          const inputNTraj = document.getElementById('inputNDernieres');
+          const nCibleTraj = inputNTraj?.dataset.modifieEnTrajectoire === 'true'
+            ? inputNTraj.dataset.valeurManuelle
+            : '25';
+
+          applyFilters(currentToken, 'trajectoire', nCibleTraj).then(confirme => {
             if (confirme !== false) {
+              adapterSelectNPourMode('trajectoire');
               btnTraj.classList.add('active');
               btnPos.classList.remove('active');
               setLabelDatetime('Date/Heure');
@@ -1224,8 +1281,14 @@ export function mettreAJourBoutonAppliquer() {
     !!(document.getElementById('dateTo')?.value) ||
     document.getElementById('checkAberrantes')?.checked ||
     Array.from(document.querySelectorAll('#listeIndividus input:checked'))
-      .some(cb => cb.closest('label')?.dataset.cocheAuto !== 'init') ||
-    (document.getElementById('inputNDernieres')?.dataset.modifieParUtilisateur === 'true');
+      .some(cb => {
+        const cocheAuto = cb.closest('label')?.dataset.cocheAuto;
+        return cocheAuto !== 'init' && cocheAuto !== 'true';
+      }) ||
+    (document.getElementById('inputNDernieres')?.dataset.modifieEnPositions === 'true' &&
+      !document.getElementById('btnTrajectoire')?.classList.contains('active')) ||
+    (document.getElementById('inputNDernieres')?.dataset.modifieEnTrajectoire === 'true' &&
+      document.getElementById('btnTrajectoire')?.classList.contains('active'));
 
   btn.disabled = !actionManuelle;
   btn.classList.toggle('btn-disabled', !actionManuelle);
@@ -1253,7 +1316,7 @@ async function reinitialiserTousLesFiltres() {
       mettreAJourListeParDate();
     }, 'checkSuivis');
 
-    // 3. Mode Positions par défaut
+    // 3. Mode Positions par défaut + adapter le select N
     const btnPos = document.getElementById('btnPositions');
     const btnTraj = document.getElementById('btnTrajectoire');
     if (btnPos && btnTraj) {
@@ -1261,6 +1324,7 @@ async function reinitialiserTousLesFiltres() {
       btnTraj.classList.remove('active');
       clearTrajectoire();
     }
+    adapterSelectNPourMode('positions');
 
     // 4. Recherche textuelle
     const searchIndividu = document.getElementById('searchIndividu');
@@ -1299,13 +1363,15 @@ async function reinitialiserTousLesFiltres() {
 
     const inputNReinit = document.getElementById('inputNDernieres');
     if (inputNReinit) {
-      inputNReinit.value = '1';
+      inputNReinit.value = '5';
       inputNReinit.disabled = false;
+      delete inputNReinit.dataset.modifieEnPositions;
+      delete inputNReinit.dataset.modifieEnTrajectoire;
       delete inputNReinit.dataset.valeurManuelle;
       delete inputNReinit.dataset.modifieParUtilisateur;
     }
     const labelNReinit = document.getElementById('labelNDernieres');
-    if (labelNReinit) labelNReinit.textContent = 'dernière position';
+    if (labelNReinit) labelNReinit.textContent = 'dernières positions';
 
     // 9. Individus
     document.querySelectorAll('#listeIndividus input').forEach(cb => {
@@ -1322,9 +1388,13 @@ async function reinitialiserTousLesFiltres() {
     // 11. Recharger la carte
     if (currentToken) {
       try {
-        const locations = await fetchAllLastLocations(currentToken);
-        const locationsEnrichies = enrichirLocations(locations);
-        const locationsSuivies = locationsEnrichies.filter(l => l.cor_date_fin === null);
+        const locationsAll = await fetchAllLastLocations(currentToken);
+        const idsActifsReinit = Array.from(
+          new Set(locationsAll.filter(l => l.cor_date_fin === null).map(l => String(l.ani_id)))
+        );
+        const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
+        const locationsN = await fetchNDernieresLocalisations(currentToken, idsActifsReinit, n);
+        const locationsSuivies = enrichirLocations(locationsN);
         clearMapPoints();
         clearTrajectoire();
         const count = renderPoints(locationsSuivies, false);
@@ -1400,45 +1470,48 @@ async function deconnecter() {
   clearTimeout(inactivityTimer);
   sessionStorage.removeItem('bqt_token');
 
-  clearMapPoints();
-  clearTrajectoire();
-
-  setCurrentToken(null);
-  viderCache();
-
-  await reinitialiserTousLesFiltres();
-
-  document.querySelectorAll('details').forEach(d => {
-    d.removeAttribute('open');
-  });
-  const detailsPeriode = document.getElementById('detailsPeriode');
-  if (detailsPeriode) detailsPeriode.setAttribute('open', '');
-
-  const sidebarRight = document.getElementById('sidebarRight');
-  const mapScreen = document.getElementById('mapScreen');
-  if (sidebarRight) {
-    sidebarRight.classList.remove('visible');
-    sidebarRight.style.width = '';
-  }
-  if (mapScreen) {
-    mapScreen.style.right = '';
-    mapScreen.classList.remove('panel-open');
-  }
-  const toggleIcon = document.querySelector('#sidebarRightToggle .toggle-icon');
-  if (toggleIcon) toggleIcon.textContent = '›';
-  setPanneauFermeManuel(false);
+  // Afficher login immédiatement
+  const loginScreen = document.getElementById('loginScreen');
+  if (loginScreen) loginScreen.style.display = 'flex';
+  document.getElementById('username').value = '';
+  document.getElementById('password').value = '';
+  document.getElementById('loginError').textContent = '';
 
   const userChip = document.getElementById('userChip');
   if (userChip) userChip.style.display = 'none';
   const menu = document.getElementById('sessionMenu');
   if (menu) menu.style.display = 'none';
 
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.style.display = 'flex';
-  document.getElementById('username').value = '';
-  document.getElementById('password').value = '';
-  document.getElementById('loginError').textContent = '';
-  loginEnCours = false;
+  clearMapPoints();
+  clearTrajectoire();
+
+  setCurrentToken(null);
+  viderCache();
+
+  try {
+    // Réinitialiser sans recharger depuis l'API (token null)
+    await reinitialiserTousLesFiltres();
+
+    document.querySelectorAll('details').forEach(d => d.removeAttribute('open'));
+    const detailsPeriode = document.getElementById('detailsPeriode');
+    if (detailsPeriode) detailsPeriode.setAttribute('open', '');
+
+    const sidebarRight = document.getElementById('sidebarRight');
+    const mapScreen = document.getElementById('mapScreen');
+    if (sidebarRight) {
+      sidebarRight.classList.remove('visible');
+      sidebarRight.style.width = '';
+    }
+    if (mapScreen) {
+      mapScreen.style.right = '';
+      mapScreen.classList.remove('panel-open');
+    }
+    const toggleIcon = document.querySelector('#sidebarRightToggle .toggle-icon');
+    if (toggleIcon) toggleIcon.textContent = '›';
+    setPanneauFermeManuel(false);
+  } finally {
+    loginEnCours = false;
+  }
 }
 
 document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
