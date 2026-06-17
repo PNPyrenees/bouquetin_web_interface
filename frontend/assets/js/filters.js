@@ -2,6 +2,7 @@ import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode,
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
 import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI } from './config.js';
+import { SAISONS_CONFIG } from './config.js';
 import {
   getAnimals, getActiveIds, getCurrentToken, getProgrammationsMap,
   enrichirLocations, enrichirAnimauxAvecPositions,
@@ -13,128 +14,101 @@ import {
 } from './app.js';
 
 export function getPeriodesActives() {
-  const annee = document.getElementById('selectAnnee')?.value || '';
+  // CHEMIN 1 — Periode (champs dateFrom/dateTo avec JJ/MM/AAAA)
   const dateFrom = document.getElementById('dateFrom')?.value || '';
   const dateTo = document.getElementById('dateTo')?.value || '';
+  const isPeriode = /^\d{2}\/\d{2}\/\d{4}$/.test(dateFrom) || /^\d{2}\/\d{2}\/\d{4}$/.test(dateTo);
 
-  const saisons = {
-    hiver: document.getElementById('checkHiver')?.checked || false,
-    printemps: document.getElementById('checkPrintemps')?.checked || false,
-    ete: document.getElementById('checkEte')?.checked || false,
-    rut: document.getElementById('checkRut')?.checked || false
-  };
-
-  const SAISONS_BORNES = {
-    hiver: { from: '01-01', to: '03-31' },
-    printemps: { from: '04-01', to: '06-30' },
-    ete: { from: '07-01', to: '10-15' },
-    rut: { from: '10-16', to: '12-31' }
-  };
-
-  const saisonsCochees = Object.entries(saisons).filter(([, v]) => v).map(([k]) => k);
-  const saisonActive = saisonsCochees.length > 0;
-
-  if (saisonActive && saisonsCochees.length > 1) {
-    if (annee) {
-      return saisonsCochees.map(k => ({
-        from: `${annee}-${SAISONS_BORNES[k].from}`,
-        to: `${annee}-${SAISONS_BORNES[k].to}`,
-        source: k
-      }));
+  if (isPeriode) {
+    let from = null;
+    let to = null;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateFrom)) {
+      const [j, m, a] = dateFrom.split('/');
+      from = `${a}-${m}-${j}`;
     }
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateTo)) {
+      const [j, m, a] = dateTo.split('/');
+      to = `${a}-${m}-${j}`;
+    }
+    return [{ from, to, source: 'periode' }];
+  }
 
-    const anneeOptions = (window._anneeOptions || []).map(String);
+  // CHEMIN 2 — Saisonnalite (selectAnnee + saisonFrom/saisonTo JJ/MM)
+  const annee = document.getElementById('selectAnnee')?.value || '';
+  const annees = annee ? [annee] : [];
+
+  const saisonFrom = document.getElementById('saisonFrom')?.value || '';
+  const saisonTo = document.getElementById('saisonTo')?.value || '';
+  const hasSaisonPeriode = /^\d{2}\/\d{2}$/.test(saisonFrom) && /^\d{2}\/\d{2}$/.test(saisonTo);
+
+  if (annees.length > 0 && hasSaisonPeriode) {
+    // N annees x 1 periode recurrente
+    const [jFrom, mFrom] = saisonFrom.split('/');
+    const [jTo, mTo] = saisonTo.split('/');
+
+    // Gestion periode a cheval (ex: Hiver 01/01 -> 31/03 : meme annee)
+    // ou periode chevauchant deux annees (ex: 21/12 -> 20/03)
+    const fromMonthDay = parseInt(mFrom) * 100 + parseInt(jFrom);
+    const toMonthDay = parseInt(mTo) * 100 + parseInt(jTo);
+    const chevauche = fromMonthDay > toMonthDay; // ex: 12/21 > 03/20
+
     const periodes = [];
-    anneeOptions.forEach(a => {
-      saisonsCochees.forEach(k => {
+    annees.forEach(annee => {
+      const a = parseInt(annee);
+      if (chevauche) {
+        // Periode a cheval : debut en annee A, fin en annee A+1
         periodes.push({
-          from: `${a}-${SAISONS_BORNES[k].from}`,
-          to: `${a}-${SAISONS_BORNES[k].to}`,
-          source: k
+          from: `${a}-${mFrom}-${jFrom}`,
+          to: `${a + 1}-${mTo}-${jTo}`,
+          source: 'saisonnalite',
+          annee: annee
         });
-      });
+      } else {
+        periodes.push({
+          from: `${a}-${mFrom}-${jFrom}`,
+          to: `${a}-${mTo}-${jTo}`,
+          source: 'saisonnalite',
+          annee: annee
+        });
+      }
     });
     return periodes;
   }
 
-  if (saisonActive && saisonsCochees.length === 1 && dateFrom && dateTo &&
-      /^\d{2}\/\d{2}$/.test(dateFrom) && /^\d{2}\/\d{2}$/.test(dateTo) &&
-      window._saisonDatesModifiees === true) {
-    if (annee) {
-      const [jFrom, mFrom] = dateFrom.split('/');
-      const [jTo, mTo] = dateTo.split('/');
-      return [{ from: `${annee}-${mFrom}-${jFrom}`, to: `${annee}-${mTo}-${jTo}`, source: 'custom' }];
+  if (annees.length > 0 && !hasSaisonPeriode) {
+    // Annees seules sans periode saisonniere — une periode par annee (01/01 -> 31/12)
+    return annees.map(annee => ({
+      from: `${annee}-01-01`,
+      to: `${annee}-12-31`,
+      source: 'annee',
+      annee
+    }));
+  }
+
+  if (hasSaisonPeriode && annees.length === 0) {
+    // Periode saisonniere sans annee — toutes les annees disponibles
+    const [jFrom, mFrom] = saisonFrom.split('/');
+    const [jTo, mTo] = saisonTo.split('/');
+    const fromMonthDay = parseInt(mFrom) * 100 + parseInt(jFrom);
+    const toMonthDay = parseInt(mTo) * 100 + parseInt(jTo);
+    const chevauche = fromMonthDay > toMonthDay;
+
+    const anneeOptions = (window._anneeOptions || []).map(String).map(Number).sort((a, b) => a - b);
+    if (anneeOptions.length === 0) return [];
+
+    if (chevauche) {
+      return anneeOptions.map(a => ({
+        from: `${a}-${mFrom}-${jFrom}`,
+        to: `${a + 1}-${mTo}-${jTo}`,
+        source: 'saisonnalite_all'
+      }));
+    } else {
+      return [{
+        from: `${anneeOptions[0]}-${mFrom}-${jFrom}`,
+        to: `${anneeOptions[anneeOptions.length - 1]}-${mTo}-${jTo}`,
+        source: 'saisonnalite_all'
+      }];
     }
-
-    const anneeOptions = Array.from(
-      document.querySelectorAll('#selectAnnee option')
-    ).map(o => o.value).filter(v => v !== '');
-    return anneeOptions.map(a => {
-      const [jFrom, mFrom] = dateFrom.split('/');
-      const [jTo, mTo] = dateTo.split('/');
-      return { from: `${a}-${mFrom}-${jFrom}`, to: `${a}-${mTo}-${jTo}`, source: 'custom' };
-    });
-  }
-
-if (saisonActive && saisonsCochees.length === 1) {
-  const k = saisonsCochees[0];
-
-  // Si une année est choisie → comportement actuel
-  if (annee) {
-    return [{
-      from: `${annee}-${SAISONS_BORNES[k].from}`,
-      to: `${annee}-${SAISONS_BORNES[k].to}`,
-      source: k
-    }];
-  }
-
-  // Sinon une seule période globale au lieu de 13 requêtes
-  const annees = (window._anneeOptions || [])
-    .map(Number)
-    .sort((a, b) => a - b);
-
-  if (annees.length === 0) return [];
-
-  return [{
-    from: `${annees[0]}-${SAISONS_BORNES[k].from}`,
-    to: `${annees[annees.length - 1]}-${SAISONS_BORNES[k].to}`,
-    source: k
-  }];
-}
-
-  if (dateFrom || dateTo) {
-    if (annee) {
-      let from = null;
-      let to = null;
-      if (dateFrom && /^\d{2}\/\d{2}$/.test(dateFrom)) {
-        const [j, m] = dateFrom.split('/');
-        from = `${annee}-${m}-${j}`;
-      }
-      if (dateTo && /^\d{2}\/\d{2}$/.test(dateTo)) {
-        const [j, m] = dateTo.split('/');
-        to = `${annee}-${m}-${j}`;
-      }
-      return [{ from, to, source: 'dates' }];
-    }
-
-    const anneeOptions = (window._anneeOptions || []).map(String);
-    return anneeOptions.map(a => {
-      let from = null;
-      let to = null;
-      if (dateFrom && /^\d{2}\/\d{2}$/.test(dateFrom)) {
-        const [j, m] = dateFrom.split('/');
-        from = `${a}-${m}-${j}`;
-      }
-      if (dateTo && /^\d{2}\/\d{2}$/.test(dateTo)) {
-        const [j, m] = dateTo.split('/');
-        to = `${a}-${m}-${j}`;
-      }
-      return { from, to, source: 'dates' };
-    });
-  }
-
-  if (annee) {
-    return [{ from: `${annee}-01-01`, to: `${annee}-12-31`, source: 'annee' }];
   }
 
   return [];
@@ -154,16 +128,16 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
     ani_id: Array.from(document.querySelectorAll('#listeIndividus input:checked'))
       .filter(cb => {
         const label = cb.closest('label');
-        return !label || label.dataset.cocheAuto !== 'init';
+        return !label || (label.dataset.cocheAuto !== 'init' && label.dataset.cocheAuto !== 'true');
       })
       .map(cb => cb.value),
-    date_from: document.getElementById('dateFrom').value,
-    date_to: document.getElementById('dateTo').value,
-    sexe: document.getElementById('selectSexe').value,
-    gestionnaire: document.getElementById('selectGestionnaire').value,
-    population: document.getElementById('selectPopulation').value,
+    date_from: document.getElementById('dateFrom')?.value || '',
+    date_to: document.getElementById('dateTo')?.value || '',
+    sexe: document.getElementById('selectSexe')?.value || '',
+    gestionnaire: document.getElementById('selectGestionnaire')?.value || '',
+    population: document.getElementById('selectPopulation')?.value || '',
     include_outliers: document.getElementById('checkAberrantes')?.checked || false,
-    programmation: document.getElementById('selectProgrammation').value
+    programmation: document.getElementById('selectProgrammation')?.value || ''
   };
 
   if (btnApply) {
@@ -177,12 +151,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       : document.getElementById('btnPositions').classList.contains('active');
     const selectedIds = filters.ani_id;
     const suivisSeulement = document.getElementById('checkSuivis')?.checked || false;
-
-    const dateFromRaw = filters.date_from; // format jj/mm
-    const dateToRaw = filters.date_to;     // format jj/mm
-    const anneeSelectionnee = document.getElementById('selectAnnee')?.value;
-    const aDateFrom = dateFromRaw && /^\d{2}\/\d{2}$/.test(dateFromRaw);
-    const aDateTo = dateToRaw && /^\d{2}\/\d{2}$/.test(dateToRaw);
 
     let locations;
 
@@ -294,11 +262,11 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           }
         }
       } else {
-        // Avec filtre temporel → toutes les positions (comme trajectoire mais sans traits)
-        const periode = periodes.length === 1 ? periodes[0] : {
-          from: periodes.reduce((min, p) => p.from < min ? p.from : min, periodes[0].from),
-          to: periodes.reduce((max, p) => p.to > max ? p.to : max, periodes[0].to)
-        };
+        // Avec periodes — consolider en une seule plage min/max pour fetchCountLocations
+        const dateMin = periodes.reduce((min, p) => p.from && p.from < min ? p.from : min,
+          periodes.find(p => p.from)?.from || '');
+        const dateMax = periodes.reduce((max, p) => p.to && p.to > max ? p.to : max,
+          periodes.find(p => p.to)?.to || '');
 
         const idsAChercher = selectedIds.length > 0 ? selectedIds :
           Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
@@ -308,14 +276,14 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
 
         const countFilters = {
           ani_id: idsAChercher,
-          date_from: periode.from,
-          date_to: periode.to,
+          date_from: dateMin || null,
+          date_to: dateMax || null,
           include_outliers: filters.include_outliers
         };
 
         // Étape 1 — Compter les résultats AVANT de télécharger
         const totalPositions = await fetchCountLocations(token, countFilters);
-        const SEUIL = 25000;
+        const SEUIL = 15000;
         let confirmed = 500000;
 
         if (totalPositions > SEUIL) {
@@ -343,26 +311,31 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           limit: confirmed
         });
 
-        // Filtrer par saisons cochées si nécessaire (pour saison sans année)
-        const saisonActive = Object.values({
-          hiver: document.getElementById('checkHiver')?.checked || false,
-          printemps: document.getElementById('checkPrintemps')?.checked || false,
-          ete: document.getElementById('checkEte')?.checked || false,
-          rut: document.getElementById('checkRut')?.checked || false
-        }).some(Boolean);
+        // Filtrage JS par saison si source = saisonnalite
+        const hasSaisonnalite = periodes.some(p => p.source === 'saisonnalite' || p.source === 'saisonnalite_all');
+        if (hasSaisonnalite) {
+          const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
+          const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
+          if (jFrom && mFrom && jTo && mTo) {
+            const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
+            const toMD = parseInt(mTo) * 100 + parseInt(jTo);
+            const chevauche = fromMD > toMD;
 
-        if (saisonActive) {
-          const saisons = {
-            hiver: document.getElementById('checkHiver')?.checked || false,
-            printemps: document.getElementById('checkPrintemps')?.checked || false,
-            ete: document.getElementById('checkEte')?.checked || false,
-            rut: document.getElementById('checkRut')?.checked || false
-          };
-          locations = locations.filter(loc => {
-            const d = loc.loc_datetime_local || loc.loc_date_local;
-            if (!d) return false;
-            return correspondALaSaisonJS(new Date(d), saisons);
-          });
+            locations = locations.filter(loc => {
+              const d = loc.loc_datetime_local || loc.loc_date_local;
+              if (!d) return false;
+              const date = new Date(d);
+              const mois = date.getMonth() + 1;
+              const jour = date.getDate();
+              const md = mois * 100 + jour;
+
+              if (chevauche) {
+                return md >= fromMD || md <= toMD;
+              } else {
+                return md >= fromMD && md <= toMD;
+              }
+            });
+          }
         }
       }
 
@@ -545,6 +518,36 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           locations = [...locations, ...outlierResults.flat()];
         }
       }
+
+      // Filtrage JS par mois/jour pour saisonnalite sans annee (coherence avec mode Positions)
+      const periodesT2 = getPeriodesActives();
+      const hasSaisonnaliteAll = periodesT2.some(p => p.source === 'saisonnalite_all');
+      if (hasSaisonnaliteAll) {
+        const saisonFromVal = document.getElementById('saisonFrom')?.value || '';
+        const saisonToVal = document.getElementById('saisonTo')?.value || '';
+        if (/^\d{2}\/\d{2}$/.test(saisonFromVal) && /^\d{2}\/\d{2}$/.test(saisonToVal)) {
+          const [jFrom, mFrom] = saisonFromVal.split('/');
+          const [jTo, mTo] = saisonToVal.split('/');
+          const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
+          const toMD = parseInt(mTo) * 100 + parseInt(jTo);
+          const chevauche = fromMD > toMD;
+
+          locations = locations.filter(loc => {
+            const d = loc.loc_datetime_local || loc.loc_date_local;
+            if (!d) return false;
+            const date = new Date(d);
+            const mois = date.getMonth() + 1;
+            const jour = date.getDate();
+            const md = mois * 100 + jour;
+            if (chevauche) {
+              return md >= fromMD || md <= toMD;
+            } else {
+              return md >= fromMD && md <= toMD;
+            }
+          });
+        }
+      }
+
       locations = enrichirLocations(locations);
       clearMapPoints();
       clearTrajectoire();
@@ -587,46 +590,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
     mettreAJourBoutonAppliquer();
   }
 
-}
-
-function toMMJJ(ddmm) {
-  const [j, m] = ddmm.split('/');
-  return parseInt(m) * 100 + parseInt(j);
-}
-
-function correspondALaSaison(date, saisons) {
-  const mois = date.getMonth() + 1; // 1 à 12
-  const jour = date.getDate();
-
-  const estHiver =
-    (mois >= 1 && mois <= 3);
-
-  const estPrintemps =
-    (mois === 4 || mois === 5) ||
-    (mois === 6 && jour <= 30);
-
-  const estEte =
-    (mois === 7) ||
-    (mois === 8) ||
-    (mois === 9) ||
-    (mois === 10 && jour <= 15);
-
-  const estRut =
-    (mois === 10 && jour >= 16) ||
-    mois === 11 ||
-    mois === 12;
-
-  return (
-    (saisons.hiver && estHiver) ||
-    (saisons.printemps && estPrintemps) ||
-    (saisons.ete && estEte) ||
-    (saisons.rut && estRut)
-  );
-}
-
-function toMMJJfilters(ddmm) {
-  const [j, m] = ddmm.split('/');
-  return parseInt(m) * 100 + parseInt(j);
 }
 
 function correspondALaSaisonJS(date, saisons) {
@@ -701,7 +664,6 @@ let _derniereRequeteId = 0;
  * sans recharger la carte — appelée au changement de date
  */
 export async function mettreAJourListeParDate() {
-  mettreAJourSelectN();
   if (window._filtreListeDirectIds) {
     const ids = window._filtreListeDirectIds;
     window._filtreListeDirectIds = null;
@@ -710,67 +672,18 @@ export async function mettreAJourListeParDate() {
   }
 
   const requeteId = ++_derniereRequeteId;
-
-  const annee = document.getElementById('selectAnnee')?.value || '';
-  const saisons = {
-    hiver: document.getElementById('checkHiver')?.checked || false,
-    printemps: document.getElementById('checkPrintemps')?.checked || false,
-    ete: document.getElementById('checkEte')?.checked || false,
-    rut: document.getElementById('checkRut')?.checked || false
-  };
-  const saisonActive = Object.values(saisons).some(Boolean);
-
-  if (saisonActive && !annee) {
-    try {
-      const SAISONS_BORNES = {
-        hiver:     { from: '01-01', to: '03-31' },
-        printemps: { from: '04-01', to: '06-30' },
-        ete:       { from: '07-01', to: '10-15' },
-        rut:       { from: '10-16', to: '12-31' }
-      };
-      const saisonsCochees = Object.entries(saisons)
-        .filter(([, v]) => v).map(([k]) => k);
-      const anneesSorted = (window._anneeOptions || []).map(String);
-
-      const promises = [];
-      anneesSorted.forEach(a => {
-        saisonsCochees.forEach(k => {
-          promises.push(
-            fetchAnimalIdsParPeriode(getCurrentToken(), {
-              date_from: `${a}-${SAISONS_BORNES[k].from}`,
-              date_to: `${a}-${SAISONS_BORNES[k].to}`,
-              include_outliers: false
-            })
-          );
-        });
-      });
-
-      const results = await Promise.all(promises);
-      const idsUnion = new Set();
-      results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
-      if (requeteId !== _derniereRequeteId) return;
-      _appliquerFiltreListeAvecIds(idsUnion);
-    } catch (err) {
-      console.error('Erreur mettreAJourListeParDate saison sans année:', err);
-    }
-    return;
-  }
-
   const periodes = getPeriodesActives();
-
-  console.log('[mettreAJourListeParDate] requeteId:', requeteId, '_derniereRequeteId:', _derniereRequeteId);
-  console.log('[mettreAJourListeParDate] periodes:', JSON.stringify(periodes));
 
   if (periodes.length === 0) {
     if (requeteId !== _derniereRequeteId) return;
-    console.log('[mettreAJourListeParDate] → aucune période, filtrerListeIndividus');
     filtrerListeIndividus();
     return;
   }
 
   try {
-    console.log('[mettreAJourListeParDate] → lancement', periodes.length, 'requête(s) fetchAnimalIdsParPeriode');
     const idsUnion = new Set();
+
+    // Pour chaque periode, recuperer les ani_id ayant des donnees
     const promises = periodes.map(p =>
       fetchAnimalIdsParPeriode(getCurrentToken(), {
         date_from: p.from,
@@ -778,16 +691,27 @@ export async function mettreAJourListeParDate() {
         include_outliers: false
       })
     );
+
     const results = await Promise.all(promises);
-    console.log('[mettreAJourListeParDate] → résultats reçus, tailles:', results.map(r => r.length));
     results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
-    console.log('[mettreAJourListeParDate] → idsUnion.size:', idsUnion.size);
-    if (requeteId !== _derniereRequeteId) {
-      console.log('[mettreAJourListeParDate] → requête obsolète, abandon');
-      return;
+
+    if (requeteId !== _derniereRequeteId) return;
+
+    // Si saisonnalite — filtrer JS par mois/jour
+    const hasSaisonnalite = periodes.some(p =>
+      p.source === 'saisonnalite' || p.source === 'saisonnalite_all'
+    );
+
+    if (hasSaisonnalite) {
+      const saisonFrom = document.getElementById('saisonFrom')?.value || '';
+      const saisonTo = document.getElementById('saisonTo')?.value || '';
+      if (/^\d{2}\/\d{2}$/.test(saisonFrom) && /^\d{2}\/\d{2}$/.test(saisonTo)) {
+        // Le filtrage JS fin par mois/jour est fait dans applyFilters
+        // Ici on garde juste l union des IDs par periode
+      }
     }
+
     _appliquerFiltreListeAvecIds(idsUnion);
-    console.log('[mettreAJourListeParDate] → liste mise à jour');
   } catch (err) {
     console.error('[mettreAJourListeParDate] Erreur:', err);
   }
@@ -803,7 +727,6 @@ function _appliquerFiltreListeAvecIds(idsAvecDonnees) {
     const gestionnaire = document.getElementById('selectGestionnaire')?.value;
     const population = document.getElementById('selectPopulation')?.value;
     const classe = document.getElementById('selectClasseAge')?.value;
-    const suivisSeulement = document.getElementById('checkSuivis')?.checked || false;
     const programmation = document.getElementById('selectProgrammation')?.value;
 
     const matchPeriode = idsAvecDonnees.has(String(checkbox.value));
@@ -811,7 +734,7 @@ function _appliquerFiltreListeAvecIds(idsAvecDonnees) {
     const matchGestionnaire = !gestionnaire || label.dataset.gestionnaire === gestionnaire;
     const matchPopulation = !population || label.dataset.population === population;
     const matchClasse = !classe || label.dataset.classe === classe;
-    const matchSuivis = !suivisSeulement || getActiveIds().has(Number(checkbox.value));
+    const matchSuivis = !document.getElementById('checkSuivis')?.checked || getActiveIds().has(Number(checkbox.value));
     const matchProgrammation = !programmation ||
       String(getProgrammationsMap().get(String(checkbox.value))) === programmation;
 
