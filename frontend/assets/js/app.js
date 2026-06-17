@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations } from './api.js';
-import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES } from './config.js';
+import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse, decocherCochesAutomatiques } from './filters.js';
@@ -21,6 +21,7 @@ let sidebarBadgesInitialized = false;
 let basemapInitialized = false;
 let mapListenersInitialized = false;
 let mapInitialized = false;
+let temporelInitialized = false;
 
 export function getAnimals() { return animals; }
 export function getActiveIds() { return activeIds; }
@@ -210,6 +211,103 @@ function adapterSelectNPourMode(mode) {
     }
   }
   mettreAJourLabelN();
+}
+
+function gererExclusiviteTemporel(actif) {
+  const groupePeriode = document.getElementById('groupePeriode');
+  const groupeSaisonnalite = document.getElementById('groupeSaisonnalite');
+
+  if (actif === 'periode') {
+    groupePeriode?.classList.remove('disabled');
+    groupeSaisonnalite?.classList.add('disabled');
+  } else if (actif === 'saisonnalite') {
+    groupeSaisonnalite?.classList.remove('disabled');
+    groupePeriode?.classList.add('disabled');
+  } else {
+    groupePeriode?.classList.remove('disabled');
+    groupeSaisonnalite?.classList.remove('disabled');
+  }
+}
+
+function _mettreAJourBadgeSaisonnalite() {
+  const annee = document.getElementById('selectAnnee')?.value;
+  const saisonFrom = document.getElementById('saisonFrom')?.value;
+  const saisonTo = document.getElementById('saisonTo')?.value;
+
+  supprimerBadgeById('saisonnalite');
+
+  if (!saisonFrom && !saisonTo && !annee) {
+    gererExclusiviteTemporel(null);
+    return;
+  }
+
+  let label = '';
+  if (saisonFrom && saisonTo && annee) {
+    label = `Du ${saisonFrom} au ${saisonTo}/${annee}`;
+  } else if (saisonFrom && saisonTo) {
+    label = `Du ${saisonFrom} au ${saisonTo}`;
+  } else if (annee) {
+    label = `Année ${annee}`;
+  }
+
+  if (label) {
+    ajouterBadge(label, () => {
+      document.getElementById('selectAnnee').value = '';
+      if (document.getElementById('selectAnnee').tomselect) {
+        document.getElementById('selectAnnee').tomselect.clear(true);
+        document.getElementById('selectAnnee').tomselect.setValue('', true);
+      }
+      const sf = document.getElementById('saisonFrom');
+      const st = document.getElementById('saisonTo');
+      if (sf) { sf.value = ''; sf._flatpickr?.clear(); }
+      if (st) { st.value = ''; st._flatpickr?.clear(); }
+      document.querySelectorAll('input[name="saisonRadio"]').forEach(r => r.checked = false);
+      gererExclusiviteTemporel(null);
+      mettreAJourListeParDate();
+      mettreAJourBoutonAppliquer();
+    }, 'saisonnalite');
+    gererExclusiviteTemporel('saisonnalite');
+  }
+}
+
+function _mettreAJourBadgePeriode() {
+  const from = document.getElementById('dateFrom')?.value;
+  const to = document.getElementById('dateTo')?.value;
+
+  // Gerer badge Du independamment
+  supprimerBadgeById('periode-from');
+  if (from && /^\d{2}\/\d{2}\/\d{4}$/.test(from)) {
+    ajouterBadge(`Du ${from}`, () => {
+      const df = document.getElementById('dateFrom');
+      if (df) { df.value = ''; df._flatpickr?.clear(); }
+      supprimerBadgeById('periode-from');
+      const toVal = document.getElementById('dateTo')?.value;
+      if (!toVal) gererExclusiviteTemporel(null);
+      mettreAJourListeParDate();
+      mettreAJourBoutonAppliquer();
+    }, 'periode-from');
+  }
+
+  // Gerer badge Au independamment
+  supprimerBadgeById('periode-to');
+  if (to && /^\d{2}\/\d{2}\/\d{4}$/.test(to)) {
+    ajouterBadge(`Au ${to}`, () => {
+      const dt = document.getElementById('dateTo');
+      if (dt) { dt.value = ''; dt._flatpickr?.clear(); }
+      supprimerBadgeById('periode-to');
+      const fromVal = document.getElementById('dateFrom')?.value;
+      if (!fromVal) gererExclusiviteTemporel(null);
+      mettreAJourListeParDate();
+      mettreAJourBoutonAppliquer();
+    }, 'periode-to');
+  }
+
+  // Exclusivite selon etat global
+  if (from || to) {
+    gererExclusiviteTemporel('periode');
+  } else {
+    gererExclusiviteTemporel(null);
+  }
 }
 
 /**
@@ -464,6 +562,204 @@ async function startApp(token) {
       });
     }
 
+    // Initialisation des filtres temporels (flatpickr + listeners) — une seule fois pour la duree de vie de la page
+    if (!temporelInitialized) {
+      temporelInitialized = true;
+
+      // Filet de securite — detruire d eventuelles instances flatpickr residuelles avant d en recreer
+      ['dateFrom', 'dateTo', 'saisonFrom', 'saisonTo'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el?._flatpickr) el._flatpickr.destroy();
+      });
+
+      // Flatpickr — Periode (JJ/MM/AAAA)
+      if (window.flatpickr) {
+        flatpickr('#dateFrom', {
+          dateFormat: 'd/m/Y',
+          allowInput: true,
+          locale: 'fr',
+          onChange(selectedDates, dateStr) {
+            document.getElementById('dateFrom').value = dateStr;
+            document.getElementById('dateFrom').dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        });
+        flatpickr('#dateTo', {
+          dateFormat: 'd/m/Y',
+          allowInput: true,
+          locale: 'fr',
+          onChange(selectedDates, dateStr) {
+            document.getElementById('dateTo').value = dateStr;
+            document.getElementById('dateTo').dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        });
+
+        // Flatpickr — Saisonnalite (JJ/MM uniquement, sans annee)
+        flatpickr('#saisonFrom', {
+          dateFormat: 'd/m',
+          allowInput: true,
+          locale: 'fr',
+          disableMobile: true,
+          onChange(selectedDates, dateStr) {
+            document.getElementById('saisonFrom').value = dateStr;
+            document.getElementById('saisonFrom').dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        });
+        flatpickr('#saisonTo', {
+          dateFormat: 'd/m',
+          allowInput: true,
+          locale: 'fr',
+          disableMobile: true,
+          onChange(selectedDates, dateStr) {
+            document.getElementById('saisonTo').value = dateStr;
+            document.getElementById('saisonTo').dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        });
+      }
+
+      // Listeners radios saison
+      document.querySelectorAll('input[name="saisonRadio"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+          if (!radio.checked) return;
+          const saison = radio.value;
+          const config = SAISONS_CONFIG[saison];
+          if (!config) return;
+
+          const saisonFrom = document.getElementById('saisonFrom');
+          const saisonTo = document.getElementById('saisonTo');
+          if (saisonFrom) {
+            saisonFrom.value = config.from;
+            saisonFrom._flatpickr?.setDate(config.from, false, 'd/m');
+          }
+          if (saisonTo) {
+            saisonTo.value = config.to;
+            saisonTo._flatpickr?.setDate(config.to, false, 'd/m');
+          }
+
+          gererExclusiviteTemporel('saisonnalite');
+          mettreAJourListeParDate();
+          mettreAJourBoutonAppliquer();
+          decocherCochesAutomatiques();
+          _mettreAJourBadgeSaisonnalite();
+        });
+      });
+
+      // Listeners saisonFrom / saisonTo
+      ['saisonFrom', 'saisonTo'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.addEventListener('input', () => {
+          if (el.value === '') {
+            const autreId = id === 'saisonFrom' ? 'saisonTo' : 'saisonFrom';
+            const autre = document.getElementById(autreId);
+            const annee = document.getElementById('selectAnnee')?.value;
+            if (!autre?.value && !annee) {
+              supprimerBadgeById('saisonnalite');
+              gererExclusiviteTemporel(null);
+            } else {
+              _mettreAJourBadgeSaisonnalite();
+            }
+            mettreAJourListeParDate();
+            mettreAJourBoutonAppliquer();
+            return;
+          }
+          const isComplete = /^\d{2}\/\d{2}$/.test(el.value);
+          if (isComplete) {
+            document.querySelectorAll('input[name="saisonRadio"]').forEach(r => r.checked = false);
+            mettreAJourListeParDate();
+            mettreAJourBoutonAppliquer();
+            decocherCochesAutomatiques();
+            _mettreAJourBadgeSaisonnalite();
+          }
+        });
+
+        el.addEventListener('blur', () => {
+          const val = el.value;
+          if (val && !/^\d{2}\/\d{2}$/.test(val)) {
+            if (!el._flatpickr?.selectedDates?.length) {
+              el.value = '';
+              _mettreAJourBadgeSaisonnalite();
+              mettreAJourBoutonAppliquer();
+            } else {
+              const d = el._flatpickr.selectedDates[0];
+              const j = String(d.getDate()).padStart(2, '0');
+              const m = String(d.getMonth() + 1).padStart(2, '0');
+              el.value = `${j}/${m}`;
+              _mettreAJourBadgeSaisonnalite();
+              mettreAJourListeParDate();
+              mettreAJourBoutonAppliquer();
+            }
+          }
+        });
+      });
+
+      // Listener selectAnnee
+      document.getElementById('selectAnnee')?.addEventListener('change', () => {
+        decocherCochesAutomatiques();
+        mettreAJourListeParDate();
+        mettreAJourBoutonAppliquer();
+        _mettreAJourBadgeSaisonnalite();
+      });
+
+      // Listeners sur dateFrom et dateTo
+      ['dateFrom', 'dateTo'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        el.addEventListener('input', () => {
+          if (el.value === '') {
+            // Ne pas supprimer les deux badges manuellement — appeler _mettreAJourBadgePeriode()
+            // qui gere chaque badge selon l etat actuel de chaque champ
+            _mettreAJourBadgePeriode();
+            const autreId = id === 'dateFrom' ? 'dateTo' : 'dateFrom';
+            const autre = document.getElementById(autreId);
+            if (!autre?.value) {
+              gererExclusiviteTemporel(null);
+            }
+            mettreAJourListeParDate();
+            mettreAJourBoutonAppliquer();
+            return;
+          }
+          // Ne pas reformater pendant la frappe — Flatpickr gere au blur
+          const isComplete = /^\d{2}\/\d{2}\/\d{4}$/.test(el.value);
+          if (isComplete) {
+            gererExclusiviteTemporel('periode');
+            mettreAJourListeParDate();
+            mettreAJourBoutonAppliquer();
+            decocherCochesAutomatiques();
+            _mettreAJourBadgePeriode();
+          }
+        });
+
+        el.addEventListener('blur', () => {
+          const val = el.value;
+          if (val && !/^\d{2}\/\d{2}\/\d{4}$/.test(val)) {
+            // Laisser Flatpickr parser — si la valeur est invalide apres blur, vider
+            if (!el._flatpickr?.selectedDates?.length) {
+              el.value = '';
+              // Appeler _mettreAJourBadgePeriode() qui gere les badges independamment
+              _mettreAJourBadgePeriode();
+              const autreId = id === 'dateFrom' ? 'dateTo' : 'dateFrom';
+              const autre = document.getElementById(autreId);
+              if (!autre?.value) gererExclusiviteTemporel(null);
+              mettreAJourBoutonAppliquer();
+            } else {
+              // Flatpickr a une date valide — reformater proprement
+              const d = el._flatpickr.selectedDates[0];
+              const j = String(d.getDate()).padStart(2, '0');
+              const m = String(d.getMonth() + 1).padStart(2, '0');
+              const a = d.getFullYear();
+              el.value = `${j}/${m}/${a}`;
+              gererExclusiviteTemporel('periode');
+              _mettreAJourBadgePeriode();
+              mettreAJourListeParDate();
+              mettreAJourBoutonAppliquer();
+            }
+          }
+        });
+      });
+    }
+
     // Listener sur le select N dernières localisations
     const inputN = document.getElementById('inputNDernieres');
     const labelN = document.getElementById('labelNDernieres');
@@ -516,6 +812,7 @@ async function startApp(token) {
 
     // Initialisation de la logique des badges pour tous les autres filtres de la sidebar
     initSidebarBadges(token);
+
     // Initialisation du sélecteur de fond de carte
     initBasemapSelector();
 
@@ -557,29 +854,6 @@ async function startApp(token) {
         if (details.open) {
           initTS();
         }
-      });
-    });
-
-    // Listeners sur dateFrom et dateTo (masque automatique et validation sur blur)
-    ['dateFrom', 'dateTo'].forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
-
-      el.addEventListener('input', () => {
-        let val = el.value.replace(/\D/g, '');
-        if (val.length >= 3) val = val.slice(0, 2) + '/' + val.slice(2, 4);
-        el.value = val;
-
-        if (/^\d{2}\/\d{2}$/.test(el.value)) {
-          mettreAJourListeParDate();
-        }
-      });
-
-      el.addEventListener('blur', () => {
-        if (el.value && !/^\d{2}\/\d{2}$/.test(el.value)) {
-          el.value = ''; // vider si format invalide
-        }
-        el.dispatchEvent(new Event('change', { bubbles: true }));
       });
     });
 
@@ -707,90 +981,8 @@ async function startApp(token) {
 function initSidebarBadges(token) {
   if (sidebarBadgesInitialized) return;
   sidebarBadgesInitialized = true;
-  const SAISONS_DATES = {
-    checkHiver:     { from: '01/01', to: '31/03', label: 'Hiver' },
-    checkPrintemps: { from: '01/04', to: '30/06', label: 'Printemps' },
-    checkEte:       { from: '01/07', to: '15/10', label: 'Été' },
-    checkRut:      { from: '16/10', to: '31/12', label: 'Rut' }
-  };
-
-  const datesSaisonModifiees = {
-    checkHiver: null,
-    checkPrintemps: null,
-    checkEte: null,
-    checkRut: null
-  };
-
-  // Flag pour éviter que le listener change de dateFrom/dateTo
-  // écrase datesSaisonModifiees pendant une restauration programmatique
+  // TODO legacy saison — flag enCoursDeRestauration, peut être retire apres validation
   let enCoursDeRestauration = false;
-  // Saison actuellement en édition (cible des modifications dateFrom/dateTo)
-  let saisonEnEdition = null;
-
-  function mettreAJourBadgeSaison(id, label, estModifie) {
-    const badge = document.querySelector(`.filtre-badge[data-id='${id}']`);
-    if (badge) {
-      const btn = badge.querySelector('button');
-      Array.from(badge.childNodes).forEach(node => {
-        if (node !== btn) node.remove();
-      });
-      badge.insertBefore(document.createTextNode(label + ' '), btn);
-      badge.classList.toggle('badge-modifie', estModifie);
-    }
-  }
-
-  // Badges pour dateFrom et dateTo
-  ['dateFrom', 'dateTo'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const prefix = id === 'dateFrom' ? 'Du ' : 'Au ';
-
-    el.addEventListener('change', () => {
-      const saisonsCochees = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut']
-        .filter(sid => document.getElementById(sid)?.checked);
-
-      if (!enCoursDeRestauration && saisonsCochees.length > 0) {
-        window._saisonDatesModifiees = true;
-      }
-
-      if (!enCoursDeRestauration) {
-        // Déterminer quelle saison mettre à jour :
-        // - 1 saison cochée : c'est elle
-        // - plusieurs cochées : c'est saisonEnEdition (dernière cochée ou cliquée)
-        let cible = null;
-        if (saisonsCochees.length === 1) {
-          cible = saisonsCochees[0];
-        } else if (saisonsCochees.length > 1 && saisonEnEdition && saisonsCochees.includes(saisonEnEdition)) {
-          cible = saisonEnEdition;
-        }
-
-        if (cible) {
-          const saisonCible = SAISONS_DATES[cible];
-          const dateFromVal = document.getElementById('dateFrom')?.value;
-          const dateToVal = document.getElementById('dateTo')?.value;
-          const estModifie = dateFromVal !== saisonCible.from || dateToVal !== saisonCible.to;
-          datesSaisonModifiees[cible] = estModifie ? { from: dateFromVal, to: dateToVal } : null;
-          const annee = document.getElementById('selectAnnee')?.value;
-          const badgeLabel = annee ? `${saisonCible.label} ${annee}` : saisonCible.label;
-          mettreAJourBadgeSaison(cible, badgeLabel, estModifie);
-        }
-      }
-
-      const saisonCochee = saisonsCochees.length > 0;
-      supprimerBadgeById(id);
-      if (el.value && /^\d{2}\/\d{2}$/.test(el.value) && !saisonCochee) {
-        const annee = document.getElementById('selectAnnee')?.value;
-        const affichage = annee ? `${el.value}/${annee}` : el.value;
-        ajouterBadge(`${prefix}${affichage}`, () => {
-          el.value = '';
-          filtrerListeIndividus();
-        }, id);
-      }
-      decocherCochesAutomatiques();
-      mettreAJourListeParDate();
-      mettreAJourBoutonAppliquer();
-    });
-  });
 
   // Inclure les outliers
   const checkOutliers = document.getElementById('checkAberrantes');
@@ -836,174 +1028,6 @@ function initSidebarBadges(token) {
     });
   });
 
-
-  // Select année — partagé Période/Saison
-  document.getElementById('selectAnnee')?.addEventListener('change', (e) => {
-    supprimerBadgeById('selectAnnee');
-    if (e.target.value) {
-      ajouterBadge(`Année ${e.target.value}`, () => {
-        e.target.value = '';
-        e.target.dispatchEvent(new Event('change'));
-      }, 'selectAnnee');
-    }
-    // Si des dates jj/mm sont remplies, mettre à jour leurs badges
-    ['dateFrom', 'dateTo'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el && el.value) {
-        el.dispatchEvent(new Event('change'));
-      }
-    });
-    // Si une saison est cochée, mettre à jour les dates jj/mm et son badge
-    ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut'].forEach(id => {
-      const cb = document.getElementById(id);
-      if (cb?.checked) cb.dispatchEvent(new Event('change'));
-    });
-    const dateFrom = document.getElementById('dateFrom')?.value;
-    const dateTo = document.getElementById('dateTo')?.value;
-    decocherCochesAutomatiques();
-    if (dateFrom || dateTo) {
-      mettreAJourListeParDate();
-    } else {
-      filtrerListeIndividus();
-    }
-    mettreAJourBoutonAppliquer();
-  });
-
-  // Saisons
-  ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const saison = SAISONS_DATES[id];
-
-    el.addEventListener('change', () => {
-      supprimerBadgeById(id);
-
-      if (el.checked) {
-        const annee = document.getElementById('selectAnnee')?.value;
-        const badgeLabel = annee ? `${saison.label} ${annee}` : saison.label;
-        const datesMemoisees = datesSaisonModifiees[id];
-
-        const saisonsCochees = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut']
-          .filter(sid => document.getElementById(sid)?.checked);
-
-        // Toujours afficher les dates de CETTE saison et la définir comme saison en édition
-        const dateFromEl = document.getElementById('dateFrom');
-        const dateToEl = document.getElementById('dateTo');
-        const fromVal = datesMemoisees?.from || saison.from;
-        const toVal = datesMemoisees?.to || saison.to;
-        window._saisonDatesModifiees = false;
-        if (dateFromEl) { supprimerBadgeById('dateFrom'); dateFromEl.value = fromVal; }
-        if (dateToEl) { supprimerBadgeById('dateTo'); dateToEl.value = toVal; }
-        saisonEnEdition = id;
-
-        ajouterBadge(badgeLabel, () => {
-          el.checked = false;
-          supprimerBadgeById(id);
-          datesSaisonModifiees[id] = null;
-          if (saisonEnEdition === id) saisonEnEdition = null;
-
-          const saisonsRestantes = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut']
-            .filter(sid => document.getElementById(sid)?.checked);
-
-          if (saisonsRestantes.length >= 1) {
-            const prochaineSaisonId = (saisonEnEdition === null || !saisonsRestantes.includes(saisonEnEdition))
-              ? saisonsRestantes[0]
-              : saisonEnEdition;
-            saisonEnEdition = prochaineSaisonId;
-            const saisonSuivante = SAISONS_DATES[prochaineSaisonId];
-            const datesMemoiseesSuivante = datesSaisonModifiees[prochaineSaisonId];
-            const fromVal = datesMemoiseesSuivante?.from || saisonSuivante.from;
-            const toVal = datesMemoiseesSuivante?.to || saisonSuivante.to;
-            const dateFromEl = document.getElementById('dateFrom');
-            const dateToEl = document.getElementById('dateTo');
-            enCoursDeRestauration = true;
-            if (dateFromEl) {
-              supprimerBadgeById('dateFrom');
-              dateFromEl.value = fromVal;
-              dateFromEl.dispatchEvent(new Event('input', { bubbles: true }));
-              dateFromEl.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            if (dateToEl) {
-              supprimerBadgeById('dateTo');
-              dateToEl.value = toVal;
-              dateToEl.dispatchEvent(new Event('input', { bubbles: true }));
-              dateToEl.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-            enCoursDeRestauration = false;
-            const annee = document.getElementById('selectAnnee')?.value;
-            const badgeLabelSuivant = annee ? `${saisonSuivante.label} ${annee}` : saisonSuivante.label;
-            mettreAJourBadgeSaison(prochaineSaisonId, badgeLabelSuivant, !!datesMemoiseesSuivante);
-          } else {
-            saisonEnEdition = null;
-            const dateFromEl = document.getElementById('dateFrom');
-            const dateToEl = document.getElementById('dateTo');
-            if (dateFromEl) { supprimerBadgeById('dateFrom'); dateFromEl.value = ''; dateFromEl.dispatchEvent(new Event('change', { bubbles: true })); }
-            if (dateToEl) { supprimerBadgeById('dateTo'); dateToEl.value = ''; dateToEl.dispatchEvent(new Event('change', { bubbles: true })); }
-          }
-
-          setTimeout(() => mettreAJourListeParDate(), 100);
-        }, id, () => {
-          // Clic sur le badge : afficher les dates de cette saison et la marquer en édition
-          saisonEnEdition = id;
-          const dateFromEl = document.getElementById('dateFrom');
-          const dateToEl = document.getElementById('dateTo');
-          const datesMemoisees = datesSaisonModifiees[id];
-          const fromVal = datesMemoisees?.from || saison.from;
-          const toVal = datesMemoisees?.to || saison.to;
-          if (dateFromEl) { dateFromEl.value = fromVal; }
-          if (dateToEl) { dateToEl.value = toVal; }
-        });
-        if (datesMemoisees) {
-          mettreAJourBadgeSaison(id, badgeLabel, true);
-        }
-
-      } else {
-        const saisonsRestantes = ['checkHiver', 'checkPrintemps', 'checkEte', 'checkRut']
-          .filter(sid => document.getElementById(sid)?.checked);
-
-        if (saisonsRestantes.length >= 1) {
-          const prochaineSaisonId = (saisonEnEdition === id || !saisonsRestantes.includes(saisonEnEdition))
-            ? saisonsRestantes[0]
-            : saisonEnEdition;
-          saisonEnEdition = prochaineSaisonId;
-          const saisonSuivante = SAISONS_DATES[prochaineSaisonId];
-          const datesMemoiseesSuivante = datesSaisonModifiees[prochaineSaisonId];
-          const fromVal = datesMemoiseesSuivante?.from || saisonSuivante.from;
-          const toVal = datesMemoiseesSuivante?.to || saisonSuivante.to;
-          const dateFromEl = document.getElementById('dateFrom');
-          const dateToEl = document.getElementById('dateTo');
-          enCoursDeRestauration = true;
-          if (dateFromEl) {
-            supprimerBadgeById('dateFrom');
-            dateFromEl.value = fromVal;
-            dateFromEl.dispatchEvent(new Event('input', { bubbles: true }));
-            dateFromEl.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-          if (dateToEl) {
-            supprimerBadgeById('dateTo');
-            dateToEl.value = toVal;
-            dateToEl.dispatchEvent(new Event('input', { bubbles: true }));
-            dateToEl.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-          enCoursDeRestauration = false;
-          const annee = document.getElementById('selectAnnee')?.value;
-          const badgeLabel = annee ? `${saisonSuivante.label} ${annee}` : saisonSuivante.label;
-          mettreAJourBadgeSaison(prochaineSaisonId, badgeLabel, !!datesMemoiseesSuivante);
-        } else {
-          saisonEnEdition = null;
-          window._saisonDatesModifiees = false;
-          const dateFromEl = document.getElementById('dateFrom');
-          const dateToEl = document.getElementById('dateTo');
-          if (dateFromEl) { supprimerBadgeById('dateFrom'); dateFromEl.value = ''; dateFromEl.dispatchEvent(new Event('change', { bubbles: true })); }
-          if (dateToEl) { supprimerBadgeById('dateTo'); dateToEl.value = ''; dateToEl.dispatchEvent(new Event('change', { bubbles: true })); }
-        }
-      }
-
-      decocherCochesAutomatiques();
-      mettreAJourListeParDate();
-      mettreAJourBoutonAppliquer();
-    });
-  });
 
   const btnResetBadges = document.getElementById('btnReinitialiser');
   if (btnResetBadges) btnResetBadges.addEventListener('click', () => reinitialiserTousLesFiltres());
@@ -1082,15 +1106,6 @@ function initSidebarBadges(token) {
     document.getElementById('tabIndividus').classList.add('active');
     document.getElementById('tabDonnees').classList.remove('active');
   });
-
-  window._reinitialiserEtatSaisons = () => {
-    datesSaisonModifiees.checkHiver = null;
-    datesSaisonModifiees.checkPrintemps = null;
-    datesSaisonModifiees.checkEte = null;
-    datesSaisonModifiees.checkRut = null;
-    saisonEnEdition = null;
-    window._saisonDatesModifiees = false;
-  };
 
 }
 
@@ -1233,13 +1248,11 @@ export function mettreAJourSelectN() {
     !!document.getElementById('selectPopulation')?.value ||
     !!document.getElementById('selectClasseAge')?.value ||
     !!document.getElementById('selectProgrammation')?.value ||
-    !!document.getElementById('selectAnnee')?.value ||
-    document.getElementById('checkHiver')?.checked ||
-    document.getElementById('checkPrintemps')?.checked ||
-    document.getElementById('checkEte')?.checked ||
-    document.getElementById('checkRut')?.checked ||
+    !!(document.getElementById('selectAnnee')?.value) ||
     !!(document.getElementById('dateFrom')?.value) ||
     !!(document.getElementById('dateTo')?.value) ||
+    !!(document.getElementById('saisonFrom')?.value) ||
+    !!(document.getElementById('saisonTo')?.value) ||
     Array.from(document.querySelectorAll('#listeIndividus input:checked')).length > 0;
 
   if (filtreActif) {
@@ -1272,19 +1285,14 @@ export function mettreAJourBoutonAppliquer() {
     !!document.getElementById('selectPopulation')?.value ||
     !!document.getElementById('selectClasseAge')?.value ||
     !!document.getElementById('selectProgrammation')?.value ||
-    !!document.getElementById('selectAnnee')?.value ||
-    document.getElementById('checkHiver')?.checked ||
-    document.getElementById('checkPrintemps')?.checked ||
-    document.getElementById('checkEte')?.checked ||
-    document.getElementById('checkRut')?.checked ||
+    !!(document.getElementById('selectAnnee')?.value) ||
     !!(document.getElementById('dateFrom')?.value) ||
     !!(document.getElementById('dateTo')?.value) ||
+    !!(document.getElementById('saisonFrom')?.value) ||
+    !!(document.getElementById('saisonTo')?.value) ||
     document.getElementById('checkAberrantes')?.checked ||
     Array.from(document.querySelectorAll('#listeIndividus input:checked'))
-      .some(cb => {
-        const cocheAuto = cb.closest('label')?.dataset.cocheAuto;
-        return cocheAuto !== 'init' && cocheAuto !== 'true';
-      }) ||
+      .some(cb => cb.closest('label')?.dataset.cocheAuto !== 'init') ||
     (document.getElementById('inputNDernieres')?.dataset.modifieEnPositions === 'true' &&
       !document.getElementById('btnTrajectoire')?.classList.contains('active')) ||
     (document.getElementById('inputNDernieres')?.dataset.modifieEnTrajectoire === 'true' &&
@@ -1305,9 +1313,6 @@ async function reinitialiserTousLesFiltres() {
   lockSidebar();
 
   try {
-    // 1. Réinitialiser états internes saisons
-    if (window._reinitialiserEtatSaisons) window._reinitialiserEtatSaisons();
-
     // 2. Supprimer tous les badges
     document.querySelectorAll('.filtre-badge').forEach(badge => badge.remove());
     ajouterBadge('Individus en cours de suivi', () => {
@@ -1329,12 +1334,6 @@ async function reinitialiserTousLesFiltres() {
     // 4. Recherche textuelle
     const searchIndividu = document.getElementById('searchIndividu');
     if (searchIndividu) searchIndividu.value = '';
-
-    // 5. Saisons décochées
-    ['checkRut', 'checkHiver', 'checkPrintemps', 'checkEte'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.checked = false;
-    });
 
     // 6. Dates vidées SANS dispatcher change (pour éviter les effets de bord)
     ['dateFrom', 'dateTo'].forEach(id => {
@@ -1381,6 +1380,21 @@ async function reinitialiserTousLesFiltres() {
       label.dataset.masqueParDate = 'false';
       label.style.display = label.dataset.sansGeom === 'true' ? 'none' : 'flex';
     });
+
+    // Reset filtres temporels
+    const df = document.getElementById('dateFrom');
+    const dt = document.getElementById('dateTo');
+    const sf = document.getElementById('saisonFrom');
+    const st = document.getElementById('saisonTo');
+    if (df) { df.value = ''; df._flatpickr?.clear(); }
+    if (dt) { dt.value = ''; dt._flatpickr?.clear(); }
+    if (sf) { sf.value = ''; sf._flatpickr?.clear(); }
+    if (st) { st.value = ''; st._flatpickr?.clear(); }
+    document.querySelectorAll('input[name="saisonRadio"]').forEach(r => r.checked = false);
+    supprimerBadgeById('periode-from');
+    supprimerBadgeById('periode-to');
+    supprimerBadgeById('saisonnalite');
+    gererExclusiviteTemporel(null);
 
     // 10. Mettre à jour compteur filtres
     mettreAJourFiltresActifs();
@@ -1493,8 +1507,8 @@ async function deconnecter() {
     await reinitialiserTousLesFiltres();
 
     document.querySelectorAll('details').forEach(d => d.removeAttribute('open'));
-    const detailsPeriode = document.getElementById('detailsPeriode');
-    if (detailsPeriode) detailsPeriode.setAttribute('open', '');
+    const detailsTemporel = document.getElementById('detailsTemporel');
+    if (detailsTemporel) detailsTemporel.setAttribute('open', '');
 
     const sidebarRight = document.getElementById('sidebarRight');
     const mapScreen = document.getElementById('mapScreen');
