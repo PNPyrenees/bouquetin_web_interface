@@ -34,14 +34,20 @@ export function getPeriodesActives() {
   }
 
   // CHEMIN 2 — Saisonnalite (selectAnnee + saisonFrom/saisonTo JJ/MM)
-  const annee = document.getElementById('selectAnnee')?.value || '';
-  const annees = annee ? [annee] : [];
+  const selectAnneeEl = document.getElementById('selectAnnee');
+  const annees = selectAnneeEl?.tomselect
+    ? Object.values(selectAnneeEl.tomselect.items).map(item => typeof item === 'string' ? item : item?.value).filter(Boolean)
+    : (selectAnneeEl?.value ? [selectAnneeEl.value] : []);
+
+  const toutesAnnees = annees.includes('toutes');
+  const anneesReelles = annees.filter(a => a !== 'toutes');
+  const anneesEffectives = toutesAnnees ? [] : anneesReelles;
 
   const saisonFrom = document.getElementById('saisonFrom')?.value || '';
   const saisonTo = document.getElementById('saisonTo')?.value || '';
   const hasSaisonPeriode = /^\d{2}\/\d{2}$/.test(saisonFrom) && /^\d{2}\/\d{2}$/.test(saisonTo);
 
-  if (annees.length > 0 && hasSaisonPeriode) {
+  if (anneesEffectives.length > 0 && hasSaisonPeriode) {
     // N annees x 1 periode recurrente
     const [jFrom, mFrom] = saisonFrom.split('/');
     const [jTo, mTo] = saisonTo.split('/');
@@ -53,7 +59,7 @@ export function getPeriodesActives() {
     const chevauche = fromMonthDay > toMonthDay; // ex: 12/21 > 03/20
 
     const periodes = [];
-    annees.forEach(annee => {
+    anneesEffectives.forEach(annee => {
       const a = parseInt(annee);
       if (chevauche) {
         // Periode a cheval : debut en annee A, fin en annee A+1
@@ -75,9 +81,9 @@ export function getPeriodesActives() {
     return periodes;
   }
 
-  if (annees.length > 0 && !hasSaisonPeriode) {
+  if (anneesEffectives.length > 0 && !hasSaisonPeriode) {
     // Annees seules sans periode saisonniere — une periode par annee (01/01 -> 31/12)
-    return annees.map(annee => ({
+    return anneesEffectives.map(annee => ({
       from: `${annee}-01-01`,
       to: `${annee}-12-31`,
       source: 'annee',
@@ -85,7 +91,7 @@ export function getPeriodesActives() {
     }));
   }
 
-  if (hasSaisonPeriode && annees.length === 0) {
+  if (hasSaisonPeriode && anneesEffectives.length === 0) {
     // Periode saisonniere sans annee — toutes les annees disponibles
     const [jFrom, mFrom] = saisonFrom.split('/');
     const [jTo, mTo] = saisonTo.split('/');
