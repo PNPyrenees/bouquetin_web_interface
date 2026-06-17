@@ -77,33 +77,57 @@
           <div id="badgesFiltres"></div>
         </div>
 
-        <details id="detailsPeriode" open>
-          <summary>Période</summary>
+        <details id="detailsTemporel" class="details-temporel" open>
+          <summary>Filtres temporels</summary>
           <div class="details-content">
-            <div class="input-group">
-              <label>Année</label>
-              <select id="selectAnnee" class="sidebar-select">
-                <option value="">Toutes les années</option>
-              </select>
-            </div>
-            <div class="input-group">
-              <label>Du</label>
-              <input type="text" class="sidebar-input" id="dateFrom" placeholder="jj/mm">
-            </div>
-            <div class="input-group">
-              <label>Au</label>
-              <input type="text" class="sidebar-input" id="dateTo" placeholder="jj/mm">
-            </div>
-          </div>
-        </details>
 
-        <details>
-          <summary>Saison</summary>
-          <div class="details-content">
-            <label class="checkbox-label"><input type="checkbox" id="checkHiver"> Hiver</label>
-            <label class="checkbox-label"><input type="checkbox" id="checkPrintemps"> Printemps</label>
-            <label class="checkbox-label"><input type="checkbox" id="checkEte"> Été</label>
-            <label class="checkbox-label"><input type="checkbox" id="checkRut"> Rut</label>
+            <!-- PERIODE -->
+            <div class="temporel-groupe" id="groupePeriode">
+              <div class="temporel-titre">Période</div>
+              <div class="date-row">
+                <div class="input-group">
+                  <label>Du</label>
+                  <input type="text" class="sidebar-input" id="dateFrom" placeholder="JJ/MM/AAAA" autocomplete="off">
+                </div>
+                <div class="input-group">
+                  <label>Au</label>
+                  <input type="text" class="sidebar-input" id="dateTo" placeholder="JJ/MM/AAAA" autocomplete="off">
+                </div>
+              </div>
+            </div>
+
+            <div class="temporel-divider"></div>
+
+            <!-- SAISONNALITE -->
+            <div class="temporel-groupe" id="groupeSaisonnalite">
+              <div class="temporel-titre">Saisonnalité</div>
+              <div class="input-group">
+                <label>Année</label>
+                <select id="selectAnnee" class="sidebar-select">
+                  <option value="">Toutes les années</option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label>Saison</label>
+                <div class="saison-radios" id="saisonButtons">
+                  <label class="checkbox-label"><input type="radio" name="saisonRadio" value="hiver"> Hiver</label>
+                  <label class="checkbox-label"><input type="radio" name="saisonRadio" value="printemps"> Printemps</label>
+                  <label class="checkbox-label"><input type="radio" name="saisonRadio" value="ete"> Été</label>
+                  <label class="checkbox-label"><input type="radio" name="saisonRadio" value="rut"> Rut</label>
+                </div>
+              </div>
+              <div class="date-row">
+                <div class="input-group">
+                  <label>Du</label>
+                  <input type="text" class="sidebar-input" id="saisonFrom" placeholder="JJ/MM" autocomplete="off">
+                </div>
+                <div class="input-group">
+                  <label>Au</label>
+                  <input type="text" class="sidebar-input" id="saisonTo" placeholder="JJ/MM" autocomplete="off">
+                </div>
+              </div>
+            </div>
+
           </div>
         </details>
 
