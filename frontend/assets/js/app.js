@@ -23,6 +23,10 @@ let mapListenersInitialized = false;
 let mapInitialized = false;
 let temporelInitialized = false;
 
+let _dernierNPositions = '5';
+let _dernierNTrajectoire = '25';
+let _selectionManuelleActive = false;
+
 export function getAnimals() { return animals; }
 export function getActiveIds() { return activeIds; }
 export function getCurrentToken() { return currentToken; }
@@ -169,46 +173,23 @@ function mettreAJourLabelN() {
 // Adapte les options de #inputNDernieres selon le mode (positions/trajectoire)
 function adapterSelectNPourMode(mode) {
   const inputN = document.getElementById('inputNDernieres');
-  const labelN = document.getElementById('labelNDernieres');
   if (!inputN) return;
 
   inputN.innerHTML = '';
+  [['1','1'],['5','5'],['10','10'],['15','15'],['20','20'],['25','25'],['50','50'],['toutes','Toutes']].forEach(([val, txt]) => {
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = txt;
+    inputN.appendChild(opt);
+  });
+
+  const valeursValides = ['1', '5', '10', '15', '20', '25', '50', 'toutes'];
 
   if (mode === 'trajectoire') {
-    [['20', '20'], ['25', '25'], ['50', '50'], ['toutes', 'Toutes']].forEach(([val, txt]) => {
-      const opt = document.createElement('option');
-      opt.value = val;
-      opt.textContent = txt;
-      inputN.appendChild(opt);
-    });
-    if (!inputN.dataset.modifieEnTrajectoire) {
-      inputN.value = '25';
-      inputN.dataset.valeurManuelle = '25';
-      if (labelN) labelN.textContent = 'dernières positions';
-    } else {
-      // Restaurer valeur manuelle si compatible, sinon défaut
-      const valeursValides = ['20', '25', '50', 'toutes'];
-      inputN.value = valeursValides.includes(inputN.dataset.valeurManuelle)
-        ? inputN.dataset.valeurManuelle
-        : '25';
-    }
+    const valeurCible = _dernierNPositions === 'toutes' ? 'toutes' : _dernierNTrajectoire;
+    inputN.value = valeursValides.includes(valeurCible) ? valeurCible : '25';
   } else {
-    [['1', '1'], ['5', '5'], ['10', '10'], ['15', '15'], ['20', '20'], ['toutes', 'Toutes']].forEach(([val, txt]) => {
-      const opt = document.createElement('option');
-      opt.value = val;
-      opt.textContent = txt;
-      inputN.appendChild(opt);
-    });
-    if (!inputN.dataset.modifieEnPositions) {
-      inputN.value = '5';
-      inputN.dataset.valeurManuelle = '5';
-      if (labelN) labelN.textContent = 'dernières positions';
-    } else {
-      const valeursValides = ['1', '5', '10', '15', '20', 'toutes'];
-      inputN.value = valeursValides.includes(inputN.dataset.valeurManuelle)
-        ? inputN.dataset.valeurManuelle
-        : '5';
-    }
+    inputN.value = valeursValides.includes(_dernierNPositions) ? _dernierNPositions : '5';
   }
   mettreAJourLabelN();
 }
@@ -230,32 +211,46 @@ function gererExclusiviteTemporel(actif) {
 }
 
 function _mettreAJourBadgeSaisonnalite() {
-  const annee = document.getElementById('selectAnnee')?.value;
+  const selectAnneeEl = document.getElementById('selectAnnee');
+  const annees = selectAnneeEl?.tomselect
+    ? Object.values(selectAnneeEl.tomselect.items).map(item => typeof item === 'string' ? item : item?.value).filter(Boolean)
+    : Array.from(document.querySelectorAll('#selectAnnee option:checked'))
+        .map(o => o.value).filter(Boolean);
   const saisonFrom = document.getElementById('saisonFrom')?.value;
   const saisonTo = document.getElementById('saisonTo')?.value;
 
+  const toutesAnnees = annees.includes('toutes');
+  const anneesReelles = annees.filter(a => a !== 'toutes');
+
   supprimerBadgeById('saisonnalite');
 
-  if (!saisonFrom && !saisonTo && !annee) {
+  if (!annees.length && !saisonFrom && !saisonTo) {
     gererExclusiviteTemporel(null);
     return;
   }
 
   let label = '';
-  if (saisonFrom && saisonTo && annee) {
-    label = `Du ${saisonFrom} au ${saisonTo}/${annee}`;
+  if (toutesAnnees) {
+    if (saisonFrom && saisonTo) {
+      label = `Du ${saisonFrom} au ${saisonTo} - toutes années`;
+    } else {
+      label = 'Toutes les années';
+    }
+  } else if (saisonFrom && saisonTo && anneesReelles.length > 0) {
+    label = `Du ${saisonFrom} au ${saisonTo}/${anneesReelles.join('/')}`;
   } else if (saisonFrom && saisonTo) {
     label = `Du ${saisonFrom} au ${saisonTo}`;
-  } else if (annee) {
-    label = `Année ${annee}`;
+  } else if (anneesReelles.length > 0) {
+    label = anneesReelles.length === 1 ? `Année ${anneesReelles[0]}` : `Années ${anneesReelles.join(' - ')}`;
   }
 
   if (label) {
     ajouterBadge(label, () => {
-      document.getElementById('selectAnnee').value = '';
-      if (document.getElementById('selectAnnee').tomselect) {
-        document.getElementById('selectAnnee').tomselect.clear(true);
-        document.getElementById('selectAnnee').tomselect.setValue('', true);
+      const el = document.getElementById('selectAnnee');
+      if (el?.tomselect) {
+        el.tomselect.clear(true);
+      } else if (el) {
+        el.value = '';
       }
       const sf = document.getElementById('saisonFrom');
       const st = document.getElementById('saisonTo');
@@ -454,8 +449,8 @@ async function startApp(token) {
     if (selectAnnee) {
       if (selectAnnee.tomselect) {
         selectAnnee.tomselect.clearOptions();
-        selectAnnee.tomselect.addOption({ value: '', text: 'Toutes les années' });
         annees.forEach(annee => selectAnnee.tomselect.addOption({ value: String(annee), text: String(annee) }));
+        selectAnnee.tomselect.addOption({ value: 'toutes', text: 'Toutes les années' });
         selectAnnee.tomselect.refreshOptions(false);
       } else {
         while (selectAnnee.options.length > 1) selectAnnee.remove(1);
@@ -465,6 +460,10 @@ async function startApp(token) {
           opt.textContent = annee;
           selectAnnee.appendChild(opt);
         });
+        const optToutes = document.createElement('option');
+        optToutes.value = 'toutes';
+        optToutes.textContent = 'Toutes les années';
+        selectAnnee.appendChild(optToutes);
       }
     }
     window._anneeOptions = annees.map(String);
@@ -509,21 +508,30 @@ async function startApp(token) {
           // Gestion du clic sur une checkbox d'individu
           checkbox.addEventListener('change', () => {
             if (!checkbox.checked) {
-              // Décochage d'un individu -> reset complet de toutes les coches
-              document.querySelectorAll('#listeIndividus .checkbox-label').forEach(lbl => {
-                const cb = lbl.querySelector('input');
-                if (!cb) return;
-                cb.checked = false;
-                lbl.dataset.cocheAuto = 'false';
-                supprimerBadgeById(`ani-${cb.value}`);
-              });
+              if (_selectionManuelleActive) {
+                // Mode selection manuelle — decocher uniquement cet individu
+                label.dataset.cocheAuto = 'false';
+                supprimerBadgeById(`ani-${ani.ani_id}`);
+              } else {
+                // Sortie de l'etat init — reset complet des coches auto
+                document.querySelectorAll('#listeIndividus .checkbox-label').forEach(lbl => {
+                  const cb = lbl.querySelector('input');
+                  if (!cb) return;
+                  cb.checked = false;
+                  lbl.dataset.cocheAuto = 'false';
+                  supprimerBadgeById(`ani-${cb.value}`);
+                });
+              }
             } else {
-              // Cochage manuel d'un individu
+              // Cochage manuel — activer le mode selection manuelle
+              _selectionManuelleActive = true;
               label.dataset.cocheAuto = 'false';
               ajouterBadge(ani.ani_nom, () => {
                 checkbox.checked = false;
                 label.dataset.cocheAuto = 'false';
                 supprimerBadgeById(`ani-${ani.ani_id}`);
+                mettreAJourSelectN();
+                mettreAJourBoutonAppliquer();
               }, `ani-${ani.ani_id}`);
             }
             mettreAJourSelectN();
@@ -652,8 +660,11 @@ async function startApp(token) {
           if (el.value === '') {
             const autreId = id === 'saisonFrom' ? 'saisonTo' : 'saisonFrom';
             const autre = document.getElementById(autreId);
-            const annee = document.getElementById('selectAnnee')?.value;
-            if (!autre?.value && !annee) {
+            const selectAnneeEl2 = document.getElementById('selectAnnee');
+            const aDesAnnees2 = selectAnneeEl2?.tomselect
+              ? Object.values(selectAnneeEl2.tomselect.items).map(item => typeof item === 'string' ? item : item?.value).filter(Boolean).length > 0
+              : !!selectAnneeEl2?.value;
+            if (!autre?.value && !aDesAnnees2) {
               supprimerBadgeById('saisonnalite');
               gererExclusiviteTemporel(null);
             } else {
@@ -699,6 +710,15 @@ async function startApp(token) {
         mettreAJourListeParDate();
         mettreAJourBoutonAppliquer();
         _mettreAJourBadgeSaisonnalite();
+        const selectAnneeEl = document.getElementById('selectAnnee');
+        const aDesAnnees = selectAnneeEl?.tomselect
+          ? Object.values(selectAnneeEl.tomselect.items).map(item => typeof item === 'string' ? item : item?.value).filter(Boolean).length > 0
+          : !!selectAnneeEl?.value;
+        if (aDesAnnees || document.getElementById('saisonFrom')?.value || document.getElementById('saisonTo')?.value) {
+          gererExclusiviteTemporel('saisonnalite');
+        } else {
+          gererExclusiviteTemporel(null);
+        }
       });
 
       // Listeners sur dateFrom et dateTo
@@ -766,11 +786,12 @@ async function startApp(token) {
 
     if (inputN) {
       inputN.addEventListener('change', () => {
-        inputN.dataset.valeurManuelle = inputN.value;
         const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
         if (isTrajectoire) {
+          _dernierNTrajectoire = inputN.value;
           inputN.dataset.modifieEnTrajectoire = 'true';
         } else {
+          _dernierNPositions = inputN.value;
           inputN.dataset.modifieEnPositions = 'true';
         }
         mettreAJourLabelN();
@@ -822,7 +843,38 @@ async function startApp(token) {
     // TomSelect — initialisation au premier toggle de chaque details (ou immédiatement si déjà ouvert)
     // Les selects natifs sont cachés via CSS (select.sidebar-select { display: none })
     // TomSelect injecte son propre widget
-    ['selectAnnee', 'selectPopulation', 'selectSexe', 'selectClasseAge', 'selectGestionnaire', 'selectTranslocation', 'selectProgrammation'].forEach(id => {
+    // TomSelect multiple dédié pour selectAnnee
+    {
+      const selectAnneeEl = document.getElementById('selectAnnee');
+      if (selectAnneeEl && !selectAnneeEl.tomselect) {
+        const detailsAnnee = selectAnneeEl.closest('details');
+        let anneeInitialized = false;
+        const initTSAnnee = () => {
+          if (anneeInitialized || selectAnneeEl.tomselect) return;
+          anneeInitialized = true;
+          new TomSelect(selectAnneeEl, {
+            create: false,
+            allowEmptyOption: false,
+            placeholder: 'Ajouter une année...',
+            plugins: ['remove_button'],
+            hideSelected: false,
+            render: {
+              option(data, escape) {
+                const isSelected = Object.values(selectAnneeEl.tomselect?.items || {}).map(item => typeof item === 'string' ? item : item?.value).includes(data.value);
+                return `<div class="${isSelected ? 'ts-option-selected' : ''}">${escape(data.text)}</div>`;
+              }
+            },
+            onChange() {
+              selectAnneeEl.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
+        };
+        if (detailsAnnee?.open) initTSAnnee();
+        detailsAnnee?.addEventListener('toggle', () => { if (detailsAnnee.open) initTSAnnee(); });
+      }
+    }
+
+    ['selectPopulation', 'selectSexe', 'selectClasseAge', 'selectGestionnaire', 'selectTranslocation', 'selectProgrammation'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
 
@@ -871,6 +923,7 @@ async function startApp(token) {
       const btnTraj = document.getElementById('btnTrajectoire');
       if (btnPos && btnTraj) {
         btnPos.addEventListener('click', () => {
+          _selectionManuelleActive = false;
           decocherCochesAutomatiques();
 
           // Restaurer coches initiales sans badges
@@ -885,10 +938,7 @@ async function startApp(token) {
             }
           });
 
-          const inputNPos = document.getElementById('inputNDernieres');
-          const nCiblePos = inputNPos?.dataset.modifieEnPositions === 'true'
-            ? inputNPos.dataset.valeurManuelle
-            : '5';
+          const nCiblePos = _dernierNPositions;
 
           applyFilters(currentToken, 'positions', nCiblePos).then(confirme => {
             if (confirme !== false) {
@@ -901,10 +951,7 @@ async function startApp(token) {
           });
         });
         btnTraj.addEventListener('click', () => {
-          const inputNTraj = document.getElementById('inputNDernieres');
-          const nCibleTraj = inputNTraj?.dataset.modifieEnTrajectoire === 'true'
-            ? inputNTraj.dataset.valeurManuelle
-            : '25';
+          const nCibleTraj = _dernierNPositions === 'toutes' ? 'toutes' : _dernierNTrajectoire;
 
           applyFilters(currentToken, 'trajectoire', nCibleTraj).then(confirme => {
             if (confirme !== false) {
@@ -1242,13 +1289,18 @@ export function mettreAJourSelectN() {
   const labelN = document.getElementById('labelNDernieres');
   if (!inputN || !labelN) return;
 
+  const _selectAnneeN = document.getElementById('selectAnnee');
+  const _aDesAnneesN = _selectAnneeN?.tomselect
+    ? Object.values(_selectAnneeN.tomselect.items).map(item => typeof item === 'string' ? item : item?.value).filter(Boolean).length > 0
+    : !!_selectAnneeN?.value;
+
   const filtreActif =
     !!document.getElementById('selectSexe')?.value ||
     !!document.getElementById('selectGestionnaire')?.value ||
     !!document.getElementById('selectPopulation')?.value ||
     !!document.getElementById('selectClasseAge')?.value ||
     !!document.getElementById('selectProgrammation')?.value ||
-    !!(document.getElementById('selectAnnee')?.value) ||
+    _aDesAnneesN ||
     !!(document.getElementById('dateFrom')?.value) ||
     !!(document.getElementById('dateTo')?.value) ||
     !!(document.getElementById('saisonFrom')?.value) ||
@@ -1259,19 +1311,14 @@ export function mettreAJourSelectN() {
     inputN.value = 'toutes';
     inputN.disabled = true;
     labelN.textContent = 'les positions';
+    _dernierNPositions = 'toutes';
   } else {
     inputN.disabled = false;
-    const valeursValides = ['1', '5', '10', '15', '20', 'toutes'];
-    if (!valeursValides.includes(inputN.value)) {
-      inputN.value = inputN.dataset.valeurManuelle || '1';
-    }
-    const val = inputN.value;
-    if (val === 'toutes') {
-      labelN.textContent = 'les positions';
-    } else {
-      const n = parseInt(val) || 1;
-      labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
-    }
+    const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+    const derniere = isTrajectoire ? _dernierNTrajectoire : _dernierNPositions;
+    const valeursValides = ['1', '5', '10', '15', '20', '25', '50', 'toutes'];
+    inputN.value = valeursValides.includes(derniere) ? derniere : (isTrajectoire ? '25' : '5');
+    mettreAJourLabelN();
   }
 }
 
@@ -1279,13 +1326,18 @@ export function mettreAJourBoutonAppliquer() {
   const btn = document.getElementById('btnApplyFilters');
   if (!btn) return;
 
+  const _selectAnneeB = document.getElementById('selectAnnee');
+  const _aDesAnneesB = _selectAnneeB?.tomselect
+    ? Object.values(_selectAnneeB.tomselect.items).map(item => typeof item === 'string' ? item : item?.value).filter(Boolean).length > 0
+    : !!_selectAnneeB?.value;
+
   const actionManuelle =
     !!document.getElementById('selectSexe')?.value ||
     !!document.getElementById('selectGestionnaire')?.value ||
     !!document.getElementById('selectPopulation')?.value ||
     !!document.getElementById('selectClasseAge')?.value ||
     !!document.getElementById('selectProgrammation')?.value ||
-    !!(document.getElementById('selectAnnee')?.value) ||
+    _aDesAnneesB ||
     !!(document.getElementById('dateFrom')?.value) ||
     !!(document.getElementById('dateTo')?.value) ||
     !!(document.getElementById('saisonFrom')?.value) ||
@@ -1307,6 +1359,7 @@ let isResetting = false;
 async function reinitialiserTousLesFiltres() {
   if (isResetting) return;
   isResetting = true;
+  _selectionManuelleActive = false;
   viderCache();
 
   showMapLoading();
@@ -1343,7 +1396,7 @@ async function reinitialiserTousLesFiltres() {
 
     // 7. Tous les selects — valeur native + TomSelect
     ['selectSexe', 'selectGestionnaire', 'selectTranslocation', 'selectClasseAge',
-     'selectPopulation', 'selectProgrammation', 'selectAnnee'].forEach(id => {
+     'selectPopulation', 'selectProgrammation'].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.value = '';
@@ -1353,12 +1406,24 @@ async function reinitialiserTousLesFiltres() {
         }
       }
     });
+    // selectAnnee — mode multiple : clear() suffit, pas de setValue('')
+    const selectAnneeReinit = document.getElementById('selectAnnee');
+    if (selectAnneeReinit) {
+      if (selectAnneeReinit.tomselect) {
+        selectAnneeReinit.tomselect.clear(true);
+      } else {
+        selectAnneeReinit.value = '';
+      }
+    }
 
     // 8. Checkboxes
     const checkOutliers = document.getElementById('checkAberrantes');
     if (checkOutliers) checkOutliers.checked = false;
     const checkSuivis = document.getElementById('checkSuivis');
     if (checkSuivis) checkSuivis.checked = true;
+
+    _dernierNPositions = '5';
+    _dernierNTrajectoire = '25';
 
     const inputNReinit = document.getElementById('inputNDernieres');
     if (inputNReinit) {
