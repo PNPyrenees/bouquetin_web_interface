@@ -690,7 +690,7 @@ select.sidebar-select {
   font-size: 10px;
   font-weight: 700;
   color: #2D6A4F;
-  margin-bottom: 4px;
+  margin-top: 8px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -919,7 +919,7 @@ input[type="checkbox"] {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  border-bottom: 1px solid #2D6A4F;
+  border-bottom: none;
 }
 
 .filtre-badge {
@@ -1660,9 +1660,49 @@ select:has(+ .ts-wrapper) {
   color: var(--select-color) !important;
 }
 
-.ts-wrapper.sidebar-select .ts-dropdown .option.selected {
-  background: var(--select-selected-bg) !important;
-  color: white !important;
+.ts-dropdown .option.selected,
+.ts-dropdown .option.active.selected {
+  background: transparent !important;
+  color: #aabdb5 !important;
+}
+
+.ts-dropdown .option.selected:hover {
+  background: transparent !important;
+  color: #aabdb5 !important;
+  cursor: default;
+}
+
+.ts-dropdown .ts-option-selected {
+  color: #9ab5ac;
+  font-style: italic;
+}
+
+.ts-dropdown .ts-option-selected::after {
+  content: ' ✓';
+  color: #2D6A4F;
+  font-weight: 700;
+}
+
+#selectAnnee-ts-wrapper .ts-dropdown .option.selected {
+  background: transparent !important;
+  color: #9ab5ac !important;
+  font-style: italic;
+}
+#selectAnnee-ts-wrapper .ts-dropdown .option.selected::after {
+  content: ' ✓';
+  color: #2D6A4F;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.input-group2 label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #2D6A4F;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 /* Flatpickr */
@@ -1836,9 +1876,7 @@ select:has(+ .ts-wrapper) {
 }
 
 .temporel-divider {
-  height: 1px;
-  background: #d5e4de;
-  margin: 10px 0;
+  display: none;
 }
 
 .saison-radios {
