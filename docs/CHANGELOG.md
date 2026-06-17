@@ -1,5 +1,40 @@
 # CHANGELOG
 
+## [0.29.0] - 2026-06-17
+
+### Ajouts
+- Refonte filtres temporels - bloc fusionne Periode et Saisonnalite mutuellement exclusifs
+- Filtre Periode avec champs Du/Au JJ/MM/AAAA et calendrier Flatpickr
+- Filtre Saisonnalite avec selecteur annee, radio buttons saisons et champs Du/Au JJ/MM
+- Saisons configurables depuis SAISONS_CONFIG dans config.js
+- Badges independants Du/Au pour le filtre Periode
+- Badge Saisonnalite au format Du JJ/MM au JJ/MM/AAAA
+- Exclusivite automatique Periode/Saisonnalite via gererExclusiviteTemporel()
+- Flag temporelInitialized pour eviter les listeners dupliques a la reconnexion
+- Filtrage JS mois/jour pour saisonnalite_all en mode Trajectoire
+
+### Modifications
+- selectAnnee remplace selectAnnees - selection annee unique pour la Saisonnalite
+- Boutons saison remplaces par radio buttons a selection unique
+- Saisons disposees en grille 2x2 pour reduire la hauteur
+- Champs Du/Au cote a cote via date-row
+- autocomplete=off sur les 4 champs de date
+- Saisie manuelle robuste - reformatage delegue au blur via Flatpickr
+
+### Refonte visuelle sidebar
+- Accordeons style institutionnel SIG - fond #e8efec, titres vert fonce uppercase
+- Section Filtres temporels visuellement mise en avant
+- Motif animalier opacity 0.02
+- Bouton Appliquer vert primaire #2D6A4F
+- Symbologie et footer fond #f3f6f5 coherent avec les accordeons
+- Bordures champs accentuees #9ab5ac pour meilleure lisibilite
+- Suppression des border-left residuels
+
+### Corrections
+- Suppression autocomplete navigateur masquant le calendrier Flatpickr
+- Badges Periode independants - supprimer Du ne supprime plus Au et vice versa
+- Vidage manuel d'un champ ne supprime plus le badge de l'autre champ
+
 ## [0.28.0] - 2026-06-16
 
 ### Ajouts
