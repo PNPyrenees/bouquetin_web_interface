@@ -30,7 +30,21 @@
 - Bordures champs accentuees #9ab5ac pour meilleure lisibilite
 - Suppression des border-left residuels
 
+### Ajouts
+- Selecteur N positions unifie 1/5/10/15/20/25/50/Toutes pour les deux modes
+- Variables _dernierNPositions et _dernierNTrajectoire pour memoriser les valeurs par mode
+- Passage Positions Toutes vers Trajectoire conserve la valeur Toutes
+- Retour mode Positions restaure la derniere valeur choisie
+- Selecteur annees multi-valeurs TomSelect avec chips et annees grisees
+- Option Toutes les annees dans le selecteur apres 2014
+- Flag _selectionManuelleActive pour gestion independante des coches individus
+
 ### Corrections
+- Badge annees affiche les vraies valeurs et non les indices TomSelect
+- Annees deja selectionnees grisees sans fond colore dans le dropdown
+- Decocher un individu en selection manuelle ne decoche plus les autres
+- Suppression du soulignement sur le bouton Reinitialiser
+- Separateur badge saisonnalite remplace par tiret simple
 - Suppression autocomplete navigateur masquant le calendrier Flatpickr
 - Badges Periode independants - supprimer Du ne supprime plus Au et vice versa
 - Vidage manuel d'un champ ne supprime plus le badge de l'autre champ
