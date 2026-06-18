@@ -1048,10 +1048,17 @@ function initSidebarBadges(token) {
     el.addEventListener('change', () => {
       supprimerBadgeById(id);
       if (el.value) {
-        const label = el.options[el.selectedIndex].text;
+        const label = el.options[el.selectedIndex]?.text || el.tomselect?.options[el.value]?.text || el.value;
         ajouterBadge(label, () => {
-          el.value = '';
+          if (el.tomselect) {
+            el.tomselect.clear(true);
+            el.tomselect.setValue('', true);
+          } else {
+            el.value = '';
+          }
+          decocherCochesAutomatiques();
           mettreAJourListeParDate();
+          mettreAJourBoutonAppliquer();
         }, id);
       }
       decocherCochesAutomatiques();
@@ -1342,7 +1349,7 @@ async function reinitialiserTousLesFiltres() {
       mettreAJourListeParDate();
     }, 'checkSuivis');
 
-    // 3. Mode Positions par défaut + adapter le select N
+    // 3. Mode Positions par défaut
     const btnPos = document.getElementById('btnPositions');
     const btnTraj = document.getElementById('btnTrajectoire');
     if (btnPos && btnTraj) {
@@ -1350,7 +1357,6 @@ async function reinitialiserTousLesFiltres() {
       btnTraj.classList.remove('active');
       clearTrajectoire();
     }
-    adapterSelectNPourMode('positions');
 
     // 4. Recherche textuelle
     const searchIndividu = document.getElementById('searchIndividu');
@@ -1394,6 +1400,7 @@ async function reinitialiserTousLesFiltres() {
     _nEstToutes = false;
     _dernierNPositions = '5';
     _dernierNTrajectoire = '25';
+    adapterSelectNPourMode('positions');
 
     const inputNReinit = document.getElementById('inputNDernieres');
     const nModeLimiteReinit = document.getElementById('nModeLimite');
@@ -1417,6 +1424,7 @@ async function reinitialiserTousLesFiltres() {
       const label = cb.closest('label');
       if (!label) return;
       label.dataset.masqueParDate = 'false';
+      label.dataset.cocheAuto = 'false';
       label.style.display = label.dataset.sansGeom === 'true' ? 'none' : 'flex';
     });
 
@@ -1445,6 +1453,9 @@ async function reinitialiserTousLesFiltres() {
         const idsActifsReinit = Array.from(
           new Set(locationsAll.filter(l => l.cor_date_fin === null).map(l => String(l.ani_id)))
         );
+        setActiveIds(new Set(
+          locationsAll.filter(l => l.cor_date_fin === null).map(l => l.ani_id)
+        ));
         const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
         const locationsN = await fetchNDernieresLocalisations(currentToken, idsActifsReinit, n);
         const locationsSuivies = enrichirLocations(locationsN);
@@ -1458,6 +1469,17 @@ async function reinitialiserTousLesFiltres() {
         mettreAJourLegende();
         setLabelDatetime('Dernière position');
         filtrerListeIndividus();
+
+        setTimeout(() => {
+          const extent = getGpsSource().getExtent();
+          if (extent && !ol.extent.isEmpty(extent)) {
+            getMap().getView().fit(extent, {
+              padding: [80, 80, 80, 80],
+              maxZoom: 13,
+              duration: 600
+            });
+          }
+        }, 300);
       } catch (err) {
         console.error('Erreur reset map:', err);
       }
