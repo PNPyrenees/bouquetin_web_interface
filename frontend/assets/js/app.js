@@ -36,6 +36,8 @@ export function getProgrammationsMap() { return programmationsMap; }
 export function setAnimals(val) { animals = val; }
 export function setActiveIds(val) { activeIds = val; }
 export function setCurrentToken(val) { currentToken = val; }
+export function setDernierNPositions(val) { _dernierNPositions = val; }
+export function setDernierNTrajectoire(val) { _dernierNTrajectoire = val; }
 
 /**
  * ENRICHISSEMENT DES DONNÉES
@@ -769,9 +771,8 @@ async function startApp(token) {
       if (!nModeToutes.checked) return;
       _nEstToutes = true;
       _nModeManuel = true;
-      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-      if (isTrajectoire) { _dernierNTrajectoire = 'toutes'; }
-      else { _dernierNPositions = 'toutes'; }
+      // Ne pas modifier _dernierNPositions/_dernierNTrajectoire ici
+      // Ces variables ne sont mises a jour qu apres un applyFilters() reussi
       mettreAJourLabelN();
       decocherCochesAutomatiques();
       mettreAJourBoutonAppliquer();
@@ -794,9 +795,15 @@ async function startApp(token) {
         const n = parseInt(inputN.value);
         if (n >= 1) {
           _nModeManuel = true;
-          const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-          if (isTrajectoire) { _dernierNTrajectoire = String(n); inputN.dataset.modifieEnTrajectoire = 'true'; }
-          else { _dernierNPositions = String(n); inputN.dataset.modifieEnPositions = 'true'; }
+          _nEstToutes = false;
+          // Saisir une valeur commute toujours le DOM vers le mode Limite,
+          // quelle que soit la radio active (y compris apres un auto-switch vers Toutes)
+          if (nModeLimite && !nModeLimite.checked) {
+            nModeLimite.checked = true;
+            if (nModeToutes) nModeToutes.checked = false;
+          }
+          // Ne pas modifier _dernierNPositions/_dernierNTrajectoire ici
+          // Ces variables ne sont mises a jour qu apres un applyFilters() reussi
           mettreAJourLabelN();
           mettreAJourBoutonAppliquer();
         }
@@ -1291,7 +1298,7 @@ export function mettreAJourSelectN() {
     _nEstToutes = true;
     if (nModeToutes) nModeToutes.checked = true;
     if (nModeLimite) nModeLimite.checked = false;
-    labelN.textContent = '';
+    mettreAJourLabelN();
   } else if (!filtreActif && !_nEstToutes && !_nModeManuel) {
     // Pas de filtre et utilisateur n a pas choisi Toutes — mode Limite
     if (nModeLimite) nModeLimite.checked = true;
@@ -1310,34 +1317,10 @@ export function mettreAJourSelectN() {
 export function mettreAJourBoutonAppliquer() {
   const btn = document.getElementById('btnApplyFilters');
   if (!btn) return;
-
-  const _selectAnneeB = document.getElementById('selectAnnee');
-  const _aDesAnneesB = _selectAnneeB?.tomselect
-    ? Object.values(_selectAnneeB.tomselect.items).map(item => typeof item === 'string' ? item : item?.value).filter(Boolean).length > 0
-    : !!_selectAnneeB?.value;
-
-  const actionManuelle =
-    !!document.getElementById('selectSexe')?.value ||
-    !!document.getElementById('selectGestionnaire')?.value ||
-    !!document.getElementById('selectPopulation')?.value ||
-    !!document.getElementById('selectClasseAge')?.value ||
-    !!document.getElementById('selectProgrammation')?.value ||
-    _aDesAnneesB ||
-    !!(document.getElementById('dateFrom')?.value) ||
-    !!(document.getElementById('dateTo')?.value) ||
-    !!(document.getElementById('saisonFrom')?.value) ||
-    !!(document.getElementById('saisonTo')?.value) ||
-    document.getElementById('checkAberrantes')?.checked ||
-    Array.from(document.querySelectorAll('#listeIndividus input:checked'))
-      .filter(cb => cb.closest('label')?.dataset.cocheAuto !== 'true')
-      .length > 0 ||
-    (document.getElementById('inputNDernieres')?.dataset.modifieEnPositions === 'true' &&
-      !document.getElementById('btnTrajectoire')?.classList.contains('active')) ||
-    (document.getElementById('inputNDernieres')?.dataset.modifieEnTrajectoire === 'true' &&
-      document.getElementById('btnTrajectoire')?.classList.contains('active'));
-
-  btn.disabled = !actionManuelle;
-  btn.classList.toggle('btn-disabled', !actionManuelle);
+  // Bouton toujours actif — la logique de verrouillage est geree uniquement
+  // par lockSidebar() pendant les chargements
+  btn.disabled = false;
+  btn.classList.remove('btn-disabled');
 }
 
 let isResetting = false;
