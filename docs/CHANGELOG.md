@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [0.32.0] - 2026-06-18
+
+### Ajouts
+- Synchronisation automatique des individus selectionnes manuellement avec la liste filtree - decochage automatique si un individu sort des resultats du filtre
+- Synchronisation badge selecteur pour Sexe/Gestionnaire/Population/Classe d age/Programmation GPS - suppression du badge reinitialise le select TomSelect
+
+### Modifications
+- reinitialiserTousLesFiltres() corrige l ordre d appel de adapterSelectNPourMode apres le reset des variables N
+- cocheAuto remis a false pour tous les individus lors de la reinitialisation
+- setActiveIds() appele lors de la reinitialisation pour rafraichir les animaux actifs
+- Recentrage automatique de la carte sur l emprise des donnees apres Reinitialiser
+
+### Corrections
+- Alerte volumetrique pour Saisonnalite affiche desormais le compte reel apres filtre saison au lieu du compte brut sur la plage de dates large
+- Compte exact calcule via somme de COUNT par annee - aucun telechargement massif avant affichage de l alerte
+- Coherence verifiee avec la base de donnees pour le filtre Hiver multi-annees
+
 ## [0.31.0] - 2026-06-18
 
 ### Ajouts
