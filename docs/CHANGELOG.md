@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [0.31.0] - 2026-06-18
+
+### Ajouts
+- Architecture 4 chemins dans applyFilters() branche periodes pour respecter N selon le type de saisonnalite
+- Chemin A+C : periode exacte ou saison+annee precise - requete API directe par animal avec limit=N sans alerte volume
+- Chemin D : saison sans annee (saisonnalite_all) + N - requetes par animal x par annee avec limit=N puis fusion et slice
+- Chemin B : Toutes les positions ou cas residuel - count + alerte volume + filtre JS post-fetch
+- Meme architecture 4 chemins portee au mode Trajectoire (saisonnaliteExacteTraj, saisonnaliteAllTraj)
+- SEUIL_ALERTE_VOLUME = 15000 exporte depuis config.js et importe dans filters.js
+
+### Modifications
+- _dernierNPositions et _dernierNTrajectoire mis a jour uniquement apres un applyFilters() reussi via setDernierNPositions/setDernierNTrajectoire
+- Bouton Appliquer toujours actif - logique de verrouillage geree exclusivement par lockSidebar/unlockSidebar
+- Suppression du filtre JS redondant hasSaisonnaliteAll apres le bloc if/else - logique integree dans Chemin D et Chemin B
+
+### Corrections
+- N ignore apres auto-switch vers Toutes quand l utilisateur saisit une valeur sans cliquer nModeLimite - inputN.input commute desormais le DOM radio vers Limite
+- Label derniere/dernieres positions efface lors de l auto-switch - mettreAJourLabelN() remplace labelN.textContent = ''
+- Alerte volume declenchee a tort pour Annee+Saison+N - Chemin A+C court-circuite le count
+- Telechargement massif pour saisonnalite sans annee + N - Chemin D fait des requetes ciblees par annee
+
 ## [0.30.0] - 2026-06-18
 
 ### Ajouts
