@@ -151,17 +151,19 @@
               <input type="checkbox" id="checkSuivis"> Individus en cours de suivi
             </label>
             <div class="input-group-n">
-              <select id="inputNDernieres" class="spinbox-select">
-                <option value='1'>1</option>
-                <option value='5' selected>5</option>
-                <option value='10'>10</option>
-                <option value='15'>15</option>
-                <option value='20'>20</option>
-                <option value='25'>25</option>
-                <option value='50'>50</option>
-                <option value='toutes'>Toutes</option>
-              </select>
-              <span id="labelNDernieres" class="checkbox-label-text">dernière position</span>
+              <div class="positions-mode">
+                <label class="checkbox-label">
+                  <input type="radio" name="nPositionsMode" id="nModeToutes" value="toutes">
+                  <span>Toutes les positions</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="radio" name="nPositionsMode" id="nModeLimite" value="limite" checked>
+                  <div class="inputn-wrapper">
+                    <input type="number" id="inputNDernieres" class="inputn-field" min="1" value="5">
+                  </div>
+                  <span id="labelNDernieres">dernières positions</span>
+                </label>
+              </div>
             </div>
             <div id="listeIndividus"></div>
           </div>
