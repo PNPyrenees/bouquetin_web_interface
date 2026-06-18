@@ -134,7 +134,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
     ani_id: Array.from(document.querySelectorAll('#listeIndividus input:checked'))
       .filter(cb => {
         const label = cb.closest('label');
-        return !label || (label.dataset.cocheAuto !== 'init' && label.dataset.cocheAuto !== 'true');
+        return !label || label.dataset.cocheAuto !== 'true';
       })
       .map(cb => cb.value),
     date_from: document.getElementById('dateFrom')?.value || '',
@@ -162,6 +162,11 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
 
     if (isPositionMode) {
       const periodes = getPeriodesActives();
+      const inputN = document.getElementById('inputNDernieres');
+      const nModeToutes = document.getElementById('nModeToutes');
+      const nVal = nOverride !== null ? String(nOverride) : (inputN?.value || '5');
+      const toutesPositions = nModeToutes?.checked || nVal === 'toutes';
+      const n = toutesPositions ? null : (parseInt(nVal) || 5);
 
       if (periodes.length === 0) {
         const filtreAttributaireActif =
@@ -171,15 +176,11 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           Array.from(document.querySelectorAll('#listeIndividus input:checked'))
             .filter(cb => {
               const label = cb.closest('label');
-              return label && label.dataset.cocheAuto !== 'init' && label.dataset.cocheAuto !== 'true';
+              return label && label.dataset.cocheAuto !== 'true';
             }).length > 0 ||
           !!filters.include_outliers;
 
         if (!filtreAttributaireActif) {
-          const inputN = document.getElementById('inputNDernieres');
-          const nVal = nOverride !== null ? String(nOverride) : (document.getElementById('inputNDernieres')?.value || '5');
-          const toutesPositions = inputN?.disabled || nVal === 'toutes';
-          const n = toutesPositions ? null : (parseInt(nVal) || 5);
 
           let idsActifs = suivisSeulement
             ? Array.from(getActiveIds()).map(String)
@@ -222,7 +223,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
             locations = await fetchNDernieresLocalisations(token, idsActifs, n);
           }
         } else {
-          // Un ou plusieurs filtres actifs → toutes les positions historiques correspondantes
+          // Un ou plusieurs filtres actifs → positions historiques correspondantes
           const idsAChercher = selectedIds.length > 0 ? selectedIds :
             Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
               .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
@@ -230,8 +231,13 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
               .filter(Boolean);
 
           if (idsAChercher.length === 0) {
-            // Aucun individu ne correspond aux filtres actifs → aucun résultat
             locations = [];
+          } else if (!toutesPositions && n) {
+            // N positions par animal — appel API direct, pas de comptage ni de modale
+            const nPromises = idsAChercher.map(id =>
+              fetchLocations(token, { ani_id: id, include_outliers: filters.include_outliers, limit: n })
+            );
+            locations = (await Promise.all(nPromises)).flat();
           } else {
             const countFilters = {
               ani_id: idsAChercher,
@@ -268,11 +274,12 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           }
         }
       } else {
-        // Avec periodes — consolider en une seule plage min/max pour fetchCountLocations
+        // Avec periodes — consolider en une seule plage min/max
         const dateMin = periodes.reduce((min, p) => p.from && p.from < min ? p.from : min,
           periodes.find(p => p.from)?.from || '');
         const dateMax = periodes.reduce((max, p) => p.to && p.to > max ? p.to : max,
           periodes.find(p => p.to)?.to || '');
+        const hasSaisonnalite = periodes.some(p => p.source === 'saisonnalite' || p.source === 'saisonnalite_all');
 
         const idsAChercher = selectedIds.length > 0 ? selectedIds :
           Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
@@ -280,67 +287,93 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
             .map(l => l.querySelector('input')?.value)
             .filter(Boolean);
 
-        const countFilters = {
-          ani_id: idsAChercher,
-          date_from: dateMin || null,
-          date_to: dateMax || null,
-          include_outliers: filters.include_outliers
-        };
+        if (!toutesPositions && n && !hasSaisonnalite) {
+          // N positions par animal — appel API direct avec contrainte de dates
+          const nPromises = idsAChercher.map(id =>
+            fetchLocations(token, {
+              ani_id: id,
+              date_from: dateMin || null,
+              date_to: dateMax || null,
+              include_outliers: filters.include_outliers,
+              limit: n
+            })
+          );
+          locations = (await Promise.all(nPromises)).flat();
+        } else {
+          const countFilters = {
+            ani_id: idsAChercher,
+            date_from: dateMin || null,
+            date_to: dateMax || null,
+            include_outliers: filters.include_outliers
+          };
 
-        // Étape 1 — Compter les résultats AVANT de télécharger
-        const totalPositions = await fetchCountLocations(token, countFilters);
-        const SEUIL = 15000;
-        let confirmed = 500000;
+          const totalPositions = await fetchCountLocations(token, countFilters);
+          const SEUIL = 15000;
+          let confirmed = 500000;
 
-        if (totalPositions > SEUIL) {
-          const modal = document.getElementById('modalVolume');
-          document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
-          modal.style.display = 'flex';
+          if (totalPositions > SEUIL) {
+            const modal = document.getElementById('modalVolume');
+            document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
+            modal.style.display = 'flex';
 
-          confirmed = await new Promise(resolve => {
-            document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
-            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
+            confirmed = await new Promise(resolve => {
+              document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
+              document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
+            });
+
+            if (confirmed === null) {
+              hideMapLoading();
+              unlockSidebar();
+              if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+              mettreAJourBoutonAppliquer();
+              return false;
+            }
+          }
+
+          locations = await fetchLocations(token, {
+            ...countFilters,
+            limit: confirmed
           });
 
-          if (confirmed === null) {
-            hideMapLoading();
-            unlockSidebar();
-            if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
-            mettreAJourBoutonAppliquer();
-            return false;
+          if (hasSaisonnalite) {
+            const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
+            const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
+            if (jFrom && mFrom && jTo && mTo) {
+              const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
+              const toMD = parseInt(mTo) * 100 + parseInt(jTo);
+              const chevauche = fromMD > toMD;
+
+              locations = locations.filter(loc => {
+                const d = loc.loc_datetime_local || loc.loc_date_local;
+                if (!d) return false;
+                const date = new Date(d);
+                const mois = date.getMonth() + 1;
+                const jour = date.getDate();
+                const md = mois * 100 + jour;
+
+                if (chevauche) {
+                  return md >= fromMD || md <= toMD;
+                } else {
+                  return md >= fromMD && md <= toMD;
+                }
+              });
+            }
           }
-        }
 
-        // Étape 2 — Télécharger toutes les positions
-        locations = await fetchLocations(token, {
-          ...countFilters,
-          limit: confirmed
-        });
-
-        // Filtrage JS par saison si source = saisonnalite
-        const hasSaisonnalite = periodes.some(p => p.source === 'saisonnalite' || p.source === 'saisonnalite_all');
-        if (hasSaisonnalite) {
-          const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
-          const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
-          if (jFrom && mFrom && jTo && mTo) {
-            const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
-            const toMD = parseInt(mTo) * 100 + parseInt(jTo);
-            const chevauche = fromMD > toMD;
-
-            locations = locations.filter(loc => {
-              const d = loc.loc_datetime_local || loc.loc_date_local;
-              if (!d) return false;
-              const date = new Date(d);
-              const mois = date.getMonth() + 1;
-              const jour = date.getDate();
-              const md = mois * 100 + jour;
-
-              if (chevauche) {
-                return md >= fromMD || md <= toMD;
-              } else {
-                return md >= fromMD && md <= toMD;
-              }
+          if (!toutesPositions && n) {
+            const nMap = new Map();
+            locations.forEach(l => {
+              const id = String(l.ani_id);
+              if (!nMap.has(id)) nMap.set(id, []);
+              nMap.get(id).push(l);
             });
+            locations = Array.from(nMap.values()).flatMap(locs =>
+              locs.sort((a, b) => {
+                const da = a.loc_datetime_local || a.loc_date_local || '';
+                const db = b.loc_datetime_local || b.loc_date_local || '';
+                return db < da ? -1 : db > da ? 1 : 0;
+              }).slice(0, n)
+            );
           }
         }
       }
@@ -367,22 +400,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
 
       // Rendu carte
       locations = enrichirLocations(locations);
-      const idsAffiches = new Set(locations.map(l => String(l.ani_id)));
-      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-        const checkbox = label.querySelector('input');
-        if (!checkbox) return;
-        const aniId = String(checkbox.value);
-        if (idsAffiches.has(aniId) && !checkbox.checked) {
-          checkbox.checked = true;
-          label.dataset.cocheAuto = 'true';
-          const nom = label.textContent.trim();
-          ajouterBadge(nom, () => {
-            checkbox.checked = false;
-            label.dataset.cocheAuto = 'false';
-          }, `ani-${aniId}`);
-        }
-        // Si déjà coché en mode init, ne pas reposer de badge
-      });
       clearTrajectoire();
       clearMapPoints();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
@@ -436,25 +453,11 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           .map(l => l.querySelector('input')?.value)
           .filter(Boolean);
       window._idsAChercherTraj = idsAChercher;
-      const idsAffiches = new Set(idsAChercher.map(String));
-      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-        const checkbox = label.querySelector('input');
-        if (!checkbox) return;
-        const aniId = String(checkbox.value);
-        if (idsAffiches.has(aniId) && !checkbox.checked) {
-          checkbox.checked = true;
-          label.dataset.cocheAuto = 'true';
-          const nom = label.textContent.trim();
-          ajouterBadge(nom, () => {
-            checkbox.checked = false;
-            label.dataset.cocheAuto = 'false';
-          }, `ani-${aniId}`);
-        }
-      });
 
       const inputNTraj = document.getElementById('inputNDernieres');
-      const nValTraj = nOverride !== null ? String(nOverride) : (document.getElementById('inputNDernieres')?.value || '25');
-      const toutesPositionsTraj = nValTraj === 'toutes';
+      const nModeToutesCheck = document.getElementById('nModeToutes');
+      const nValTraj = nOverride !== null ? String(nOverride) : (inputNTraj?.value || '25');
+      const toutesPositionsTraj = nValTraj === 'toutes' || nModeToutesCheck?.checked;
       const nTraj = toutesPositionsTraj ? null : (parseInt(nValTraj) || 25);
 
       if (!dateFromApi && !dateToApi && !toutesPositionsTraj) {
@@ -610,7 +613,7 @@ function correspondALaSaisonJS(date, saisons) {
 }
 
 export function decocherCochesAutomatiques() {
-  document.querySelectorAll('#listeIndividus .checkbox-label[data-coche-auto="true"], #listeIndividus .checkbox-label[data-coche-auto="init"]').forEach(label => {
+  document.querySelectorAll('#listeIndividus .checkbox-label[data-coche-auto="true"]').forEach(label => {
     const checkbox = label.querySelector('input');
     if (checkbox) checkbox.checked = false;
     label.dataset.cocheAuto = 'false';
