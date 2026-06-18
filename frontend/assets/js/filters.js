@@ -1,8 +1,7 @@
 import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations, fetchNDernieresLocalisations } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
-import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI } from './config.js';
-import { SAISONS_CONFIG } from './config.js';
+import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, SAISONS_CONFIG } from './config.js';
 import {
   getAnimals, getActiveIds, getCurrentToken, getProgrammationsMap,
   enrichirLocations, enrichirAnimauxAvecPositions,
@@ -10,7 +9,8 @@ import {
   lockSidebar, unlockSidebar,
   showToast, mettreAJourLegende,
   ajouterBadge, supprimerBadgeById, mettreAJourFiltresActifs,
-  mettreAJourSelectN, mettreAJourBoutonAppliquer
+  mettreAJourSelectN, mettreAJourBoutonAppliquer,
+  setDernierNPositions, setDernierNTrajectoire
 } from './app.js';
 
 export function getPeriodesActives() {
@@ -192,7 +192,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
               include_outliers: filters.include_outliers
             };
             const totalPositions = await fetchCountLocations(token, countFilters);
-            const SEUIL = 25000;
+            const SEUIL = SEUIL_ALERTE_VOLUME;
             let confirmed = 500000;
             if (totalPositions > SEUIL) {
               const modal = document.getElementById('modalVolume');
@@ -245,7 +245,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
             };
 
             const totalPositions = await fetchCountLocations(token, countFilters);
-            const SEUIL = 25000;
+            const SEUIL = SEUIL_ALERTE_VOLUME;
             let confirmed = 500000;
 
             if (totalPositions > SEUIL) {
@@ -287,8 +287,16 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
             .map(l => l.querySelector('input')?.value)
             .filter(Boolean);
 
-        if (!toutesPositions && n && !hasSaisonnalite) {
-          // N positions par animal — appel API direct avec contrainte de dates
+        const saisonnaliteExacte = hasSaisonnalite
+          && periodes.length === 1
+          && periodes[0].source === 'saisonnalite';
+
+        const saisonnaliteAllSansAnnee = hasSaisonnalite
+          && periodes.some(p => p.source === 'saisonnalite_all');
+
+        if (!toutesPositions && n && (!hasSaisonnalite || saisonnaliteExacte)) {
+          // Chemin A+C — API direct par animal, limit:n, dates exactes
+          // Couvre : periode dateFrom/dateTo ET saison+1annee precise
           const nPromises = idsAChercher.map(id =>
             fetchLocations(token, {
               ani_id: id,
@@ -299,6 +307,71 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
             })
           );
           locations = (await Promise.all(nPromises)).flat();
+
+          // Filtre JS saison en finition de precision si saisonnaliteExacte
+          if (saisonnaliteExacte) {
+            const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
+            const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
+            if (jFrom && mFrom && jTo && mTo) {
+              const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
+              const toMD = parseInt(mTo) * 100 + parseInt(jTo);
+              const chevauche = fromMD > toMD;
+              locations = locations.filter(loc => {
+                const d = loc.loc_datetime_local || loc.loc_date_local;
+                if (!d) return false;
+                const date = new Date(d);
+                const md = (date.getMonth() + 1) * 100 + date.getDate();
+                return chevauche ? (md >= fromMD || md <= toMD) : (md >= fromMD && md <= toMD);
+              });
+            }
+          }
+        } else if (!toutesPositions && n && saisonnaliteAllSansAnnee) {
+          // Chemin D — saisonnalite sans annee + N : requete par animal x par annee, limit:n chacune
+          // Evite le download massif sur toute la plage multi-annees
+          const saisonFromVal = document.getElementById('saisonFrom')?.value || '';
+          const saisonToVal = document.getElementById('saisonTo')?.value || '';
+          const [jFrom, mFrom] = saisonFromVal.split('/');
+          const [jTo, mTo] = saisonToVal.split('/');
+          const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
+          const toMD = parseInt(mTo) * 100 + parseInt(jTo);
+          const chevauche = fromMD > toMD;
+
+          const anneeOptions = (window._anneeOptions || []).map(Number).sort((a, b) => a - b);
+
+          // Une requete par animal x par annee avec les bornes exactes de la saison
+          const requetes = [];
+          idsAChercher.forEach(id => {
+            anneeOptions.forEach(a => {
+              const from = `${a}-${mFrom}-${jFrom}`;
+              const to = chevauche ? `${a + 1}-${mTo}-${jTo}` : `${a}-${mTo}-${jTo}`;
+              requetes.push(
+                fetchLocations(token, {
+                  ani_id: id,
+                  date_from: from,
+                  date_to: to,
+                  include_outliers: filters.include_outliers,
+                  limit: n
+                })
+              );
+            });
+          });
+
+          const resultats = (await Promise.all(requetes)).flat();
+
+          // Fusionner par animal et garder les N plus recentes toutes annees confondues
+          const parAnimal = new Map();
+          resultats.forEach(loc => {
+            const id = String(loc.ani_id);
+            if (!parAnimal.has(id)) parAnimal.set(id, []);
+            parAnimal.get(id).push(loc);
+          });
+          locations = Array.from(parAnimal.values()).flatMap(locs =>
+            locs.sort((a, b) => {
+              const da = a.loc_datetime_local || a.loc_date_local || '';
+              const db = b.loc_datetime_local || b.loc_date_local || '';
+              return db < da ? -1 : db > da ? 1 : 0;
+            }).slice(0, n)
+          );
         } else {
           const countFilters = {
             ani_id: idsAChercher,
@@ -308,7 +381,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           };
 
           const totalPositions = await fetchCountLocations(token, countFilters);
-          const SEUIL = 15000;
+          const SEUIL = SEUIL_ALERTE_VOLUME;
           let confirmed = 500000;
 
           if (totalPositions > SEUIL) {
@@ -398,6 +471,9 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       }
       if (suivisSeulement) locations = locations.filter(l => getActiveIds().has(Number(l.ani_id)));
 
+      if (toutesPositions) { setDernierNPositions('toutes'); }
+      else if (n) { setDernierNPositions(String(n)); }
+
       // Rendu carte
       locations = enrichirLocations(locations);
       clearTrajectoire();
@@ -460,10 +536,89 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const toutesPositionsTraj = nValTraj === 'toutes' || nModeToutesCheck?.checked;
       const nTraj = toutesPositionsTraj ? null : (parseInt(nValTraj) || 25);
 
+      const hasSaisonnaliteTraj = periodesT.some(p => p.source === 'saisonnalite' || p.source === 'saisonnalite_all');
+      const saisonnaliteExacteTraj = hasSaisonnaliteTraj && periodesT.length === 1 && periodesT[0].source === 'saisonnalite';
+      const saisonnaliteAllTraj = hasSaisonnaliteTraj && periodesT.some(p => p.source === 'saisonnalite_all');
+
       if (!dateFromApi && !dateToApi && !toutesPositionsTraj) {
-        // N dernières localisations par individu sans période — pas de COUNT ni modale
+        // Pas de periode — N dernieres localisations par individu, pas de COUNT ni modale
         locations = await fetchNDernieresLocalisations(token, idsAChercher, nTraj);
+
+      } else if (!toutesPositionsTraj && nTraj && (!hasSaisonnaliteTraj || saisonnaliteExacteTraj)) {
+        // Chemin A+C Trajectoire — periode simple ou saison+1annee + N
+        const nPromisesTraj = idsAChercher.map(id =>
+          fetchLocations(token, {
+            ani_id: id,
+            date_from: dateFromApi,
+            date_to: dateToApi,
+            include_outliers: false,
+            limit: nTraj
+          })
+        );
+        locations = (await Promise.all(nPromisesTraj)).flat();
+
+        if (saisonnaliteExacteTraj) {
+          const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
+          const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
+          if (jFrom && mFrom && jTo && mTo) {
+            const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
+            const toMD = parseInt(mTo) * 100 + parseInt(jTo);
+            const chevauche = fromMD > toMD;
+            locations = locations.filter(loc => {
+              const d = loc.loc_datetime_local || loc.loc_date_local;
+              if (!d) return false;
+              const date = new Date(d);
+              const md = (date.getMonth() + 1) * 100 + date.getDate();
+              return chevauche ? (md >= fromMD || md <= toMD) : (md >= fromMD && md <= toMD);
+            });
+          }
+        }
+
+      } else if (!toutesPositionsTraj && nTraj && saisonnaliteAllTraj) {
+        // Chemin D Trajectoire — saisonnalite sans annee + N : requete par animal x par annee, limit:n
+        const saisonFromVal = document.getElementById('saisonFrom')?.value || '';
+        const saisonToVal = document.getElementById('saisonTo')?.value || '';
+        const [jFrom, mFrom] = saisonFromVal.split('/');
+        const [jTo, mTo] = saisonToVal.split('/');
+        const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
+        const toMD = parseInt(mTo) * 100 + parseInt(jTo);
+        const chevauche = fromMD > toMD;
+        const anneeOptionsTraj = (window._anneeOptions || []).map(Number).sort((a, b) => a - b);
+
+        const requetesTraj = [];
+        idsAChercher.forEach(id => {
+          anneeOptionsTraj.forEach(a => {
+            const from = `${a}-${mFrom}-${jFrom}`;
+            const to = chevauche ? `${a + 1}-${mTo}-${jTo}` : `${a}-${mTo}-${jTo}`;
+            requetesTraj.push(
+              fetchLocations(token, {
+                ani_id: id,
+                date_from: from,
+                date_to: to,
+                include_outliers: false,
+                limit: nTraj
+              })
+            );
+          });
+        });
+
+        const resultatsTraj = (await Promise.all(requetesTraj)).flat();
+        const parAnimalTraj = new Map();
+        resultatsTraj.forEach(loc => {
+          const id = String(loc.ani_id);
+          if (!parAnimalTraj.has(id)) parAnimalTraj.set(id, []);
+          parAnimalTraj.get(id).push(loc);
+        });
+        locations = Array.from(parAnimalTraj.values()).flatMap(locs =>
+          locs.sort((a, b) => {
+            const da = a.loc_datetime_local || a.loc_date_local || '';
+            const db = b.loc_datetime_local || b.loc_date_local || '';
+            return db < da ? -1 : db > da ? 1 : 0;
+          }).slice(0, nTraj)
+        );
+
       } else {
+        // Chemin B Trajectoire — Toutes positions ou cas residuels
         const trajCountFilters = {
           ani_id: idsAChercher,
           date_from: dateFromApi,
@@ -472,10 +627,9 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         };
 
         const totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
-        const SEUIL = 25000;
         let confirmedTraj = 500000;
 
-        if (totalTrajPositions > SEUIL) {
+        if (totalTrajPositions > SEUIL_ALERTE_VOLUME) {
           const modal = document.getElementById('modalVolume');
           document.getElementById('modalVolumeCount').textContent = totalTrajPositions.toLocaleString('fr-FR');
 
@@ -505,6 +659,23 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           ...trajCountFilters,
           limit: confirmedTraj
         });
+
+        if (hasSaisonnaliteTraj) {
+          const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
+          const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
+          if (jFrom && mFrom && jTo && mTo) {
+            const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
+            const toMD = parseInt(mTo) * 100 + parseInt(jTo);
+            const chevauche = fromMD > toMD;
+            locations = locations.filter(loc => {
+              const d = loc.loc_datetime_local || loc.loc_date_local;
+              if (!d) return false;
+              const date = new Date(d);
+              const md = (date.getMonth() + 1) * 100 + date.getDate();
+              return chevauche ? (md >= fromMD || md <= toMD) : (md >= fromMD && md <= toMD);
+            });
+          }
+        }
       }
 
       // Outliers - requête séparée, inchangée
@@ -528,34 +699,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         }
       }
 
-      // Filtrage JS par mois/jour pour saisonnalite sans annee (coherence avec mode Positions)
-      const periodesT2 = getPeriodesActives();
-      const hasSaisonnaliteAll = periodesT2.some(p => p.source === 'saisonnalite_all');
-      if (hasSaisonnaliteAll) {
-        const saisonFromVal = document.getElementById('saisonFrom')?.value || '';
-        const saisonToVal = document.getElementById('saisonTo')?.value || '';
-        if (/^\d{2}\/\d{2}$/.test(saisonFromVal) && /^\d{2}\/\d{2}$/.test(saisonToVal)) {
-          const [jFrom, mFrom] = saisonFromVal.split('/');
-          const [jTo, mTo] = saisonToVal.split('/');
-          const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
-          const toMD = parseInt(mTo) * 100 + parseInt(jTo);
-          const chevauche = fromMD > toMD;
-
-          locations = locations.filter(loc => {
-            const d = loc.loc_datetime_local || loc.loc_date_local;
-            if (!d) return false;
-            const date = new Date(d);
-            const mois = date.getMonth() + 1;
-            const jour = date.getDate();
-            const md = mois * 100 + jour;
-            if (chevauche) {
-              return md >= fromMD || md <= toMD;
-            } else {
-              return md >= fromMD && md <= toMD;
-            }
-          });
-        }
-      }
+      if (toutesPositionsTraj) { setDernierNTrajectoire('toutes'); }
+      else if (nTraj) { setDernierNTrajectoire(String(nTraj)); }
 
       locations = enrichirLocations(locations);
       clearMapPoints();
