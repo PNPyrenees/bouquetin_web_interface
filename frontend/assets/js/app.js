@@ -25,7 +25,8 @@ let temporelInitialized = false;
 
 let _dernierNPositions = '5';
 let _dernierNTrajectoire = '25';
-let _selectionManuelleActive = false;
+let _nEstToutes = false;
+let _nModeManuel = false;
 
 export function getAnimals() { return animals; }
 export function getActiveIds() { return activeIds; }
@@ -156,40 +157,33 @@ function initSidebarRight() {
 function mettreAJourLabelN() {
   const inputN = document.getElementById('inputNDernieres');
   const labelN = document.getElementById('labelNDernieres');
-  if (!inputN || !labelN) return;
-  if (inputN.disabled) {
-    labelN.textContent = 'les positions';
-    return;
-  }
-  const val = inputN.value;
-  if (val === 'toutes') {
-    labelN.textContent = 'les positions';
-  } else {
-    const n = parseInt(val) || 1;
-    labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
-  }
+  if (!labelN) return;
+  const n = parseInt(inputN?.value) || 1;
+  labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
 }
 
-// Adapte les options de #inputNDernieres selon le mode (positions/trajectoire)
 function adapterSelectNPourMode(mode) {
   const inputN = document.getElementById('inputNDernieres');
+  const nModeToutes = document.getElementById('nModeToutes');
+  const nModeLimite = document.getElementById('nModeLimite');
   if (!inputN) return;
 
-  inputN.innerHTML = '';
-  [['1','1'],['5','5'],['10','10'],['15','15'],['20','20'],['25','25'],['50','50'],['toutes','Toutes']].forEach(([val, txt]) => {
-    const opt = document.createElement('option');
-    opt.value = val;
-    opt.textContent = txt;
-    inputN.appendChild(opt);
-  });
+  _nModeManuel = false;
+  const valeurCible = mode === 'trajectoire'
+    ? (_dernierNPositions === 'toutes' ? 'toutes' : _dernierNTrajectoire)
+    : _dernierNPositions;
 
-  const valeursValides = ['1', '5', '10', '15', '20', '25', '50', 'toutes'];
-
-  if (mode === 'trajectoire') {
-    const valeurCible = _dernierNPositions === 'toutes' ? 'toutes' : _dernierNTrajectoire;
-    inputN.value = valeursValides.includes(valeurCible) ? valeurCible : '25';
+  if (valeurCible === 'toutes') {
+    _nEstToutes = true;
+    if (nModeToutes) nModeToutes.checked = true;
+    if (nModeLimite) nModeLimite.checked = false;
+    inputN.disabled = false;
   } else {
-    inputN.value = valeursValides.includes(_dernierNPositions) ? _dernierNPositions : '5';
+    _nEstToutes = false;
+    if (nModeLimite) nModeLimite.checked = true;
+    if (nModeToutes) nModeToutes.checked = false;
+    inputN.disabled = false;
+    inputN.value = valeurCible || (mode === 'trajectoire' ? '25' : '5');
   }
   mettreAJourLabelN();
 }
@@ -508,23 +502,9 @@ async function startApp(token) {
           // Gestion du clic sur une checkbox d'individu
           checkbox.addEventListener('change', () => {
             if (!checkbox.checked) {
-              if (_selectionManuelleActive) {
-                // Mode selection manuelle — decocher uniquement cet individu
-                label.dataset.cocheAuto = 'false';
-                supprimerBadgeById(`ani-${ani.ani_id}`);
-              } else {
-                // Sortie de l'etat init — reset complet des coches auto
-                document.querySelectorAll('#listeIndividus .checkbox-label').forEach(lbl => {
-                  const cb = lbl.querySelector('input');
-                  if (!cb) return;
-                  cb.checked = false;
-                  lbl.dataset.cocheAuto = 'false';
-                  supprimerBadgeById(`ani-${cb.value}`);
-                });
-              }
+              label.dataset.cocheAuto = 'false';
+              supprimerBadgeById(`ani-${ani.ani_id}`);
             } else {
-              // Cochage manuel — activer le mode selection manuelle
-              _selectionManuelleActive = true;
               label.dataset.cocheAuto = 'false';
               ajouterBadge(ani.ani_nom, () => {
                 checkbox.checked = false;
@@ -780,23 +760,46 @@ async function startApp(token) {
       });
     }
 
-    // Listener sur le select N dernières localisations
+    // Listener sur le composant N dernières localisations
+    const nModeToutes = document.getElementById('nModeToutes');
+    const nModeLimite = document.getElementById('nModeLimite');
     const inputN = document.getElementById('inputNDernieres');
-    const labelN = document.getElementById('labelNDernieres');
+
+    nModeToutes?.addEventListener('change', () => {
+      if (!nModeToutes.checked) return;
+      _nEstToutes = true;
+      _nModeManuel = true;
+      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+      if (isTrajectoire) { _dernierNTrajectoire = 'toutes'; }
+      else { _dernierNPositions = 'toutes'; }
+      mettreAJourLabelN();
+      decocherCochesAutomatiques();
+      mettreAJourBoutonAppliquer();
+    });
+
+    nModeLimite?.addEventListener('change', () => {
+      if (!nModeLimite.checked) return;
+      _nEstToutes = false;
+      _nModeManuel = true;
+      inputN.disabled = false;
+      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+      const derniere = isTrajectoire ? _dernierNTrajectoire : _dernierNPositions;
+      if (derniere && derniere !== 'toutes') inputN.value = derniere;
+      mettreAJourLabelN();
+      mettreAJourBoutonAppliquer();
+    });
 
     if (inputN) {
-      inputN.addEventListener('change', () => {
-        const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-        if (isTrajectoire) {
-          _dernierNTrajectoire = inputN.value;
-          inputN.dataset.modifieEnTrajectoire = 'true';
-        } else {
-          _dernierNPositions = inputN.value;
-          inputN.dataset.modifieEnPositions = 'true';
+      inputN.addEventListener('input', () => {
+        const n = parseInt(inputN.value);
+        if (n >= 1) {
+          _nModeManuel = true;
+          const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+          if (isTrajectoire) { _dernierNTrajectoire = String(n); inputN.dataset.modifieEnTrajectoire = 'true'; }
+          else { _dernierNPositions = String(n); inputN.dataset.modifieEnPositions = 'true'; }
+          mettreAJourLabelN();
+          mettreAJourBoutonAppliquer();
         }
-        mettreAJourLabelN();
-        decocherCochesAutomatiques();
-        mettreAJourBoutonAppliquer();
       });
     }
 
@@ -812,18 +815,6 @@ async function startApp(token) {
 
     mettreAJourFiltresActifs();
     filtrerListeIndividus();
-
-    // Cocher tous les animaux suivis sans badge individuel
-    const idsActifsInit = getActiveIds();
-    document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-      if (label.dataset.sansGeom === 'true') return;
-      const checkbox = label.querySelector('input');
-      if (!checkbox) return;
-      if (idsActifsInit.has(Number(checkbox.value))) {
-        checkbox.checked = true;
-        label.dataset.cocheAuto = 'init';
-      }
-    });
 
     const btnApply = document.getElementById('btnApplyFilters');
     if (btnApply) {
@@ -923,20 +914,7 @@ async function startApp(token) {
       const btnTraj = document.getElementById('btnTrajectoire');
       if (btnPos && btnTraj) {
         btnPos.addEventListener('click', () => {
-          _selectionManuelleActive = false;
           decocherCochesAutomatiques();
-
-          // Restaurer coches initiales sans badges
-          const idsActifs = getActiveIds();
-          document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-            if (label.dataset.sansGeom === 'true') return;
-            const checkbox = label.querySelector('input');
-            if (!checkbox) return;
-            if (idsActifs.has(Number(checkbox.value))) {
-              checkbox.checked = true;
-              label.dataset.cocheAuto = 'init';
-            }
-          });
 
           const nCiblePos = _dernierNPositions;
 
@@ -1167,7 +1145,7 @@ export function hideMapLoading() {
 }
 
 export function lockSidebar() {
-  document.querySelectorAll('.sidebar-input, .sidebar-select, .checkbox-label input, input[name="statutCollier"], #checkSuivis, #searchIndividu, #btnApplyFilters, #btnResetFilters, #btnReinitialiser').forEach(el => {
+  document.querySelectorAll('.sidebar-input, .sidebar-select, .checkbox-label input:not(#inputNDernieres):not(#nModeToutes):not(#nModeLimite), input[name="statutCollier"], #checkSuivis, #searchIndividu, #btnApplyFilters, #btnResetFilters, #btnReinitialiser').forEach(el => {
     el.disabled = true;
     if (el.tomselect) el.tomselect.disable();
   });
@@ -1178,7 +1156,7 @@ export function lockSidebar() {
 }
 
 export function unlockSidebar() {
-  document.querySelectorAll('.sidebar-input, .sidebar-select, .checkbox-label input, input[name="statutCollier"], #checkSuivis, #searchIndividu, #btnApplyFilters, #btnResetFilters, #btnReinitialiser').forEach(el => {
+  document.querySelectorAll('.sidebar-input, .sidebar-select, .checkbox-label input:not(#inputNDernieres):not(#nModeToutes):not(#nModeLimite), input[name="statutCollier"], #checkSuivis, #searchIndividu, #btnApplyFilters, #btnResetFilters, #btnReinitialiser').forEach(el => {
     el.disabled = false;
     if (el.tomselect) el.tomselect.enable();
   });
@@ -1286,13 +1264,10 @@ export function mettreAJourFiltresActifs() {
 
 export function mettreAJourSelectN() {
   const inputN = document.getElementById('inputNDernieres');
+  const nModeToutes = document.getElementById('nModeToutes');
+  const nModeLimite = document.getElementById('nModeLimite');
   const labelN = document.getElementById('labelNDernieres');
   if (!inputN || !labelN) return;
-
-  const _selectAnneeN = document.getElementById('selectAnnee');
-  const _aDesAnneesN = _selectAnneeN?.tomselect
-    ? Object.values(_selectAnneeN.tomselect.items).map(item => typeof item === 'string' ? item : item?.value).filter(Boolean).length > 0
-    : !!_selectAnneeN?.value;
 
   const filtreActif =
     !!document.getElementById('selectSexe')?.value ||
@@ -1300,26 +1275,36 @@ export function mettreAJourSelectN() {
     !!document.getElementById('selectPopulation')?.value ||
     !!document.getElementById('selectClasseAge')?.value ||
     !!document.getElementById('selectProgrammation')?.value ||
-    _aDesAnneesN ||
+    !!(document.getElementById('selectAnnee')?.tomselect
+      ? Object.values(document.getElementById('selectAnnee').tomselect.items).filter(Boolean).length > 0
+      : document.getElementById('selectAnnee')?.value) ||
     !!(document.getElementById('dateFrom')?.value) ||
     !!(document.getElementById('dateTo')?.value) ||
     !!(document.getElementById('saisonFrom')?.value) ||
     !!(document.getElementById('saisonTo')?.value) ||
-    Array.from(document.querySelectorAll('#listeIndividus input:checked')).length > 0;
+    Array.from(document.querySelectorAll('#listeIndividus input:checked'))
+      .filter(cb => cb.closest('label')?.dataset.cocheAuto !== 'true')
+      .length > 0;
 
-  if (filtreActif) {
-    inputN.value = 'toutes';
-    inputN.disabled = true;
-    labelN.textContent = 'les positions';
-    _dernierNPositions = 'toutes';
-  } else {
+  if (filtreActif && !_nEstToutes && !_nModeManuel) {
+    // Auto-switch uniquement si l utilisateur n a pas choisi manuellement
+    _nEstToutes = true;
+    if (nModeToutes) nModeToutes.checked = true;
+    if (nModeLimite) nModeLimite.checked = false;
+    labelN.textContent = '';
+  } else if (!filtreActif && !_nEstToutes && !_nModeManuel) {
+    // Pas de filtre et utilisateur n a pas choisi Toutes — mode Limite
+    if (nModeLimite) nModeLimite.checked = true;
+    if (nModeToutes) nModeToutes.checked = false;
     inputN.disabled = false;
     const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
     const derniere = isTrajectoire ? _dernierNTrajectoire : _dernierNPositions;
-    const valeursValides = ['1', '5', '10', '15', '20', '25', '50', 'toutes'];
-    inputN.value = valeursValides.includes(derniere) ? derniere : (isTrajectoire ? '25' : '5');
+    if (derniere && derniere !== 'toutes') {
+      inputN.value = derniere;
+    }
     mettreAJourLabelN();
   }
+  // Si _nModeManuel = true → ne rien changer, respecter le choix utilisateur
 }
 
 export function mettreAJourBoutonAppliquer() {
@@ -1344,7 +1329,8 @@ export function mettreAJourBoutonAppliquer() {
     !!(document.getElementById('saisonTo')?.value) ||
     document.getElementById('checkAberrantes')?.checked ||
     Array.from(document.querySelectorAll('#listeIndividus input:checked'))
-      .some(cb => cb.closest('label')?.dataset.cocheAuto !== 'init') ||
+      .filter(cb => cb.closest('label')?.dataset.cocheAuto !== 'true')
+      .length > 0 ||
     (document.getElementById('inputNDernieres')?.dataset.modifieEnPositions === 'true' &&
       !document.getElementById('btnTrajectoire')?.classList.contains('active')) ||
     (document.getElementById('inputNDernieres')?.dataset.modifieEnTrajectoire === 'true' &&
@@ -1359,7 +1345,6 @@ let isResetting = false;
 async function reinitialiserTousLesFiltres() {
   if (isResetting) return;
   isResetting = true;
-  _selectionManuelleActive = false;
   viderCache();
 
   showMapLoading();
@@ -1422,10 +1407,14 @@ async function reinitialiserTousLesFiltres() {
     const checkSuivis = document.getElementById('checkSuivis');
     if (checkSuivis) checkSuivis.checked = true;
 
+    _nModeManuel = false;
+    _nEstToutes = false;
     _dernierNPositions = '5';
     _dernierNTrajectoire = '25';
 
     const inputNReinit = document.getElementById('inputNDernieres');
+    const nModeLimiteReinit = document.getElementById('nModeLimite');
+    const nModeToutesReinit = document.getElementById('nModeToutes');
     if (inputNReinit) {
       inputNReinit.value = '5';
       inputNReinit.disabled = false;
@@ -1434,6 +1423,8 @@ async function reinitialiserTousLesFiltres() {
       delete inputNReinit.dataset.valeurManuelle;
       delete inputNReinit.dataset.modifieParUtilisateur;
     }
+    if (nModeLimiteReinit) { nModeLimiteReinit.checked = true; nModeLimiteReinit.disabled = false; }
+    if (nModeToutesReinit) { nModeToutesReinit.checked = false; nModeToutesReinit.disabled = false; }
     const labelNReinit = document.getElementById('labelNDernieres');
     if (labelNReinit) labelNReinit.textContent = 'dernières positions';
 
@@ -1484,18 +1475,6 @@ async function reinitialiserTousLesFiltres() {
         mettreAJourLegende();
         setLabelDatetime('Dernière position');
         filtrerListeIndividus();
-
-        // Recocher tous les animaux suivis sans badge individuel
-        const idsActifsReset = new Set(locationsSuivies.map(l => l.ani_id));
-        document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-          if (label.dataset.sansGeom === 'true') return;
-          const checkbox = label.querySelector('input');
-          if (!checkbox) return;
-          if (idsActifsReset.has(Number(checkbox.value))) {
-            checkbox.checked = true;
-            label.dataset.cocheAuto = 'init';
-          }
-        });
       } catch (err) {
         console.error('Erreur reset map:', err);
       }
