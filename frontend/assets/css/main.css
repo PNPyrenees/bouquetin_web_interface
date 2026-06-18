@@ -660,22 +660,47 @@ select.sidebar-select {
   margin-top: 6px;
 }
 
-.spinbox-select {
-  width: auto;
-  height: 28px;
-  padding: 0 4px;
-  border: 1px solid var(--border-color, #ccc);
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-family: inherit;
-  background: white;
-  cursor: pointer;
-  color: var(--text-color, #333);
+.positions-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
 }
 
-.spinbox-select:disabled {
-  background: var(--color-disabled, #f5f5f5);
-  color: var(--text-muted, #999);
+.inputn-wrapper {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #9ab5ac;
+  border-radius: 4px;
+  background: white;
+  height: 24px;
+  margin: 0 6px;
+}
+
+.inputn-field {
+  width: 48px;
+  height: 100%;
+  border: none;
+  outline: none;
+  padding: 0 6px;
+  font-size: 13px;
+  font-family: inherit;
+  text-align: center;
+  background: transparent;
+  color: #1a3d2f;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.inputn-field::-webkit-outer-spin-button,
+.inputn-field::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.inputn-field:disabled {
+  background: #f0f0f0;
+  color: #aaa;
   cursor: not-allowed;
 }
 
@@ -870,6 +895,10 @@ input[type="checkbox"] {
   /* border-bottom: 1px solid #e0e0e0;
   margin-bottom: 4px; */
   letter-spacing: .08em;
+}
+
+#checkTousIndividus {
+  display: none;
 }
 
 #listeIndividus {
