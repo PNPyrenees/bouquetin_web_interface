@@ -373,18 +373,50 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
             }).slice(0, n)
           );
         } else {
-          const countFilters = {
-            ani_id: idsAChercher,
-            date_from: dateMin || null,
-            date_to: dateMax || null,
-            include_outliers: filters.include_outliers
-          };
+          let totalPositions;
+          let countFilters;
 
-          const totalPositions = await fetchCountLocations(token, countFilters);
-          const SEUIL = SEUIL_ALERTE_VOLUME;
+          if (hasSaisonnalite) {
+            // Compte exact par annee — somme de COUNT par tranche saisonniere, aucun download
+            const [jFromC, mFromC] = (document.getElementById('saisonFrom')?.value || '').split('/');
+            const [jToC, mToC] = (document.getElementById('saisonTo')?.value || '').split('/');
+            const fromMDC = parseInt(mFromC) * 100 + parseInt(jFromC);
+            const toMDC = parseInt(mToC) * 100 + parseInt(jToC);
+            const chevaucheC = fromMDC > toMDC;
+            const anneeOptionsCount = (window._anneeOptions || []).map(Number).sort((a, b) => a - b);
+
+            const countPromises = anneeOptionsCount.map(a => {
+              const from = `${a}-${mFromC}-${jFromC}`;
+              const to = chevaucheC ? `${a + 1}-${mToC}-${jToC}` : `${a}-${mToC}-${jToC}`;
+              return fetchCountLocations(token, {
+                ani_id: idsAChercher,
+                date_from: from,
+                date_to: to,
+                include_outliers: filters.include_outliers
+              });
+            });
+
+            const countsParAnnee = await Promise.all(countPromises);
+            totalPositions = countsParAnnee.reduce((sum, c) => sum + c, 0);
+
+            countFilters = {
+              ani_id: idsAChercher,
+              date_from: dateMin || null,
+              date_to: dateMax || null,
+              include_outliers: filters.include_outliers
+            };
+          } else {
+            countFilters = {
+              ani_id: idsAChercher,
+              date_from: dateMin || null,
+              date_to: dateMax || null,
+              include_outliers: filters.include_outliers
+            };
+            totalPositions = await fetchCountLocations(token, countFilters);
+          }
           let confirmed = 500000;
 
-          if (totalPositions > SEUIL) {
+          if (totalPositions > SEUIL_ALERTE_VOLUME) {
             const modal = document.getElementById('modalVolume');
             document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
             modal.style.display = 'flex';
@@ -403,10 +435,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
             }
           }
 
-          locations = await fetchLocations(token, {
-            ...countFilters,
-            limit: confirmed
-          });
+          locations = await fetchLocations(token, { ...countFilters, limit: confirmed });
 
           if (hasSaisonnalite) {
             const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
@@ -415,20 +444,12 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
               const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
               const toMD = parseInt(mTo) * 100 + parseInt(jTo);
               const chevauche = fromMD > toMD;
-
               locations = locations.filter(loc => {
                 const d = loc.loc_datetime_local || loc.loc_date_local;
                 if (!d) return false;
                 const date = new Date(d);
-                const mois = date.getMonth() + 1;
-                const jour = date.getDate();
-                const md = mois * 100 + jour;
-
-                if (chevauche) {
-                  return md >= fromMD || md <= toMD;
-                } else {
-                  return md >= fromMD && md <= toMD;
-                }
+                const md = (date.getMonth() + 1) * 100 + date.getDate();
+                return chevauche ? (md >= fromMD || md <= toMD) : (md >= fromMD && md <= toMD);
               });
             }
           }
@@ -807,7 +828,15 @@ export function filtrerListeIndividus() {
     label.dataset.masqueParDate = visible ? 'false' : 'true';
 
     const matchSearch = !searchVal || label.textContent.toLowerCase().includes(searchVal);
-    label.style.display = (visible && matchSearch) ? 'flex' : 'none';
+    const afficheFinal = visible && matchSearch;
+    label.style.display = afficheFinal ? 'flex' : 'none';
+
+    // Synchronisation — decocher les coches manuelles devenues invisibles
+    if (!afficheFinal && checkbox.checked && label.dataset.cocheAuto !== 'true') {
+      checkbox.checked = false;
+      label.dataset.cocheAuto = 'false';
+      supprimerBadgeById(`ani-${aniId}`);
+    }
   });
 }
 
@@ -894,7 +923,16 @@ function _appliquerFiltreListeAvecIds(idsAvecDonnees) {
 
     const visible = matchPeriode && matchSexe && matchGestionnaire && matchPopulation && matchClasse && matchSuivis && matchProgrammation;
     label.dataset.masqueParDate = visible ? 'false' : 'true';
-    label.style.display = (visible && (!searchVal || label.textContent.toLowerCase().includes(searchVal))) ? 'flex' : 'none';
+    const afficheFinal = visible && (!searchVal || label.textContent.toLowerCase().includes(searchVal));
+    label.style.display = afficheFinal ? 'flex' : 'none';
+
+    // Synchronisation — decocher les coches manuelles devenues invisibles
+    const aniId = checkbox.value;
+    if (!afficheFinal && checkbox.checked && label.dataset.cocheAuto !== 'true') {
+      checkbox.checked = false;
+      label.dataset.cocheAuto = 'false';
+      supprimerBadgeById(`ani-${aniId}`);
+    }
   });
 }
 
