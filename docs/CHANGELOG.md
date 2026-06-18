@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [0.30.0] - 2026-06-18
+
+### Ajouts
+- Selecteur N positions remplace par deux radios Toutes les positions / Limiter a N
+- Champ numerique libre pour N - plus de liste fixe predefinie
+- Flag _nModeManuel pour proteger le choix utilisateur contre les re-ecrasements async
+- Flag _nEstToutes pour memoriser l etat du mode positions
+- N respecte dans tous les cas de filtrage - API recoit directement limit=N
+
+### Modifications
+- Suppression du cochage automatique des individus apres applyFilters
+- Suppression des badges individuels automatiques apres applyFilters
+- Bouton Tout cocher masque
+- Individus decoches a l initialisation - seul le filtre Individus en cours de suivi est actif
+- Passage automatique a Toutes les positions lors de l ajout d un filtre - valeur par defaut non verrouillee
+- Selecteur multi-annees TomSelect avec chips et annees grisees
+- Option Toutes les annees dans le selecteur
+- Selecteur N unifie avec valeurs par defaut 5 Positions et 25 Trajectoire
+
+### Corrections
+- inputN.disabled retire de toutesPositions dans applyFilters - lockSidebar ne force plus Toutes
+- Branche filtreAttributaireActif respecte N via fetchLocations par animal avec limit=N
+- Branche periodes respecte N via fetchLocations par animal avec date_from/date_to/limit=N
+- Saison sans annee continue a utiliser le chemin complet avec filtre JS mois/jour
+- Badge annees affiche les vraies valeurs et non les indices TomSelect
+- Decocher un individu en selection manuelle ne decoche plus les autres
+- Correction clearTrajectoire manquant en mode Positions
+
 ## [0.29.0] - 2026-06-17
 
 ### Ajouts
