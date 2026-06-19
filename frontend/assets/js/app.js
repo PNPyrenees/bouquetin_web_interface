@@ -188,6 +188,7 @@ function adapterSelectNPourMode(mode) {
     inputN.value = valeurCible || (mode === 'trajectoire' ? '25' : '5');
   }
   mettreAJourLabelN();
+  _mettreAJourBadgeNPositions();
 }
 
 function gererExclusiviteTemporel(actif) {
@@ -299,6 +300,29 @@ function _mettreAJourBadgePeriode() {
   } else {
     gererExclusiviteTemporel(null);
   }
+}
+
+function _mettreAJourBadgeNPositions() {
+  const inputN = document.getElementById('inputNDernieres');
+  const nModeToutes = document.getElementById('nModeToutes');
+
+  supprimerBadgeById('nPositions');
+
+  if (nModeToutes?.checked) {
+    // Pas de badge en mode Toutes les positions
+    return;
+  }
+
+  const n = parseInt(inputN?.value) || 1;
+  const label = n === 1 ? `${n} dernière position` : `${n} dernières positions`;
+
+  ajouterBadge(label, () => {
+    // Suppression du badge = bascule sur Toutes les positions
+    if (nModeToutes) {
+      nModeToutes.checked = true;
+      nModeToutes.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }, 'nPositions');
 }
 
 /**
@@ -424,6 +448,7 @@ async function startApp(token) {
     const locationsSuivies = enrichirLocations(locationsN);
 
     adapterSelectNPourMode('positions');
+    _mettreAJourBadgeNPositions();
     const count = renderPoints(locationsSuivies);
     mettreAJourPanneau(locationsSuivies);
     const posEl = document.getElementById('positionsCount');
@@ -776,6 +801,7 @@ async function startApp(token) {
       mettreAJourLabelN();
       decocherCochesAutomatiques();
       mettreAJourBoutonAppliquer();
+      _mettreAJourBadgeNPositions();
     });
 
     nModeLimite?.addEventListener('change', () => {
@@ -788,6 +814,7 @@ async function startApp(token) {
       if (derniere && derniere !== 'toutes') inputN.value = derniere;
       mettreAJourLabelN();
       mettreAJourBoutonAppliquer();
+      _mettreAJourBadgeNPositions();
     });
 
     if (inputN) {
@@ -806,6 +833,7 @@ async function startApp(token) {
           // Ces variables ne sont mises a jour qu apres un applyFilters() reussi
           mettreAJourLabelN();
           mettreAJourBoutonAppliquer();
+          _mettreAJourBadgeNPositions();
         }
       });
     }
@@ -1417,6 +1445,7 @@ async function reinitialiserTousLesFiltres() {
     if (nModeToutesReinit) { nModeToutesReinit.checked = false; nModeToutesReinit.disabled = false; }
     const labelNReinit = document.getElementById('labelNDernieres');
     if (labelNReinit) labelNReinit.textContent = 'dernières positions';
+    _mettreAJourBadgeNPositions();
 
     // 9. Individus
     document.querySelectorAll('#listeIndividus input').forEach(cb => {
