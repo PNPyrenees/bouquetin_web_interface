@@ -146,6 +146,7 @@ export function initPanneau() {
             <option value="50">50</option>
             <option value="all">Tous</option>
           </select>
+          <span class="panel-individus-total"><strong>0</strong> individus</span>
         </div>
         <div class="panel-pagination-controls" id="panelIndividusPaginationControls">
           <span class="panel-page-info" id="panelIndividusPageInfo">Page 1 sur 0</span>
@@ -786,6 +787,9 @@ function rendrePaginationIndividus(total) {
   const nbPages = size > 0 ? Math.ceil(total / size) : 1;
   const pageInfo = document.getElementById('panelIndividusPageInfo');
   if (pageInfo) pageInfo.textContent = `Page ${pageCouranteIndividus} sur ${nbPages || 0}`;
+
+  const totalEl = document.querySelector('.panel-individus-total');
+  if (totalEl) totalEl.innerHTML = `<strong>${total}</strong> individus`;
 
   paginationControls.querySelectorAll('.panel-page-btn, .panel-page-dots').forEach(b => b.remove());
   if (nbPages <= 1) return;
