@@ -5,6 +5,10 @@
 ### Ajouts
 - Synchronisation automatique des individus selectionnes manuellement avec la liste filtree - decochage automatique si un individu sort des resultats du filtre
 - Synchronisation badge selecteur pour Sexe/Gestionnaire/Population/Classe d age/Programmation GPS - suppression du badge reinitialise le select TomSelect
+- Badge dynamique pour le filtre N positions - synchronise sur l etat DOM immediat
+- Badge absent en mode Toutes les positions
+- Suppression du badge N positions bascule automatiquement sur Toutes les positions
+- Badge N positions mis a jour a l initialisation, lors des changements de mode Positions/Trajectoire, et lors de la reinitialisation
 
 ### Modifications
 - reinitialiserTousLesFiltres() corrige l ordre d appel de adapterSelectNPourMode apres le reset des variables N
