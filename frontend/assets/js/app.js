@@ -188,7 +188,7 @@ function adapterSelectNPourMode(mode) {
     inputN.value = valeurCible || (mode === 'trajectoire' ? '25' : '5');
   }
   mettreAJourLabelN();
-  _mettreAJourBadgeNPositions();
+  mettreAJourBadgeNPositions();
 }
 
 function gererExclusiviteTemporel(actif) {
@@ -302,7 +302,7 @@ function _mettreAJourBadgePeriode() {
   }
 }
 
-function _mettreAJourBadgeNPositions() {
+export function mettreAJourBadgeNPositions() {
   const inputN = document.getElementById('inputNDernieres');
   const nModeToutes = document.getElementById('nModeToutes');
 
@@ -448,7 +448,7 @@ async function startApp(token) {
     const locationsSuivies = enrichirLocations(locationsN);
 
     adapterSelectNPourMode('positions');
-    _mettreAJourBadgeNPositions();
+    mettreAJourBadgeNPositions();
     const count = renderPoints(locationsSuivies);
     mettreAJourPanneau(locationsSuivies);
     const posEl = document.getElementById('positionsCount');
@@ -801,7 +801,6 @@ async function startApp(token) {
       mettreAJourLabelN();
       decocherCochesAutomatiques();
       mettreAJourBoutonAppliquer();
-      _mettreAJourBadgeNPositions();
     });
 
     nModeLimite?.addEventListener('change', () => {
@@ -814,7 +813,6 @@ async function startApp(token) {
       if (derniere && derniere !== 'toutes') inputN.value = derniere;
       mettreAJourLabelN();
       mettreAJourBoutonAppliquer();
-      _mettreAJourBadgeNPositions();
     });
 
     if (inputN) {
@@ -833,7 +831,6 @@ async function startApp(token) {
           // Ces variables ne sont mises a jour qu apres un applyFilters() reussi
           mettreAJourLabelN();
           mettreAJourBoutonAppliquer();
-          _mettreAJourBadgeNPositions();
         }
       });
     }
@@ -1445,7 +1442,7 @@ async function reinitialiserTousLesFiltres() {
     if (nModeToutesReinit) { nModeToutesReinit.checked = false; nModeToutesReinit.disabled = false; }
     const labelNReinit = document.getElementById('labelNDernieres');
     if (labelNReinit) labelNReinit.textContent = 'dernières positions';
-    _mettreAJourBadgeNPositions();
+    mettreAJourBadgeNPositions();
 
     // 9. Individus
     document.querySelectorAll('#listeIndividus input').forEach(cb => {
