@@ -10,7 +10,8 @@ import {
   showToast, mettreAJourLegende,
   ajouterBadge, supprimerBadgeById, mettreAJourFiltresActifs,
   mettreAJourSelectN, mettreAJourBoutonAppliquer,
-  setDernierNPositions, setDernierNTrajectoire
+  setDernierNPositions, setDernierNTrajectoire,
+  mettreAJourBadgeNPositions
 } from './app.js';
 
 export function getPeriodesActives() {
@@ -494,6 +495,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
 
       if (toutesPositions) { setDernierNPositions('toutes'); }
       else if (n) { setDernierNPositions(String(n)); }
+      mettreAJourBadgeNPositions();
 
       // Rendu carte
       locations = enrichirLocations(locations);
@@ -647,7 +649,36 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           include_outliers: false
         };
 
-        const totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
+        let totalTrajPositions;
+
+        if (hasSaisonnaliteTraj) {
+          // Compte exact par annee — somme de COUNT, aucun download
+          const saisonFromValTraj = document.getElementById('saisonFrom')?.value || '';
+          const saisonToValTraj = document.getElementById('saisonTo')?.value || '';
+          const [jFromT, mFromT] = saisonFromValTraj.split('/');
+          const [jToT, mToT] = saisonToValTraj.split('/');
+          const fromMDT = parseInt(mFromT) * 100 + parseInt(jFromT);
+          const toMDT = parseInt(mToT) * 100 + parseInt(jToT);
+          const chevaucheT = fromMDT > toMDT;
+          const anneeOptionsCountTraj = (window._anneeOptions || []).map(Number).sort((a, b) => a - b);
+
+          const countPromisesTraj = anneeOptionsCountTraj.map(a => {
+            const from = `${a}-${mFromT}-${jFromT}`;
+            const to = chevaucheT ? `${a + 1}-${mToT}-${jToT}` : `${a}-${mToT}-${jToT}`;
+            return fetchCountLocations(token, {
+              ani_id: idsAChercher,
+              date_from: from,
+              date_to: to,
+              include_outliers: false
+            });
+          });
+
+          const countsParAnneeTraj = await Promise.all(countPromisesTraj);
+          totalTrajPositions = countsParAnneeTraj.reduce((sum, c) => sum + c, 0);
+        } else {
+          totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
+        }
+
         let confirmedTraj = 500000;
 
         if (totalTrajPositions > SEUIL_ALERTE_VOLUME) {
@@ -722,6 +753,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
 
       if (toutesPositionsTraj) { setDernierNTrajectoire('toutes'); }
       else if (nTraj) { setDernierNTrajectoire(String(nTraj)); }
+      mettreAJourBadgeNPositions();
 
       locations = enrichirLocations(locations);
       clearMapPoints();
