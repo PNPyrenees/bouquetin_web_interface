@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.33.0] - 2026-06-19
+
+### Ajouts
+- Badge dynamique pour le filtre N positions, mis a jour uniquement apres un Appliquer reussi (pas immediatement sur les interactions UI)
+- mettreAJourBadgeNPositions() exportee depuis app.js et appelee dans applyFilters() apres chargement reussi
+- Compteur d individus distincts affiche dans l onglet Individus observes, a cote du selecteur de taille de page
+
+### Corrections
+- Compte exact saisonnalite replique en mode Trajectoire - alerte volumetrique affiche le compte reel apres filtre saison au lieu du compte brut multi-annees
+- Architecture a 4 chemins (A+C/D/B) desormais coherente entre mode Positions et mode Trajectoire pour le calcul du volume de donnees
+
 ## [0.32.0] - 2026-06-18
 
 ### Ajouts
