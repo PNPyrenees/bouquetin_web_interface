@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse, decocherCochesAutomatiques } from './filters.js';
 
@@ -957,6 +957,7 @@ async function startApp(token) {
               btnTraj.classList.remove('active');
               clearTrajectoire();
               setLabelDatetime('Dernière position');
+              mettreAJourLegende('positions'); // ← correction timing
             }
           });
         });
@@ -969,6 +970,7 @@ async function startApp(token) {
               btnTraj.classList.add('active');
               btnPos.classList.remove('active');
               setLabelDatetime('Date/Heure');
+              mettreAJourLegende('trajectoire'); // ← correction timing
               setTimeout(() => {
                 const ids = window._idsAChercherTraj || [];
                 if (ids.length === 0) return;
@@ -1650,11 +1652,14 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
  * MISE À JOUR DE LA LÉGENDE
  * Adapte la légende selon le mode d'affichage et de coloration.
  */
-export function mettreAJourLegende() {
+export function mettreAJourLegende(modeForce = null) {
   const contenu = document.getElementById('legendeContenu');
   if (!contenu) return;
 
-  const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+  // Utiliser modeForce si fourni, sinon lire le DOM comme avant
+  const isTrajectoire = modeForce !== null
+    ? modeForce === 'trajectoire'
+    : document.getElementById('btnTrajectoire')?.classList.contains('active');
   const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
 
   contenu.classList.toggle('legende-mode-trajectoire', isTrajectoire);
@@ -1665,27 +1670,74 @@ export function mettreAJourLegende() {
 
   const sectionCouleur = document.getElementById('legendeCouleur');
   const titreCouleur = document.getElementById('legendeCouleurTitre');
-  const pastille1 = document.getElementById('legendeCouleurPastille1');
-  const label1 = document.getElementById('legendeCouleurLabel1');
-  const pastille2 = document.getElementById('legendeCouleurPastille2');
-  const label2 = document.getElementById('legendeCouleurLabel2');
 
-  if (modeCouleur === 'sexe') {
+  if (modeCouleur === 'individu') {
+    // Retire liste existante si present
+    document.getElementById('legendeIndividusList')?.remove();
+    sectionCouleur?.classList.remove('visible');
+
+    const couleursMap = getCouleursIndividus();
+    if (couleursMap.size === 0) return;
+
+    const liste = document.createElement('div');
+    liste.id = 'legendeIndividusList';
+
+    const animalsData = getAnimals();
+
+    couleursMap.forEach((couleur, aniId) => {
+      const animal = animalsData.find(a => String(a.ani_id) === String(aniId));
+      const nom = animal?.ani_nom || `ID ${aniId}`;
+
+      const ligne = document.createElement('div');
+      ligne.className = 'legende-individu-ligne';
+
+      const idx = getIndicesIndividus().get(aniId) ?? 0;
+      const contour = getContourParIndex(idx);
+      const contourCss = `rgb(${contour.strokeR}, ${contour.strokeG}, ${contour.strokeB})`;
+
+      const pastille = document.createElement('span');
+      pastille.className = 'legende-individu-pastille';
+      pastille.style.background = couleur;
+      pastille.style.border = `2px solid ${contourCss}`;
+      pastille.style.width = '12px';
+      pastille.style.height = '12px';
+
+      const label = document.createElement('span');
+      label.className = 'legende-individu-label';
+      label.textContent = nom;
+
+      ligne.appendChild(pastille);
+      ligne.appendChild(label);
+      liste.appendChild(ligne);
+    });
+
+    contenu.appendChild(liste);
+
+  } else if (modeCouleur === 'sexe') {
+    document.getElementById('legendeIndividusList')?.remove();
     sectionCouleur?.classList.add('visible');
     if (titreCouleur) titreCouleur.textContent = 'Sexe';
+    const pastille1 = document.getElementById('legendeCouleurPastille1');
+    const label1 = document.getElementById('legendeCouleurLabel1');
+    const pastille2 = document.getElementById('legendeCouleurPastille2');
+    const label2 = document.getElementById('legendeCouleurLabel2');
     if (pastille1) pastille1.className = 'legende-pastille legende-pastille-male';
     if (label1) label1.textContent = 'Mâle';
     if (pastille2) pastille2.className = 'legende-pastille legende-pastille-femelle';
     if (label2) label2.textContent = 'Femelle';
+
   } else if (modeCouleur === 'gestionnaire') {
+    document.getElementById('legendeIndividusList')?.remove();
     sectionCouleur?.classList.add('visible');
     if (titreCouleur) titreCouleur.textContent = 'Gestionnaire';
+    const pastille1 = document.getElementById('legendeCouleurPastille1');
+    const label1 = document.getElementById('legendeCouleurLabel1');
+    const pastille2 = document.getElementById('legendeCouleurPastille2');
+    const label2 = document.getElementById('legendeCouleurLabel2');
     if (pastille1) pastille1.className = 'legende-pastille legende-pastille-pnp';
     if (label1) label1.textContent = 'PNP';
     if (pastille2) pastille2.className = 'legende-pastille legende-pastille-pnrpa';
     if (label2) label2.textContent = 'PNRPA';
-  } else {
-    sectionCouleur?.classList.remove('visible');
   }
 }
 // Calcule le nombre de localisations par jour à partir de la fréquence d'acquisition
