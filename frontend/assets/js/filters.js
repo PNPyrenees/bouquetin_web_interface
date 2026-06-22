@@ -514,7 +514,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       }
       const posEl = document.getElementById('positionsCount');
       if (posEl) posEl.textContent = count;
-      mettreAJourLegende();
+      mettreAJourLegende('positions');
       setLabelDatetime('Dernière position');
 
       setTimeout(() => {
@@ -772,7 +772,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
 
       const posEl = document.getElementById('positionsCount');
       if (posEl) posEl.textContent = count;
-      mettreAJourLegende();
+      mettreAJourLegende('trajectoire');
 
       setTimeout(() => {
         const extent = getGpsSource().getExtent();
