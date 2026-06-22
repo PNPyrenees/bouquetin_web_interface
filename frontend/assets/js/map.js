@@ -6,24 +6,77 @@ let popupOverlay;
 let basemaps = [];
 let isAnimating = false;
 
-const COULEURS_PALETTE = [
-  '#2D6A4F', '#E07B39', '#3A86FF', '#9B2335', '#8338EC',
-  '#FF006E', '#06D6A0', '#FB5607', '#FFBE0B', '#3D405B'
-];
-
 const couleursIndividus = new Map();
+const indicesIndividus = new Map();
 let _dateMin = null;
 let _dateMax = null;
+
+// Palette Glasbey 32 — conçue pour maximiser la distance perceptuelle
+// Source : Glasbey et al. (2007), utilisée en bioinformatique et cartographie SIG
+const GLASBEY_32 = [
+  '#0000FF', // 1  Bleu
+  '#FF0000', // 2  Rouge
+  '#00FF00', // 3  Vert
+  '#000033', // 4  Bleu nuit
+  '#FF00B6', // 5  Rose
+  '#005300', // 6  Vert fonce
+  '#FFD300', // 7  Jaune
+  '#009FFF', // 8  Bleu ciel
+  '#9A4D42', // 9  Marron
+  '#00FFBE', // 10 Turquoise
+  '#783FC1', // 11 Violet
+  '#1F9698', // 12 Teal
+  '#FFACFD', // 13 Rose clair
+  '#B1CC71', // 14 Vert-jaune
+  '#F1085C', // 15 Rouge-rose
+  '#FE8F42', // 16 Orange
+  '#DD00FF', // 17 Magenta
+  '#201A01', // 18 Noir-marron
+  '#720055', // 19 Bordeaux
+  '#766C95', // 20 Gris-violet
+  '#02AD24', // 21 Vert vif
+  '#C8FF00', // 22 Vert citron
+  '#886C00', // 23 Or fonce
+  '#FFB79F', // 24 Saumon
+  '#858567', // 25 Kaki
+  '#A10300', // 26 Rouge fonce
+  '#14F9FF', // 27 Cyan vif
+  '#00478E', // 28 Bleu marine
+  '#96F1FA', // 29 Bleu clair
+  '#65FF00', // 30 Vert lime
+  '#FF937E', // 31 Corail
+  '#CB0076', // 32 Framboise
+];
+
+// Contours variables — 4 styles pour differencier les individus avec couleurs proches
+const CONTOURS = [
+  { strokeR: 255, strokeG: 255, strokeB: 255, strokeA: 1, strokeWidth: 2 }, // Blanc
+  { strokeR: 0,   strokeG: 0,   strokeB: 0,   strokeA: 1, strokeWidth: 2 }, // Noir
+  { strokeR: 255, strokeG: 220, strokeB: 0,   strokeA: 1, strokeWidth: 2 }, // Jaune
+  { strokeR: 0,   strokeG: 200, strokeB: 255, strokeA: 1, strokeWidth: 2 }, // Cyan
+];
+
+function getCouleurParIndex(index) {
+  return GLASBEY_32[index % GLASBEY_32.length];
+}
+
+export function getContourParIndex(index) {
+  // Changer de contour tous les 32 individus (une palette complete)
+  return CONTOURS[Math.floor(index / GLASBEY_32.length) % CONTOURS.length];
+}
 
 /**
  * Analyse les données avant rendu pour initialiser les échelles de couleurs.
  */
 function preparerCouleurs(locations) {
   couleursIndividus.clear();
+  indicesIndividus.clear();
   const ids = [...new Set(locations.map(l => l.ani_id))];
   ids.forEach((id, i) => {
-    couleursIndividus.set(id, COULEURS_PALETTE[i % COULEURS_PALETTE.length]);
+    couleursIndividus.set(id, getCouleurParIndex(i));
+    indicesIndividus.set(id, i);
   });
+
 
   const dates = locations
     .map(l => new Date(l.loc_datetime_local || l.loc_date_local))
@@ -59,7 +112,7 @@ function getCouleur(loc, mode) {
   switch (mode) {
     case 'individu':
     default:
-      return couleursIndividus.get(loc.ani_id) || COULEURS_PALETTE[0];
+      return couleursIndividus.get(loc.ani_id) || getCouleurParIndex(0);
 
     // case 'date': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
     // case 'saison': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
@@ -302,10 +355,16 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
       strokeR = 255; strokeG = 255; strokeB = 255; strokeA = 1;
       strokeWidth = 1;
     } else {
+      // Mode Positions — contour variable selon l index de l individu
+      const idx = indicesIndividus.get(loc.ani_id) ?? 0;
+      const contour = getContourParIndex(idx);
       radius = 6;
       fillR = cR; fillG = cG; fillB = cB; fillA = cA;
-      strokeR = 255; strokeG = 255; strokeB = 255; strokeA = 1;
-      strokeWidth = 2;
+      strokeR = contour.strokeR;
+      strokeG = contour.strokeG;
+      strokeB = contour.strokeB;
+      strokeA = contour.strokeA;
+      strokeWidth = contour.strokeWidth;
     }
 
     const feature = new ol.Feature({
@@ -416,7 +475,7 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
       const dy = coordB[1] - coordA[1];
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < 800) continue;
+      if (dist < 100) continue;
 
       const rotation = Math.atan2(dy, dx) - Math.PI / 2;
       const midpoint = [(coordA[0] + coordB[0]) / 2, (coordA[1] + coordB[1]) / 2];
@@ -468,6 +527,8 @@ export function switchBasemap(index) {
 
 export function getMap() { return map; }
 export function getGpsSource() { return gpsSource; }
+export function getCouleursIndividus() { return couleursIndividus; }
+export function getIndicesIndividus() { return indicesIndividus; }
 
 export function highlightPoint(ani_id, actif) {
   const features = gpsSource.getFeatures();
