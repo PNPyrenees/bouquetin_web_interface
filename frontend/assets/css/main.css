@@ -1300,8 +1300,14 @@ input[type="checkbox"] {
 }
 
 /* Légende - visibilité par mode */
+/* Mode Position — masquer tous les elements de legendeMode */
 .legende-mode-positions .legende-item-depart,
-.legende-mode-positions .legende-item-direction { display: none; }
+.legende-mode-positions .legende-item-direction,
+.legende-mode-positions .legende-item-derniere,
+.legende-mode-positions .legende-item-positions { display: none; }
+
+/* Mode Trajectoire — masquer uniquement Derniere position */
+.legende-mode-trajectoire .legende-item-derniere { display: none; }
 
 /* Légende - couleurs pastilles */
 .legende-pastille-default { background: #2D6A4F; }
@@ -1309,6 +1315,57 @@ input[type="checkbox"] {
 .legende-pastille-femelle { background: #FF006E; }
 .legende-pastille-pnp     { background: #2D6A4F; }
 .legende-pastille-pnrpa   { background: #E07B39; }
+
+/* Légende - liste individus (mode couleur Individu) */
+#legendeIndividusList {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 6px;
+}
+
+#legendeIndividusList::-webkit-scrollbar {
+  width: 4px;
+}
+
+#legendeIndividusList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#legendeIndividusList::-webkit-scrollbar-thumb {
+  background: #9ab5ac;
+  border-radius: 2px;
+}
+
+.legende-individu-ligne {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.legende-individu-ligne:hover {
+  background: rgba(0,0,0,0.05);
+  border-radius: 3px;
+}
+
+.legende-individu-pastille {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+
+.legende-individu-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+  color: #1a3d2f;
+}
 
 /* Légende - flèche direction */
 .legende-fleche {
