@@ -1,5 +1,23 @@
 # CHANGELOG
 
+## [0.34.0] - 2026-06-20
+
+### Ajouts
+- Palette Glasbey 32 pour les couleurs individus - maximise la distance perceptuelle entre toutes les couleurs
+- Contours variables (blanc/noir/jaune/cyan) pour differencier les individus avec couleurs proches
+- Legende dynamique en mode Individu - liste scrollable des individus affiches avec pastille coloree et contour
+- getCouleursIndividus(), getIndicesIndividus(), getContourParIndex() exportes depuis map.js
+
+### Modifications
+- Fleches directionnelles trajectoire - seuil distance reduit de 800 a 100 pour plus de fleches visibles
+- Legende mode Position - section legendeMode masquee (Point de depart, Direction, Derniere position redondants)
+- Legende mode Trajectoire - Derniere position masquee, Point de depart/Direction affiches
+- Correction timing legende Position/Trajectoire - mettreAJourLegende() accepte modeForce en parametre
+- Taille des points mode Position reduite a 6
+
+### Corrections
+- Legende ne restait plus bloquee sur le mode precedent lors du changement Position/Trajectoire
+
 ## [0.33.0] - 2026-06-19
 
 ### Ajouts
