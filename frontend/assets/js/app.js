@@ -96,7 +96,7 @@ function initSidebarRight() {
   } else {
     mapScreen?.classList.remove('panel-open');
   }
-  setTimeout(() => updateMapSize(), 310);
+  updateMapSize();
 });
 
   const resizer = document.getElementById('sidebarRightResizer');
@@ -120,7 +120,7 @@ function initSidebarRight() {
       isResizing = false;
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      sidebarRight.style.transition = 'right 0.3s ease, width 0.3s ease';
+      sidebarRight.style.transition = 'none';
       sidebarRight.style.width = 'var(--panel-width)';
       sidebarRight.classList.remove('visible');
       const mapScreen = document.getElementById('mapScreen');
@@ -132,7 +132,7 @@ function initSidebarRight() {
       const icon = sidebarRightToggle?.querySelector('.toggle-icon');
       if (icon) icon.textContent = '‹';
       setPanneauFermeManuel(true);
-      setTimeout(() => updateMapSize(), 310);
+      updateMapSize();
       return;
     }
 
@@ -1155,10 +1155,7 @@ function initSidebarBadges(token) {
 
     panneau.classList.toggle('collapsed');
 
-    // Mettre à jour la taille de la carte après la transition
-    setTimeout(() => {
-      updateMapSize();
-    }, 310);
+    updateMapSize();
 
     if (panneau.classList.contains('collapsed')) {
       if (icon) icon.textContent = '‹'; // pointe vers la gauche pour déplier
@@ -1307,7 +1304,7 @@ function initToolbarCarte() {
     } else {
       if (headerBottom) headerBottom.style.marginLeft = '330px';
     }
-    setTimeout(() => updateMapSize(), 310);
+    updateMapSize();
   });
 
   document.getElementById('btnZoomIn')?.addEventListener('click', () => {
@@ -1622,10 +1619,7 @@ document.getElementById('sidebarToggle').addEventListener('click', function () {
 
   sidebar.classList.toggle('collapsed');
 
-  // On attend la fin de la transition CSS (0.3s) pour mettre à jour la taille de la carte
-  setTimeout(() => {
-    updateMapSize();
-  }, 310);
+  updateMapSize();
 
   if (sidebar.classList.contains('collapsed')) {
     if (icon) icon.textContent = '›';
