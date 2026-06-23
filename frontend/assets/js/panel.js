@@ -480,6 +480,12 @@ function rendrePage() {
 
   // Mettre à jour la pagination
   rendrePagination(total);
+
+  // Remonter le tableau en haut apres le changement de page
+  const tableWrapper = document.querySelector('.panel-table-wrapper');
+  if (tableWrapper) {
+    tableWrapper.scrollTop = 0;
+  }
 }
 
 function formaterDateLocalisation(valeur) {
