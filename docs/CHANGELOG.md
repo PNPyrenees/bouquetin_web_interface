@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.35.0] - 2026-06-23
+
+### Ajouts
+- Clic sur une ligne du tableau Localisations recentre la carte sur le point GPS correspondant
+- Ligne cliquee mise en surbrillance verte dans le tableau
+
+### Modifications
+- Onglet Donnees renomme en Localisations
+- Onglet Individus observes masque temporairement en attendant validation
+- Colonnes par defaut Localisations : Individu, Date de localisation, Population, Gestionnaire
+- Colonnes masquees par defaut : ID, Sexe, Altitude, Temp., DOP
+- Format date de localisation : JJ/MM/AAAA HH:MM au lieu du format ISO
+- ani_nom, ani_pop_rattach, ani_sexe, ani_gestionnaire ajoutes a colonnesDisponibles
+- Label 'Date de localisation' applique de facon coherente via setLabelDatetime() dans app.js et filters.js, remplace l ancien 'Derniere position'
+
 ## [0.34.0] - 2026-06-20
 
 ### Ajouts
