@@ -6,11 +6,15 @@
 
 // Définition de toutes les colonnes disponibles
 const colonnesDisponibles = [
-  { key: 'ani_id', label: 'ID', defaut: true },
-  { key: 'loc_datetime_local', label: 'Dernière position', defaut: true },
-  { key: 'loc_altitude_capteur', label: 'Altitude (m)', defaut: true },
-  { key: 'loc_temperature_capteur', label: 'Temp. (°C)', defaut: true },
-  { key: 'loc_dop', label: 'DOP', defaut: false }
+  { key: 'ani_nom',                 label: 'Individu',             defaut: true  },
+  { key: 'loc_datetime_local',      label: 'Date de localisation', defaut: true  },
+  { key: 'ani_pop_rattach',         label: 'Population',           defaut: true  },
+  { key: 'ani_gestionnaire',        label: 'Gestionnaire',         defaut: true  },
+  { key: 'ani_id',                  label: 'ID',                   defaut: false },
+  { key: 'ani_sexe',                label: 'Sexe',                 defaut: false },
+  { key: 'loc_altitude_capteur',    label: 'Altitude (m)',         defaut: false },
+  { key: 'loc_temperature_capteur', label: 'Temp. (°C)',           defaut: false },
+  { key: 'loc_dop',                 label: 'DOP',                  defaut: false }
 ];
 
 let colonnesActives = colonnesDisponibles
@@ -35,7 +39,7 @@ const colonnesIndividus = [
   { key: 'ani_gestionnaire',    label: 'Gestionnaire',      defaut: true  },
   { key: 'ani_annee_naissance', label: 'Année naissance',   defaut: false },
   { key: 'premiere_position',   label: 'Première position', defaut: false },
-  { key: 'derniere_position',   label: 'Dernière position', defaut: false },
+  { key: 'derniere_position',   label: 'Date de localisation', defaut: false },
   { key: 'ani_code',            label: 'Code',              defaut: false },
   { key: 'ani_date_relache',    label: 'Date lâcher',       defaut: false },
   { key: 'ani_date_mort',       label: 'Date mort',         defaut: false }
@@ -64,10 +68,10 @@ export function initPanneau() {
 
   sidebarRightBody.innerHTML = `
     <div class="panel-tabs">
-      <button class="panel-tab active" id="tabIndividus">Individus observés</button>
-      <button class="panel-tab" id="tabDonnees">Données</button>
+      <button class="panel-tab" id="tabIndividus" style="display:none">Individus observés</button>
+      <button class="panel-tab active" id="tabDonnees">Localisations</button>
     </div>
-    <div class="panel-tab-content" id="panelContentDonnees" style="display:none">
+    <div class="panel-tab-content" id="panelContentDonnees" style="display:flex">
       <div class="panel-toolbar">
         <div style="position:relative; margin-left:auto;">
           <button class="panel-btn-filtres" id="panelBtnFiltres">
@@ -110,7 +114,7 @@ export function initPanneau() {
         <span class="panel-positions-total"><strong>0</strong> positions totales</span>
       </div>
     </div>
-    <div class="panel-tab-content" id="panelContentIndividus" style="display:flex">
+    <div class="panel-tab-content" id="panelContentIndividus" style="display:none">
       <div class="panel-toolbar">
         <div style="position:relative; margin-left:auto;">
           <button class="panel-btn-filtres" id="panelBtnFiltresIndividus">
@@ -444,11 +448,27 @@ function rendrePage() {
     // tr.addEventListener('mouseenter', () => { ... window._highlightPoint(loc.ani_id, true) });
     // tr.addEventListener('mouseleave', () => { ... window._highlightPoint(loc.ani_id, false) });
 
+    tr.style.cursor = 'pointer';
     tr.addEventListener('click', () => {
       document.querySelectorAll('.panel-table-row.selected-carte').forEach(r => r.classList.remove('selected-carte'));
       tr.classList.add('selected-carte');
       aniIdSelectionne = String(loc.ani_id);
       if (window._afficherPositionsIndividu) window._afficherPositionsIndividu(loc.ani_id);
+
+      // Recentrer la carte sur ce point GPS precis
+      if (loc?.geom?.coordinates) {
+        const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
+        const coord = ol.proj.fromLonLat(wgs84);
+        window._getMap?.().getView().animate({
+          center: coord,
+          zoom: window._ZOOM_POINT_SINGLE || 14,
+          duration: 400
+        });
+      }
+
+      // Surligner la ligne selectionnee
+      document.querySelectorAll('.panel-table-row.selected-click').forEach(r => r.classList.remove('selected-click'));
+      tr.classList.add('selected-click');
     });
   });
 
@@ -462,6 +482,18 @@ function rendrePage() {
   rendrePagination(total);
 }
 
+function formaterDateLocalisation(valeur) {
+  if (!valeur) return '—';
+  const date = new Date(valeur);
+  if (isNaN(date)) return valeur;
+  const j = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const a = date.getFullYear();
+  const h = String(date.getHours()).padStart(2, '0');
+  const min = String(date.getMinutes()).padStart(2, '0');
+  return `${j}/${m}/${a} ${h}:${min}`;
+}
+
 function formaterValeur(key, valeur, loc = {}) {
   if (valeur === null || valeur === undefined) {
     if (key === 'loc_datetime_local' && loc.loc_date_local) {
@@ -473,7 +505,7 @@ function formaterValeur(key, valeur, loc = {}) {
 
   switch (key) {
     case 'loc_datetime_local':
-      return valeur.replace('T', ' ').slice(0, 16);
+      return formaterDateLocalisation(valeur);
     case 'loc_anomalie':
       return valeur === true ? '<span style="color:#e74c3c;font-weight:700">Oui</span>' : '—';
     case 'ani_sexe':
@@ -906,10 +938,10 @@ export function ouvrirPanneauSiNecessaire() {
   if (sidebarRight && !sidebarRight.classList.contains('visible')) {
     sidebarRight.classList.add('visible');
     if (icon) icon.textContent = '›';
-    document.getElementById('tabIndividus')?.classList.add('active');
-    document.getElementById('tabDonnees')?.classList.remove('active');
-    document.getElementById('panelContentIndividus').style.display = 'flex';
-    document.getElementById('panelContentDonnees').style.display = 'none';
+    document.getElementById('tabDonnees')?.classList.add('active');
+    document.getElementById('tabIndividus')?.classList.remove('active');
+    document.getElementById('panelContentDonnees').style.display = 'flex';
+    document.getElementById('panelContentIndividus').style.display = 'none';
   }
 }
 
