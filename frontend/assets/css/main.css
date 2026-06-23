@@ -427,6 +427,8 @@ header {
 
 .sidebar.collapsed {
   width: 0;
+  overflow: hidden;
+  border-right: none;
 }
 
 .sidebar-content {
@@ -766,22 +768,6 @@ input[type="checkbox"] {
   accent-color: var(--color-primary);
 }
 
-.btn-spatial {
-  width: 100%;
-  padding: 8px;
-  background: #f0f0f0;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-spatial:hover {
-  background: #e0e0e0;
-}
-
 .sidebar-footer {
   padding: 12px 16px 14px 16px;
   background: #f3f6f5;
@@ -861,6 +847,10 @@ input[type="checkbox"] {
 
 .sidebar-toggle:hover {
   background: #245a42;
+}
+
+#sidebarToggle {
+  display: none;
 }
 
 .toggle-text {
@@ -1100,85 +1090,133 @@ input[type="checkbox"] {
 
 #basemapSelector {
   position: absolute;
-  bottom: 56px;
-  right: 10px;
-  z-index: 100;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  transform: translateY(100%);
+  z-index: 900;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
+  pointer-events: none;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  width: 100%;
+}
+
+#basemapSelector.open {
+  transform: translateY(0);
+}
+
+/* Corps du panneau */
+#basemapPanel {
+  pointer-events: auto;
+  width: 100%;
+  background: #fafcfa;
+  box-shadow: 0 -3px 15px rgba(0,0,0,0.08);
+  padding: 12px 20px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.basemap-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding-left: 44px;
+}
+
+.basemap-panel-title {
+  font-family: var(--font-family);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  letter-spacing: 1px;
+}
+
+.basemap-carousel-container {
+  display: flex;
+  align-items: center;
+  position: relative;
+  width: 100%;
+  gap: 12px;
 }
 
 #basemapOptions {
   display: flex;
   flex-direction: row;
-  gap: 10px;
-  background: rgb(255, 255, 255);
-  border-radius: 3px;
-  padding: 10px;
-  box-shadow: 0 1px 6px rgba(0,0,0,0.15);
-  margin-right: 8px;
-  transform-origin: right center;
-  transform: scale(0);
-  opacity: 0;
-  pointer-events: none;
-  transition: transform 0.2s ease, opacity 0.2s ease;
-}
-
-#basemapOptions.open {
-  transform: scale(1);
-  opacity: 1;
-  pointer-events: all;
-}
-
-#basemapActive {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  width: 72px;
-}
-
-#basemapActive .basemap-card-img {
-  width: 64px;
-  height: 64px;
-  border-radius: 0;
-  overflow: hidden;
-  border: 2px solid var(--color-primary-hover);
-}
-
-#basemapActive .basemap-card-img img {
+  gap: 10px; /* Espace réduit entre les vignettes */
+  overflow-x: auto;
+  scroll-behavior: smooth;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+  padding: 4px 0;
+  scrollbar-width: none; /* Firefox */
 }
 
-#basemapActive span {
-  font-family: var(--font-family);
-  font-size: 11px;
-  font-weight: 600;
-  color: white;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
-  text-align: center;
+#basemapOptions::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
+/* Boutons de scroll circulaires */
+.basemap-scroll-btn {
+  background: #ffffff;
+  border: 1px solid #d2ddd8;
+  color: var(--color-primary);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: bold;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+  transition: all 0.2s ease;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.basemap-scroll-btn:hover {
+  background-color: var(--color-primary-hover);
+  color: #ffffff;
+  border-color: var(--color-primary-hover);
+}
+
+.basemap-scroll-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+  box-shadow: none;
+  background-color: #f0f0f0;
+  color: #aaa;
+  border-color: #d2ddd8;
+}
+
+/* Vignettes très lisibles */
 .basemap-card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   cursor: pointer;
-  width: 72px;
+  width: 160px;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.basemap-card:hover {
+  transform: translateY(-2px);
 }
 
 .basemap-card-img {
-  width: 64px;
-  height: 64px;
-  border-radius: 0;
+  width: 160px;
+  height: 110px;
+  border-radius: 4px;
   overflow: hidden;
-  border: 1px solid transparent;
-  transition: border-color 0.15s;
+  border: 1px solid #d2ddd8;
+  position: relative;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .basemap-card-img img {
@@ -1190,24 +1228,120 @@ input[type="checkbox"] {
 
 .basemap-card span {
   font-family: var(--font-family);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--color-text);
   text-align: center;
-  white-space: nowrap;
+  white-space: normal;
+  line-height: 1.2;
+  word-wrap: break-word;
+  max-width: 160px;
 }
 
+/* Vignette Active */
 .basemap-card.active .basemap-card-img {
-  border-color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.basemap-card.active span {
+  color: var(--color-primary-hover);
+  font-weight: 700;
+}
+
+/* Coche verte sur la vignette active */
+.basemap-card.active .basemap-card-img::after {
+  content: "✓";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
 }
 
 .basemap-card:hover .basemap-card-img {
-  border-color: #aaa;
+  border-color: var(--color-primary);
 }
 
-.basemap-card:hover span {
-  color: var(--color-text);
+/* Décalage de la légende lors de l'ouverture */
+.legende-wrapper {
+  transition: bottom 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
+
+#basemapSelector.open ~ .legende-wrapper,
+#mapScreen:has(#basemapSelector.open) .legende-wrapper {
+  bottom: 210px !important;
+}
+
+.map-toolbar {
+  position: absolute;
+  left: 10px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  overflow: hidden;
+}
+
+#toolbarOutils {
+  top: 10px;
+}
+
+.toolbar-btn {
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 400;
+  color: #666;
+  padding: 0;
+  border-radius: 0;
+  transition: background 0.15s;
+}
+
+.toolbar-btn:hover {
+  background: #f4f4f4;
+  color: #333;
+}
+
+.toolbar-btn img {
+  width: 16px;
+  height: 16px;
+  opacity: 0.6;
+  filter: invert(30%) sepia(10%) saturate(500%) hue-rotate(110deg);
+}
+
+.toolbar-btn.active img {
+  opacity: 1;
+  filter: invert(27%) sepia(50%) saturate(500%) hue-rotate(110deg) brightness(0.8);
+}
+
+.toolbar-btn.active {
+  background: #eef4f1;
+}
+
+/* Separateur entre boutons */
+.toolbar-btn + .toolbar-btn {
+  border-top: 1px solid #f0f0f0;
+}
+
 .ol-zoom-custom {
   position: absolute;
   top: 10px;
@@ -1377,41 +1511,6 @@ input[type="checkbox"] {
 .legende-section-couleur { display: none; }
 .legende-section-couleur.visible { display: block; }
 
-/* Boutons mode carte — bas droite */
-#modeButtons {
-  position: absolute;
-  bottom: 16px;
-  right: 10px;
-  display: flex;
-  flex-direction: row;
-  gap: 4px;
-  z-index: 100;
-}
-
-.mode-btn {
-  padding: 6px 14px;
-  background: white;
-  border: none;
-  border-radius: 1px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-  font-family: var(--font-family);
-  font-size: 13px;
-  font-weight: 600;
-  color: #666;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.mode-btn.active {
-  background: var(--color-primary-hover);
-  color: white;
-}
-
-.mode-btn:hover:not(.active) {
-  background: #f4f4f4;
-  color: #333;
-}
-
 .radio-couleur {
   display: inline-flex;
   align-items: center;
@@ -1557,10 +1656,14 @@ input[type="checkbox"] {
 .ol-fullscreen-custom {
   position: absolute;
   top: 10px;
-  right: 10px;
+  right: 44px;
   z-index: 100;
   bottom: auto;
   left: auto;
+}
+
+#mapScreen:has(.sidebar-right.visible) .ol-fullscreen-custom {
+  right: 10px;
 }
 
 .ol-fullscreen-custom button {
@@ -1582,6 +1685,14 @@ input[type="checkbox"] {
 
 .ol-fullscreen-custom button:hover {
   background: #f4f4f4;
+}
+
+#map .ol-attribution {
+  right: 44px;
+}
+
+#mapScreen:has(.sidebar-right.visible) #map .ol-attribution {
+  right: 8px;
 }
 
 #map:-webkit-full-screen {
