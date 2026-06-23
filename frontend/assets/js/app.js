@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations } from './api.js';
-import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG } from './config.js';
+import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse, decocherCochesAutomatiques } from './filters.js';
@@ -19,6 +19,7 @@ const programmationsMap = new Map(); // ani_id → prog_id
 let sidebarRightInitialized = false;
 let sidebarBadgesInitialized = false;
 let basemapInitialized = false;
+let toolbarCarteInitialized = false;
 let mapListenersInitialized = false;
 let mapInitialized = false;
 let temporelInitialized = false;
@@ -129,7 +130,7 @@ function initSidebarRight() {
         mapScreen.classList.remove('panel-open');
       }
       const icon = sidebarRightToggle?.querySelector('.toggle-icon');
-      if (icon) icon.textContent = '›';
+      if (icon) icon.textContent = '‹';
       setPanneauFermeManuel(true);
       setTimeout(() => updateMapSize(), 310);
       return;
@@ -860,6 +861,9 @@ async function startApp(token) {
     // Initialisation du sélecteur de fond de carte
     initBasemapSelector();
 
+    // Initialisation des boutons de la barre d'outils carte (zoom + filtre spatial)
+    initToolbarCarte();
+
     // TomSelect — initialisation au premier toggle de chaque details
     // Les selects natifs sont cachés via CSS (select.sidebar-select { display: none })
     // TomSelect injecte son propre widget au premier toggle
@@ -1210,40 +1214,131 @@ export function unlockSidebar() {
 function initBasemapSelector() {
   if (basemapInitialized) return;
   basemapInitialized = true;
-  const basemaps = [
-    { index: 0, nom: 'IGN SCAN25',    apercu: 'assets/img/ign.png' },
-    { index: 1, nom: 'OpenTopoMap',   apercu: 'assets/img/opentopomap.png' },
-    { index: 2, nom: 'OpenStreetMap', apercu: 'assets/img/openstreetmap.png' }
-  ];
 
-  const basemapActive = document.getElementById('basemapActive');
+  const basemapSelector = document.getElementById('basemapSelector');
   const basemapOptions = document.getElementById('basemapOptions');
-  const activeImg = document.getElementById('basemapActiveImg');
-  const activeLabel = document.getElementById('basemapActiveLabel');
+  const btnFondsCarte = document.getElementById('btnFondsCarte');
 
-  basemapActive?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    basemapOptions.classList.toggle('open');
-  });
-
-  document.querySelectorAll('.basemap-card').forEach(card => {
-    card.addEventListener('click', () => {
-      const index = parseInt(card.dataset.index);
-      const bm = basemaps[index];
-
-      activeImg.src = bm.apercu;
-      activeLabel.textContent = bm.nom;
-
-      document.querySelectorAll('.basemap-card').forEach(c => c.classList.remove('active'));
-      card.classList.add('active');
-
-      switchBasemap(index);
-      basemapOptions.classList.remove('open');
+  // Generer dynamiquement les cartes depuis BASEMAPS_CONFIG
+  if (basemapOptions) {
+    basemapOptions.innerHTML = '';
+    BASEMAPS_CONFIG.forEach((bm, index) => {
+      const card = document.createElement('div');
+      card.className = `basemap-card${bm.visible ? ' active' : ''}`;
+      card.dataset.index = index;
+      card.innerHTML = `
+        <div class="basemap-card-img">
+          <img src='${bm.apercu}' alt='${bm.nom}' onerror="this.style.display='none'">
+        </div>
+        <span>${bm.nom}</span>
+      `;
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.basemap-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        switchBasemap(index);
+      });
+      basemapOptions.appendChild(card);
     });
+  }
+
+  btnFondsCarte?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    basemapSelector?.classList.toggle('open');
+    basemapOptions?.classList.toggle('open', basemapSelector?.classList.contains('open'));
+    btnFondsCarte.classList.toggle('active', basemapSelector?.classList.contains('open'));
   });
 
-  document.addEventListener('click', () => {
-    basemapOptions.classList.remove('open');
+  // Gestion du défilement avec les boutons
+  const scrollLeftBtn = document.getElementById('basemapScrollLeft');
+  const scrollRightBtn = document.getElementById('basemapScrollRight');
+  
+  function updateScrollButtons() {
+    if (!basemapOptions || !scrollLeftBtn || !scrollRightBtn) return;
+    const scrollLeft = basemapOptions.scrollLeft;
+    const maxScroll = basemapOptions.scrollWidth - basemapOptions.clientWidth;
+    
+    scrollLeftBtn.disabled = (scrollLeft <= 1);
+    scrollRightBtn.disabled = (scrollLeft >= maxScroll - 1);
+  }
+
+  if (scrollLeftBtn && scrollRightBtn && basemapOptions) {
+    scrollLeftBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      basemapOptions.scrollBy({ left: -350, behavior: 'smooth' });
+    });
+    scrollRightBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      basemapOptions.scrollBy({ left: 350, behavior: 'smooth' });
+    });
+
+    basemapOptions.addEventListener('scroll', updateScrollButtons);
+    window.addEventListener('resize', updateScrollButtons);
+    
+    // Initialiser les boutons après le chargement des vignettes
+    setTimeout(updateScrollButtons, 100);
+  }
+
+  document.addEventListener('click', (e) => {
+    if (basemapSelector && !basemapSelector.contains(e.target) && !btnFondsCarte?.contains(e.target)) {
+      basemapOptions?.classList.remove('open');
+      basemapSelector?.classList.remove('open');
+      btnFondsCarte?.classList.remove('active');
+    }
+  });
+}
+
+function initToolbarCarte() {
+  if (toolbarCarteInitialized) return;
+  toolbarCarteInitialized = true;
+
+  document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
+    const sidebar = document.getElementById('sidebar');
+    const headerBottom = document.querySelector('.header-bottom');
+    const btn = document.getElementById('btnToggleSidebar');
+
+    sidebar.classList.toggle('collapsed');
+    const collapsed = sidebar.classList.contains('collapsed');
+
+    btn.classList.toggle('active', !collapsed);
+
+    if (collapsed) {
+      if (headerBottom) headerBottom.style.marginLeft = '0';
+    } else {
+      if (headerBottom) headerBottom.style.marginLeft = '330px';
+    }
+    setTimeout(() => updateMapSize(), 310);
+  });
+
+  document.getElementById('btnZoomIn')?.addEventListener('click', () => {
+    const view = getMap().getView();
+    view.animate({ zoom: view.getZoom() + 1, duration: 200 });
+  });
+
+  document.getElementById('btnZoomOut')?.addEventListener('click', () => {
+    const view = getMap().getView();
+    view.animate({ zoom: view.getZoom() - 1, duration: 200 });
+  });
+
+  document.getElementById('btnZoomReset')?.addEventListener('click', () => {
+    const extent = getGpsSource().getExtent();
+    if (extent && !ol.extent.isEmpty(extent)) {
+      getMap().getView().fit(extent, {
+        padding: [80, 80, 80, 80],
+        maxZoom: 13,
+        duration: 400
+      });
+    } else {
+      getMap().getView().animate({
+        center: ol.proj.fromLonLat([0.2, 42.9]),
+        zoom: 9,
+        duration: 400
+      });
+    }
+  });
+
+  document.getElementById('btnFiltreSpatial')?.addEventListener('click', () => {
+    showToast('Filtre spatial/fonctionnalité à venir');
   });
 }
 
@@ -1598,7 +1693,7 @@ async function deconnecter() {
       mapScreen.classList.remove('panel-open');
     }
     const toggleIcon = document.querySelector('#sidebarRightToggle .toggle-icon');
-    if (toggleIcon) toggleIcon.textContent = '›';
+    if (toggleIcon) toggleIcon.textContent = '‹';
     setPanneauFermeManuel(false);
   } finally {
     loginEnCours = false;
