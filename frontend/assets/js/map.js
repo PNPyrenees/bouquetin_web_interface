@@ -1,4 +1,4 @@
-import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY } from './config.js';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG } from './config.js';
 let map;
 let gpsSource;
 let trajectoireSource;
@@ -159,30 +159,28 @@ export function initMap(targetId, popupId) {
     source: trajectoireSource
   });
 
-  // Définition des fonds de carte
-  basemaps = [
-    // IGN SCAN25 - fond de carte topographique
-    new ol.layer.Tile({
-      source: new ol.source.XYZ({
-        url: `https://data.geopf.fr/private/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&apikey=${IGN_API_KEY}&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN25TOUR&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}`,
-        attributions: '©IGN'
-      }),
-      visible: false
-    }),
-    // OpenTopoMap
-    new ol.layer.Tile({
-      source: new ol.source.XYZ({
-        url: 'https://{a-c}.tile.opentopomap.org/{z}/{x}/{y}.png',
-        attributions: '© OpenTopoMap contributors'
-      }),
-      visible: false
-    }),
-    // OpenStreetMap
-    new ol.layer.Tile({
-      source: new ol.source.OSM(),
-      visible: true
-    })
-  ];
+  // Définition des fonds de carte (générés depuis BASEMAPS_CONFIG)
+  basemaps = BASEMAPS_CONFIG.map(bm => {
+    let source;
+    if (bm.type === 'osm') {
+      source = new ol.source.OSM();
+    } else if (bm.type === 'wms') {
+      source = new ol.source.TileWMS({
+        url: bm.url,
+        params: bm.wmsParams || {},
+        serverType: 'geoserver',
+        attributions: bm.attributions
+      });
+    } else {
+      source = new ol.source.XYZ({
+        url: bm.url.includes('IGN_API_KEY')
+          ? bm.url.replace('${IGN_API_KEY}', IGN_API_KEY)
+          : bm.url,
+        attributions: bm.attributions
+      });
+    }
+    return new ol.layer.Tile({ source, visible: bm.visible });
+  });
 
   // Préparation du popup (Overlay)
   const popupEl = document.getElementById(popupId);
@@ -207,8 +205,7 @@ export function initMap(targetId, popupId) {
       maxZoom: ZOOM_MAX_MANUAL,
       minZoom: ZOOM_MIN_MANUAL
     }),
-    controls: ol.control.defaults.defaults({ zoom: false }).extend([
-      new ol.control.Zoom({ className: 'ol-zoom-custom' }),
+    controls: ol.control.defaults.defaults({ zoom: false, rotate: false }).extend([
       new ol.control.ScaleLine({
         units: 'metric',
         type: 'scalebar',
@@ -216,14 +213,13 @@ export function initMap(targetId, popupId) {
         text: true,
         minWidth: 100,
         target: document.getElementById('scaleTarget')
+      }),
+      new ol.control.FullScreen({
+        className: 'ol-fullscreen-custom',
+        tipLabel: 'Plein écran'
       })
     ])
   });
-
-  const fullscreenControl = new ol.control.FullScreen({
-    className: 'ol-fullscreen-custom'
-  });
-  map.addControl(fullscreenControl);
 
   // Changement du curseur au survol d'un point
   map.on('pointermove', evt => {
