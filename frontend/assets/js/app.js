@@ -455,7 +455,7 @@ async function startApp(token) {
     if (posEl) posEl.textContent = count;
     mettreAJourIndividus(enrichirAnimauxAvecPositions(locationsSuivies));
     mettreAJourLegende();
-    setLabelDatetime('Dernière position');
+    setLabelDatetime('Date de localisation');
 
     // Peupler le select d'années depuis les positions disponibles
     const annees = [...new Set(
@@ -956,7 +956,7 @@ async function startApp(token) {
               btnPos.classList.add('active');
               btnTraj.classList.remove('active');
               clearTrajectoire();
-              setLabelDatetime('Dernière position');
+              setLabelDatetime('Date de localisation');
               mettreAJourLegende('positions'); // ← correction timing
             }
           });
@@ -1495,7 +1495,7 @@ async function reinitialiserTousLesFiltres() {
         const posEl = document.getElementById('positionsCount');
         if (posEl) posEl.textContent = count;
         mettreAJourLegende();
-        setLabelDatetime('Dernière position');
+        setLabelDatetime('Date de localisation');
         filtrerListeIndividus();
 
         setTimeout(() => {

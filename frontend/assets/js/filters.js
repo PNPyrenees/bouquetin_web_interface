@@ -515,7 +515,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const posEl = document.getElementById('positionsCount');
       if (posEl) posEl.textContent = count;
       mettreAJourLegende('positions');
-      setLabelDatetime('Dernière position');
+      setLabelDatetime('Date de localisation');
 
       setTimeout(() => {
         const extent = getGpsSource().getExtent();
