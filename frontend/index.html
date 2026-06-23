@@ -223,12 +223,6 @@
 
           </div>
         </details>
-        <details>
-          <summary>Filtre spatial</summary>
-          <div class="details-content">
-            <button class="btn-spatial">Dessiner un périmètre </button>
-          </div>
-        </details>
       </div>
       <div class="sidebar-symbologie">
           <div class="sidebar-symbologie-label">Symbologie</div>
@@ -253,37 +247,44 @@
       <div class="map-loading-spinner"></div>
       <span>Chargement des données...</span>
     </div>
-    <div id="map"></div>
-    <div id="modeButtons">
-      <button id="btnPositions" class="mode-btn active">Positions</button>
-      <button id="btnTrajectoire" class="mode-btn">Trajectoire</button>
+    <div id="map">
+      <div id="toolbarOutils" class="map-toolbar">
+        <button id="btnToggleSidebar" class="toolbar-btn active" title="Filtres de recherches">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M3 18h6v-2H3v2zm0-5h12v-2H3v2zm0-7v2h18V6H3z"/>
+          </svg>
+        </button>
+        <button id="btnZoomIn" class="toolbar-btn" title="Zoom avant">+</button>
+        <button id="btnZoomOut" class="toolbar-btn" title="Zoom arrière">−</button>
+        <button id="btnZoomReset" class="toolbar-btn" title="Recentrer">
+          <img src="assets/img/crosshairs-solid-full.svg" width="16" height="16" alt="Recentrer">
+        </button>
+        <button id="btnPositions" class="toolbar-btn toolbar-mode active" title="Positions">
+          <img src="assets/img/location-dot-solid-full.svg" width="16" height="16" alt="Positions">
+        </button>
+        <button id="btnTrajectoire" class="toolbar-btn toolbar-mode" title="Trajectoire">
+          <img src="assets/img/route-solid-full.svg" width="16" height="16" alt="Trajectoire">
+        </button>
+        <button id="btnFiltreSpatial" class="toolbar-btn" title="Filtre spatial">
+          <img src="assets/img/draw-polygon-solid-full.svg" width="16" height="16" alt="Filtre spatial">
+        </button>
+        <button id="btnFondsCarte" class="toolbar-btn" title="Fonds de carte">
+          <img src="assets/img/layer-group-solid-full.svg" width="16" height="16" alt="Fonds de carte">
+        </button>
+      </div>
     </div>
     <div id="basemapSelector">
-      <div id="basemapOptions">
-        <div class="basemap-card active" data-index="0">
-          <div class="basemap-card-img">
-            <img src="assets/img/ign.png" alt="Plan">
+      <div id="basemapPanel">
+        <div class="basemap-panel-header">
+          <span class="basemap-panel-title">FONDS DE CARTE</span>
+        </div>
+        <div class="basemap-carousel-container">
+          <button class="basemap-scroll-btn scroll-left" id="basemapScrollLeft" type="button">‹</button>
+          <div id="basemapOptions">
+            <!-- Dynamically populated cards -->
           </div>
-          <span>IGN SCAN25</span>
+          <button class="basemap-scroll-btn scroll-right" id="basemapScrollRight" type="button">›</button>
         </div>
-        <div class="basemap-card" data-index="1">
-          <div class="basemap-card-img">
-            <img src="assets/img/opentopomap.png" alt="Relief">
-          </div>
-          <span>OpenTopoMap</span>
-        </div>
-        <div class="basemap-card" data-index="2">
-          <div class="basemap-card-img">
-            <img src="assets/img/openstreetmap.png" alt="Standard">
-          </div>
-          <span>OpenStreetMap</span>
-        </div>
-      </div>
-      <div id="basemapActive">
-        <div class="basemap-card-img">
-          <img id="basemapActiveImg" src="assets/img/ign.png" alt="Plan">
-        </div>
-        <span id="basemapActiveLabel">Fond de carte</span>
       </div>
     </div>
     <div id="popup"></div>
@@ -342,9 +343,11 @@
     </div>
   </div>
   <aside class="sidebar-right" id="sidebarRight">
-    <button class="sidebar-right-toggle" id="sidebarRightToggle" title="Masquer/Afficher le panneau">
-      <span class="toggle-text">Données</span>
-      <span class="toggle-icon">›</span>
+    <button class="sidebar-right-toggle" id="sidebarRightToggle" title="Voir le tableau des localisations">
+      <span class="toggle-icon-circle">
+        <span class="toggle-icon">‹</span>
+      </span>
+      <span class="toggle-text">Voir le tableau des localisations</span>
     </button>
     <div class="sidebar-right-resizer" id="sidebarRightResizer"></div>
     <div class="sidebar-right-content">
