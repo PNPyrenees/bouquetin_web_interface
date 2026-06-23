@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.37.0] - 2026-06-23
+
+### Modifications
+- Scroll automatique en haut du tableau lors d un changement de page
+- Suppression de tous les delais d ouverture et fermeture des panneaux sidebar gauche et droite
+- Ouverture et fermeture instantanees des deux panneaux
+- Suppression des transitions CSS sur sidebar, sidebar-right et mapScreen
+- Suppression des setTimeout lies aux transitions de panneau dans app.js
+
 ## [0.36.0] - 2026-06-23
 
 ### Ajouts
