@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## [0.36.0] - 2026-06-23
+
+### Ajouts
+- Barre d outils verticale unifiee sur la carte - zoom, recentrer, positions, trajectoire, filtre spatial
+- Bouton toggle sidebar gauche integre dans la barre d outils (remplace l ancien toggle)
+- Icones SVG custom : location-dot, route, draw-polygon, crosshairs
+- Fonds de carte externalises dans config.js via BASEMAPS_CONFIG
+- Nouveaux fonds : Satellite ESRI, Topo ESRI, Photos aeriennes IGN, Carte topo IGN, Carte du relief IGN, IGN Espagne
+- Boutons zoom custom HTML remplacant les controles OpenLayers natifs
+- Bouton recentrer - recentre sur l emprise des donnees GPS
+
+### Modifications
+- Ancien toggle sidebar masque - remplace par le bouton dans la toolbar
+- Sidebar collapsed - border-right supprime pour eviter le trait residuel
+- Boutons Positions/Trajectoire deplaces de la barre du bas vers la toolbar verticale
+- Bouton Dessiner un perimetre retire de la sidebar
+- initToolbarCarte() - nouvelle fonction dediee aux listeners toolbar
+- Toggle sidebar droite (panneau attributaire) restyle - pleine hauteur, icone ronde
+
+### Corrections
+- Trait blanc residuel a la fermeture de la sidebar supprime
+
 ## [0.35.0] - 2026-06-23
 
 ### Ajouts
