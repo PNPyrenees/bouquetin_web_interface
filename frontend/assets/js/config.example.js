@@ -29,3 +29,90 @@ export const ROLE_INITIALES = {
   'role_lecture': 'LC',
   'role_ecriture': 'AD',
 };
+
+export const SEUIL_ALERTE_VOLUME = 15000;
+
+export const SAISONS_CONFIG = {
+  hiver:     { label: 'Hiver',     from: '01/01', to: '31/03' },
+  printemps: { label: 'Printemps', from: '01/04', to: '30/06' },
+  ete:       { label: 'Ete',       from: '01/07', to: '15/10' },
+  rut:       { label: 'Rut',       from: '16/10', to: '31/12' }
+};
+
+export const BASEMAPS_CONFIG = [
+  {
+    id: 'ign_scan25',
+    nom: 'IGN SCAN25',
+    apercu: 'assets/img/ign.png',
+    type: 'xyz',
+    url: `https://data.geopf.fr/private/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&apikey=${IGN_API_KEY}&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN25TOUR&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}`,
+    attributions: '©IGN',
+    visible: false
+  },
+  {
+    id: 'opentopomap',
+    nom: 'OpenTopoMap',
+    apercu: 'assets/img/opentopomap.png',
+    type: 'xyz',
+    url: 'https://{a-c}.tile.opentopomap.org/{z}/{x}/{y}.png',
+    attributions: '© OpenTopoMap contributors',
+    visible: false
+  },
+  {
+    id: 'openstreetmap',
+    nom: 'OpenStreetMap',
+    apercu: 'assets/img/openstreetmap.png',
+    type: 'osm',
+    url: null,
+    attributions: '© OpenStreetMap contributors',
+    visible: false
+  },
+  {
+    id: 'esri_satellite',
+    nom: 'Satellite ESRI',
+    apercu: 'assets/img/esri_satellite.png',
+    type: 'xyz',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attributions: '© Esri, Maxar, Earthstar Geographics',
+    visible: true
+  },
+  {
+    id: 'esri_topo',
+    nom: 'Topo ESRI',
+    apercu: 'assets/img/esri_topo.png',
+    type: 'xyz',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    attributions: '© Esri, HERE, DeLorme',
+    visible: false
+  },
+  
+  {
+    id: 'ign_ortho',
+    nom: 'Photos aériennes IGN',
+    apercu: 'assets/img/ign_ortho.png',
+    type: 'xyz',
+    url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+    attributions: '© IGN Géoportail',
+    visible: false
+  },
+  {
+  id: 'ign_topo',
+  nom: 'Carte topo IGN',
+  apercu: 'assets/img/ign_topo.png',
+  type: 'xyz',
+  url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+  attributions: '© IGN Géoportail',
+  visible: false
+  },
+  {
+    id: 'ign_relief',
+    nom: 'Carte du relief IGN',
+    apercu: 'assets/img/ign_relief.png',
+    type: 'xyz',
+    url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ELEVATION.ELEVATIONGRIDCOVERAGE.SHADOW&STYLE=estompage_grayscale&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+    attributions: '© IGN Géoportail',
+    visible: false
+  },
+
+
+];
