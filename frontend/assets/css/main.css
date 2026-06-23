@@ -1991,3 +1991,12 @@ select:has(+ .ts-wrapper) {
 .date-row .input-group label {
   margin-bottom: 4px;
 }
+
+.panel-table-row.selected-click {
+  background: #dde8e3 !important;
+  outline: none;
+}
+
+.panel-table-row {
+  cursor: pointer;
+}
