@@ -18,7 +18,7 @@ export const ZOOM_TRAJECTOIRE_MULTI = 12;
 export const ZOOM_MAX_MANUAL = 18;
 export const ZOOM_MIN_MANUAL = 6;
 
-export const IGN_API_KEY = 'ign_scan_ws';
+export const IGN_API_KEY = 'VOTRE_CLE_IGN';
 
 export const ROLE_LABELS = {
   'role_lecture': 'Lecteur',
@@ -31,6 +31,30 @@ export const ROLE_INITIALES = {
 };
 
 export const SEUIL_ALERTE_VOLUME = 15000;
+
+export const CLASSES_AGE = {
+  F: [
+    { label: 'Cabri',      min: 0, max: 0 },
+    { label: 'Éterle',     min: 1, max: 1 },
+    { label: '2 à 4 ans',  min: 2, max: 3 },
+    { label: '4 ans et +', min: 4, max: null }
+  ],
+  M: [
+    { label: 'Cabri',      min: 0, max: 0 },
+    { label: 'Éterlou',    min: 1, max: 1 },
+    { label: '2 à 3 ans',  min: 2, max: 3 },
+    { label: '4 à 8 ans',  min: 4, max: 7 },
+    { label: '8 ans et +', min: 8, max: null }
+  ],
+  TOUS: [
+    { label: 'Cabri',      min: 0, max: 0 },
+    { label: 'Éterle',     min: 1, max: 1 },
+    { label: 'Éterlou',    min: 1, max: 1 },
+    { label: '2 à 3 ans',  min: 2, max: 3 },
+    { label: '4 à 8 ans',  min: 4, max: 7 },
+    { label: '8 ans et +', min: 8, max: null }
+  ]
+};
 
 export const SAISONS_CONFIG = {
   hiver:     { label: 'Hiver',     from: '01/01', to: '31/03' },
