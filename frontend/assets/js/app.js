@@ -1,19 +1,17 @@
 import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations } from './api.js';
-import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG } from './config.js';
+import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
-import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasse, decocherCochesAutomatiques } from './filters.js';
+import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasseAge, decocherCochesAutomatiques } from './filters.js';
 
 /**
  * VARIABLES GLOBALES
  * 'animals' stockera la liste complète des individus pour le filtrage
- * 'anneeActuelle' sert de référence pour calculer l'âge des animaux
  */
 
 let animals = [];
 let activeIds = new Set();
 let currentToken = null;
-const anneeActuelle = new Date().getFullYear();
 const programmationsMap = new Map(); // ani_id → prog_id
 
 let sidebarRightInitialized = false;
@@ -505,10 +503,9 @@ async function startApp(token) {
           const label = document.createElement('label');
           label.className = 'checkbox-label';
 
-          // Calcul de la classe d'âge et stockage dans un attribut de données (dataset)
-          // Utilisé plus tard par la fonction filtrerIndividusParClasse
-          const age = anneeActuelle - (ani.ani_annee_naissance || anneeActuelle);
-          label.dataset.classe = getClasse(age);
+          // Classe d'âge à la capture, par sexe — stockée dans un attribut de données (dataset)
+          // Utilisée plus tard par la fonction filtrerListeIndividus
+          label.dataset.classe = getClasseAge(ani) || '';
           label.dataset.sexe = ani.ani_sexe || '';
           label.dataset.gestionnaire = ani.ani_gestionnaire || '';
           label.dataset.population = ani.ani_pop_rattach || '';
@@ -557,6 +554,9 @@ async function startApp(token) {
 
       listeIndividus.style.maxHeight = '300px';
       listeIndividus.style.overflowY = 'auto';
+
+      // Peupler les classes d age au demarrage
+      peuplerSelectClasseAge('TOUS');
 
       // Écouteur pour mettre à jour la liste des individus (masquer inactifs si coché)
       document.getElementById('checkSuivis')?.addEventListener('change', (e) => {
@@ -1041,6 +1041,41 @@ async function startApp(token) {
   }
 }
 
+function peuplerSelectClasseAge(sexe) {
+  const select = document.getElementById('selectClasseAge');
+  if (!select) return;
+
+  const classes = CLASSES_AGE[sexe] || CLASSES_AGE['TOUS'];
+  const valeurActuelle = select.tomselect
+    ? select.tomselect.getValue()
+    : select.value;
+
+  if (select.tomselect) {
+    select.tomselect.clearOptions();
+    select.tomselect.addOption({ value: '', text: 'Toutes les classes' });
+    classes.forEach(c => {
+      select.tomselect.addOption({ value: c.label, text: c.label });
+    });
+    select.tomselect.refreshOptions(false);
+    // Restaurer la valeur si elle existe encore dans les nouvelles options
+    const exists = classes.find(c => c.label === valeurActuelle);
+    if (exists) {
+      select.tomselect.setValue(valeurActuelle, true);
+    } else {
+      select.tomselect.setValue('', true);
+    }
+  } else {
+    select.innerHTML = '<option value="">Toutes les classes</option>';
+    classes.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.label;
+      opt.textContent = c.label;
+      select.appendChild(opt);
+    });
+    select.value = classes.find(c => c.label === valeurActuelle) ? valeurActuelle : '';
+  }
+}
+
 function initSidebarBadges(token) {
   if (sidebarBadgesInitialized) return;
   sidebarBadgesInitialized = true;
@@ -1098,6 +1133,17 @@ function initSidebarBadges(token) {
     });
   });
 
+  // Option B — classes d age dynamiques selon sexe
+  document.getElementById('selectSexe')?.addEventListener('change', () => {
+    const sexe = document.getElementById('selectSexe')?.tomselect
+      ? document.getElementById('selectSexe').tomselect.getValue()
+      : document.getElementById('selectSexe')?.value;
+    peuplerSelectClasseAge(sexe || 'TOUS');
+    // Remettre a zero le filtre classe age si la classe n existe plus
+    supprimerBadgeById('selectClasseAge');
+    mettreAJourListeParDate();
+    mettreAJourBoutonAppliquer();
+  });
 
   const btnResetBadges = document.getElementById('btnReinitialiser');
   if (btnResetBadges) btnResetBadges.addEventListener('click', () => reinitialiserTousLesFiltres());
@@ -1499,6 +1545,7 @@ async function reinitialiserTousLesFiltres() {
         }
       }
     });
+    peuplerSelectClasseAge('TOUS');
     // selectAnnee — mode multiple : clear() suffit, pas de setValue('')
     const selectAnneeReinit = document.getElementById('selectAnnee');
     if (selectAnneeReinit) {
