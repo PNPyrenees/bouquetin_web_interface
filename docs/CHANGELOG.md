@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.38.0] - 2026-06-24
+
+### Ajouts
+- Filtre Classe d age a la capture - Option A (liste fixe) et Option B (dynamique selon sexe)
+- CLASSES_AGE dans config.js - classes configurables par sexe (F/M/TOUS)
+- calculerAgeCapture() et getClasseAge() dans filters.js - calcul depuis ani_date_relache avec regle 1er mai
+- ani_date_relache ajoute au select= de fetchAnimals() dans api.js
+- peuplerSelectClasseAge() dans app.js - repeuple dynamiquement le select selon le sexe selectionne
+- Liste TOUS avec Eterle et Eterlou comme entrees separees
+
+### Corrections
+- Eterle et Eterlou separes dans la liste TOUS - matching exact avec dataset.classe
+- Suppression du suffixe (F)/(M) dans les labels du select
+- config.example.js mis a jour avec CLASSES_AGE, et IGN_API_KEY remplace par un placeholder
+
 ## [0.37.0] - 2026-06-23
 
 ### Modifications
