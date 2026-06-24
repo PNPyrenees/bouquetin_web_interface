@@ -121,7 +121,7 @@ export async function fetchLocations(token, filters = {}) {
 export async function fetchAnimals(token) {
   // On sélectionne uniquement les colonnes nécessaires pour alléger la réponse
   const res = await fetch(
-    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_annee_naissance,ani_sexe,ani_gestionnaire,ani_pop_rattach&order=ani_nom`,
+    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_annee_naissance,ani_date_relache,ani_sexe,ani_gestionnaire,ani_pop_rattach&order=ani_nom`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
