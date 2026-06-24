@@ -1,7 +1,7 @@
 import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations, fetchNDernieresLocalisations } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
-import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, SAISONS_CONFIG } from './config.js';
+import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, SAISONS_CONFIG, CLASSES_AGE } from './config.js';
 import {
   getAnimals, getActiveIds, getCurrentToken, getProgrammationsMap,
   enrichirLocations, enrichirAnimauxAvecPositions,
@@ -974,8 +974,24 @@ export function filtrerIndividusParSexe(sexe) { filtrerListeIndividus(); }
 export function filtrerIndividusParGestionnaire(gestionnaire) { filtrerListeIndividus(); }
 export function filtrerIndividusParPopulation(population) { filtrerListeIndividus(); }
 
-export function getClasse(age) {
-  if (age <= 1) return 'Cabri';
-  if (age <= 2) return 'Éterlou';
-  return 'Adulte';
+export function calculerAgeCapture(animal) {
+  if (!animal.ani_date_relache || !animal.ani_annee_naissance) return null;
+  const dateRelache = new Date(animal.ani_date_relache);
+  const mois = dateRelache.getMonth() + 1; // getMonth() retourne 0-11
+  const anneeRelache = dateRelache.getFullYear();
+  const age = mois < 5
+    ? anneeRelache - animal.ani_annee_naissance - 1
+    : anneeRelache - animal.ani_annee_naissance;
+  return age;
+}
+
+export function getClasseAge(animal) {
+  const age = calculerAgeCapture(animal);
+  if (age === null) return null;
+  const sexe = animal.ani_sexe || 'TOUS';
+  const classes = CLASSES_AGE[sexe] || CLASSES_AGE['TOUS'];
+  const classe = classes.find(c =>
+    age >= c.min && (c.max === null || age <= c.max)
+  );
+  return classe ? classe.label : null;
 }
