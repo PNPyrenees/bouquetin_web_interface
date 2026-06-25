@@ -1,6 +1,6 @@
-import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations } from './api.js';
+import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasseAge, decocherCochesAutomatiques } from './filters.js';
 
@@ -13,6 +13,7 @@ let animals = [];
 let activeIds = new Set();
 let currentToken = null;
 const programmationsMap = new Map(); // ani_id → prog_id
+let _aniCalendrier = new Map(); // ani_id -> Set(mois_jour 'MM-JJ') — index leger pour filtrage saison instantane
 
 let sidebarRightInitialized = false;
 let sidebarBadgesInitialized = false;
@@ -31,6 +32,7 @@ export function getAnimals() { return animals; }
 export function getActiveIds() { return activeIds; }
 export function getCurrentToken() { return currentToken; }
 export function getProgrammationsMap() { return programmationsMap; }
+export function getAniCalendrier() { return _aniCalendrier; }
 
 export function setAnimals(val) { animals = val; }
 export function setActiveIds(val) { activeIds = val; }
@@ -361,6 +363,7 @@ async function startApp(token) {
     window._highlightPoint = highlightPoint;
     window._zoomToPoint = zoomToPoint;
     window._getMap = getMap;
+    window._filtrerPointsCarte = filtrerPointsParVisibilite;
     window._getGpsFeatures = () => getGpsSource().getFeatures();
     window._ZOOM_POINT_SINGLE = ZOOM_POINT_SINGLE;
     window._afficherPositionsIndividu = (aniId) => {
@@ -429,11 +432,38 @@ async function startApp(token) {
     window._scrollToAniId = scrollToAniId;
     window._scrollToAniIdIndividus = scrollToAniIdIndividus;
     window._setAniIdSelectionne = setAniIdSelectionne;
+    window._showToast = showToast;
     // mettreAJourIndividus(animals);
+
+    // Export CSV — requete dedicee tous champs
+    document.getElementById('btnExportCSV')?.addEventListener('click', async () => {
+      const { exporterCSV } = await import('./panel.js');
+      // Recuperer les ani_id actuellement affiches sur la carte
+      const aniIds = [...new Set(
+        (window._getGpsFeatures?.() || [])
+          .filter(f => f.get('ani_id'))
+          .map(f => String(f.get('ani_id')))
+      )];
+
+      // Recuperer les params temporels actifs
+      const params = {
+        dateFrom: document.getElementById('dateFrom')?.value
+          ? _parseDateFR(document.getElementById('dateFrom').value)
+          : null,
+        dateTo: document.getElementById('dateTo')?.value
+          ? _parseDateFR(document.getElementById('dateTo').value)
+          : null
+      };
+
+      await exporterCSV(currentToken, aniIds, params);
+    });
 
     // Chargement initial via fetchAllLastLocations pour calculer activeIds et idsAvecGeom
     const locationsAll = await fetchAllLastLocations(currentToken);
     const locationsEnrichiesAll = enrichirLocations(locationsAll);
+
+    // Precharger l index leger ani_id -> Set(mois_jour) pour le filtrage saison instantane
+    _aniCalendrier = await fetchAniCalendrier(currentToken);
 
     // Calculer activeIds directement depuis les données - cor_date_fin null = actif
     setActiveIds(new Set(
@@ -488,8 +518,10 @@ async function startApp(token) {
     }
     window._anneeOptions = annees.map(String);
 
-    // Identifier tous les animaux qui ont au moins une géométrie
-    const idsAvecGeom = new Set(locationsAll.map(l => String(l.ani_id)));
+    // Identifier tous les animaux qui ont au moins une géométrie — sur tout l historique
+    // (v_localisation), pas seulement leur derniere position (v_animal_last_loc), pour ne pas
+    // exclure un animal inactif dont la derniere position n a pas de geom valide
+    const idsAvecGeom = await fetchAniIdsAvecGeom(currentToken);
 
     const listeIndividus = document.getElementById('listeIndividus');
     const searchIndividu = document.getElementById('searchIndividu');
@@ -1039,6 +1071,13 @@ async function startApp(token) {
       }
     }, 600); // 600ms pour laisser WebGL rendre les points avant de calculer l'emprise
   }
+}
+
+// Helper — convertit JJ/MM/AAAA en AAAA-MM-JJ pour PostgREST
+function _parseDateFR(dateStr) {
+  if (!dateStr || !/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return null;
+  const [j, m, a] = dateStr.split('/');
+  return `${a}-${m}-${j}`;
 }
 
 function peuplerSelectClasseAge(sexe) {
