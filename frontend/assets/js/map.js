@@ -81,8 +81,8 @@ function preparerCouleurs(locations) {
   const dates = locations
     .map(l => new Date(l.loc_datetime_local || l.loc_date_local))
     .filter(d => !isNaN(d));
-  _dateMin = dates.length > 0 ? Math.min(...dates) : null;
-  _dateMax = dates.length > 0 ? Math.max(...dates) : null;
+  _dateMin = dates.length > 0 ? dates.reduce((a, b) => a < b ? a : b) : null;
+  _dateMax = dates.length > 0 ? dates.reduce((a, b) => a > b ? a : b) : null;
 }
 
 /**
@@ -230,11 +230,13 @@ export function initMap(targetId, popupId) {
   map.on('singleclick', evt => {
     let hit = false;
     let aniId = null;
+    let locDatetime = null;
     // Utiliser layerFilter pour cibler directement la couche GPS
     map.forEachFeatureAtPixel(evt.pixel, feature => {
       if (hit) return;
       hit = true;
       aniId = String(feature.get('ani_id'));
+      locDatetime = feature.get('loc_datetime_local') || feature.get('loc_date_local');
       showPopup(feature, evt.coordinate, popupEl);
     }, {
       layerFilter: layer => layer === gpsLayer
@@ -247,12 +249,14 @@ export function initMap(targetId, popupId) {
 
     const panneauOuvert = document.getElementById('sidebarRight')?.classList.contains('visible');
     if (panneauOuvert && aniId) {
-      window._scrollToAniId?.(aniId);
+      window._scrollToAniId?.(aniId, locDatetime);
       window._scrollToAniIdIndividus?.(aniId);
 
       setTimeout(() => {
-        document.querySelectorAll(`.panel-table-row[data-ani-id='${aniId}']`).forEach(tr => {
-          tr.classList.add('selected-carte');
+        document.querySelectorAll('.panel-table-row').forEach(tr => {
+          if (tr.dataset.aniId === aniId && (!locDatetime || tr.dataset.locDatetime === locDatetime)) {
+            tr.classList.add('selected-carte');
+          }
         });
       }, 50);
       window._setAniIdSelectionne?.(aniId);
@@ -453,6 +457,7 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
     const couleur = getCouleur(points[0].loc, modeCouleur);
 
     const ligne = new ol.Feature({ geometry: new ol.geom.LineString(coords) });
+    ligne.set('ani_id', ani_id);
     ligne.setStyle(new ol.style.Style({
       stroke: new ol.style.Stroke({
         color: couleur,
@@ -477,6 +482,7 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
       const midpoint = [(coordA[0] + coordB[0]) / 2, (coordA[1] + coordB[1]) / 2];
 
       const fleche = new ol.Feature({ geometry: new ol.geom.Point(midpoint) });
+      fleche.set('ani_id', ani_id);
       fleche.setStyle(new ol.style.Style({
         image: new ol.style.RegularShape({
           points: 3,
@@ -525,6 +531,71 @@ export function getMap() { return map; }
 export function getGpsSource() { return gpsSource; }
 export function getCouleursIndividus() { return couleursIndividus; }
 export function getIndicesIndividus() { return indicesIndividus; }
+
+/**
+ * Masque/affiche les points GPS selon les lignes visibles dans le tableau Localisations.
+ * @param {Set<string>|null} visiblesSet - cles 'ani_id__datetime' visibles, ou null pour tout restaurer
+ */
+export function filtrerPointsParVisibilite(visiblesSet) {
+  const features = gpsSource.getFeatures();
+  features.forEach(f => {
+    if (visiblesSet === null) {
+      if (f.get('_fillAOriginal') !== undefined) {
+        f.set('fillA', f.get('_fillAOriginal'));
+        f.set('strokeA', f.get('_strokeAOriginal'));
+      }
+      return;
+    }
+    const key = `${f.get('ani_id')}__${f.get('loc_datetime_local') || f.get('loc_date_local')}`;
+    const visible = visiblesSet.has(key);
+    if (f.get('_fillAOriginal') === undefined) {
+      f.set('_fillAOriginal', f.get('fillA'));
+      f.set('_strokeAOriginal', f.get('strokeA'));
+    }
+    f.set('fillA', visible ? f.get('_fillAOriginal') : 0);
+    f.set('strokeA', visible ? f.get('_strokeAOriginal') : 0);
+  });
+
+  // Filtrer les lignes et fleches de trajectoire (trajectoireSource, distinct de gpsSource)
+  const trajFeatures = trajectoireSource?.getFeatures() || [];
+
+  const aniIdsVisibles = visiblesSet === null
+    ? null
+    : new Set([...visiblesSet].map(k => k.split('__')[0]));
+
+  trajFeatures.forEach(f => {
+    const geom = f.getGeometry();
+    const style = f.getStyle();
+    if (!style) return;
+
+    const aniId = String(f.get('ani_id') || '');
+
+    if (visiblesSet === null) {
+      if (f.get('_styleOriginal')) {
+        f.setStyle(f.get('_styleOriginal'));
+      }
+      return;
+    }
+
+    // Sauvegarder style original si pas encore fait
+    if (!f.get('_styleOriginal')) {
+      f.set('_styleOriginal', style);
+    }
+
+    const visible = !aniId || aniIdsVisibles?.has(aniId);
+    if (!visible) {
+      if (geom?.getType() === 'LineString') {
+        f.setStyle(new ol.style.Style({
+          stroke: new ol.style.Stroke({ color: 'rgba(0,0,0,0)', width: 0 })
+        }));
+      } else {
+        f.setStyle(new ol.style.Style({}));
+      }
+    } else {
+      f.setStyle(f.get('_styleOriginal'));
+    }
+  });
+}
 
 export function highlightPoint(ani_id, actif) {
   const features = gpsSource.getFeatures();
