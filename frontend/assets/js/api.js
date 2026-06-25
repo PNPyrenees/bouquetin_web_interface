@@ -93,9 +93,22 @@ export async function fetchLocations(token, filters = {}) {
     params.append('or', '(loc_outlier.not.is.null,loc_anomalie.eq.true)');
   }
 
+  // Filtrage saisonnier direct via loc_mois_jour_local (format 'MM-JJ')
+  if (filters.saisonFrom && filters.saisonTo) {
+    const chevauchante = filters.saisonFrom > filters.saisonTo; // ex: '11-01' > '02-28'
+    if (chevauchante) {
+      // Saison a cheval — ex: nov → fev
+      params.append('or', `(loc_mois_jour_local.gte.${filters.saisonFrom},loc_mois_jour_local.lte.${filters.saisonTo})`);
+    } else {
+      // Saison simple — ex: mars → sept
+      params.append('loc_mois_jour_local', `gte.${filters.saisonFrom}`);
+      params.append('loc_mois_jour_local', `lte.${filters.saisonTo}`);
+    }
+  }
+
   // On s'assure de n'avoir que des données possédant une géométrie valide
   params.append('geom', 'not.is.null');
-  
+
   // Paramètres de pagination et de tri
   params.append('limit', filters.limit || DEFAULT_LIMIT);
   params.append('order', 'loc_datetime_local.desc');
@@ -113,6 +126,54 @@ export async function fetchLocations(token, filters = {}) {
     _setCache(cle, data);
   }
   return data;
+}
+
+/**
+ * Récupère tous les champs de v_localisation pour l'export CSV — sans limit,
+ * indépendant de la pagination et des filtres colonnes du tableau.
+ * @param {string} token - Jeton JWT pour l'autorisation
+ * @param {Array<string>} aniIds - Identifiants des animaux à exporter
+ * @param {Object} params - Filtres temporels optionnels (dateFrom, dateTo au format AAAA-MM-JJ)
+ */
+export async function fetchLocationsExportCSV(token, aniIds, params = {}) {
+  if (!aniIds || aniIds.length === 0) return [];
+
+  const CHAMPS_EXPORT = [
+    'loc_id', 'ani_id', 'ani_code', 'ani_nom', 'ani_sexe',
+    'ani_pop_rattach', 'ani_date_relache', 'ani_gestionnaire',
+    'capt_id', 'capt_actif', 'capt_frequence', 'capt_constructeur', 'capt_id_constructeur',
+    'loc_dop', 'fix_status_label', 'loc_nb_satellites', 'loc_outlier', 'loc_anomalie',
+    'loc_altitude_capteur', 'loc_temperature_capteur',
+    'loc_datetime_utc', 'loc_datetime_local', 'loc_date_local',
+    'loc_mois_jour_local', 'loc_commentaire'
+    // geom exclu volontairement — pas utile dans un CSV tabulaire
+  ].join(',');
+
+  const batchSize = 50;
+  const results = [];
+
+  for (let i = 0; i < aniIds.length; i += batchSize) {
+    const batch = aniIds.slice(i, i + batchSize);
+    const idsParam = `ani_id=in.(${batch.join(',')})`;
+
+    let url = `${API_URL}/v_localisation?${idsParam}&select=${CHAMPS_EXPORT}&loc_anomalie=not.is.true&loc_outlier=is.null&order=ani_nom.asc,loc_datetime_local.desc`;
+
+    // Appliquer les filtres temporels si presents
+    if (params.dateFrom) url += `&loc_datetime_local=gte.${params.dateFrom}`;
+    if (params.dateTo) url += `&loc_datetime_local=lte.${params.dateTo}`;
+
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin'
+      }
+    });
+    if (!res.ok) throw new Error(`Export CSV fetch error: ${res.status}`);
+    const data = await res.json();
+    results.push(...data);
+  }
+
+  return results;
 }
 
 /**
@@ -324,6 +385,17 @@ export async function fetchAnimalIdsParPeriode(token, filters = {}) {
   if (filters.date_from) params.append('loc_datetime_local', `gte.${filters.date_from}`);
   if (filters.date_to) params.append('loc_datetime_local', `lte.${filters.date_to}`);
 
+  // Filtrage saisonnier direct via loc_mois_jour_local (format 'MM-JJ')
+  if (filters.saisonFrom && filters.saisonTo) {
+    const chevauchante = filters.saisonFrom > filters.saisonTo;
+    if (chevauchante) {
+      params.append('or', `(loc_mois_jour_local.gte.${filters.saisonFrom},loc_mois_jour_local.lte.${filters.saisonTo})`);
+    } else {
+      params.append('loc_mois_jour_local', `gte.${filters.saisonFrom}`);
+      params.append('loc_mois_jour_local', `lte.${filters.saisonTo}`);
+    }
+  }
+
   const res = await fetch(`${API_URL}/v_localisation?${params.toString()}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -356,6 +428,17 @@ export async function fetchCountLocations(token, filters = {}) {
   if (!filters.include_outliers) {
     params.append('loc_anomalie', 'not.is.true');
     params.append('loc_outlier', 'is.null');
+  }
+
+  // Filtrage saisonnier direct via loc_mois_jour_local (format 'MM-JJ')
+  if (filters.saisonFrom && filters.saisonTo) {
+    const chevauchante = filters.saisonFrom > filters.saisonTo;
+    if (chevauchante) {
+      params.append('or', `(loc_mois_jour_local.gte.${filters.saisonFrom},loc_mois_jour_local.lte.${filters.saisonTo})`);
+    } else {
+      params.append('loc_mois_jour_local', `gte.${filters.saisonFrom}`);
+      params.append('loc_mois_jour_local', `lte.${filters.saisonTo}`);
+    }
   }
 
   params.append('geom', 'not.is.null');
@@ -448,4 +531,58 @@ export async function fetchNDernieresLocalisations(token, ids, n) {
   );
   const results = await Promise.all(promises);
   return results.flat();
+}
+
+/**
+ * Precharge un index leger ani_id -> Set(mois_jour) pour filtrer la liste
+ * individus instantanement cote client lors d'une selection de saison,
+ * sans requete API supplementaire.
+ */
+export async function fetchAniCalendrier(token) {
+  // Requete legere — uniquement ani_id + loc_mois_jour_local, pas de geom
+  const url = `${API_URL}/v_localisation?select=ani_id,loc_mois_jour_local&loc_anomalie=not.is.true&loc_outlier=is.null&geom=not.is.null&order=ani_id.asc`;
+
+  const res = await fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=none'
+    }
+  });
+  if (!res.ok) throw new Error(`fetchAniCalendrier error: ${res.status}`);
+  const data = await res.json();
+
+  // Construire Map ani_id -> Set de mois_jour
+  const calendrier = new Map();
+  data.forEach(row => {
+    const id = String(row.ani_id);
+    if (!calendrier.has(id)) calendrier.set(id, new Set());
+    if (row.loc_mois_jour_local) {
+      calendrier.get(id).add(row.loc_mois_jour_local);
+    }
+  });
+  return calendrier;
+}
+
+/**
+ * Recupere les ani_id distincts ayant au moins une position avec geometrie
+ * valide dans tout l historique (v_localisation), pas seulement leur derniere
+ * position (v_animal_last_loc) — un animal inactif dont la derniere position
+ * n a pas de geom ne doit pas etre exclu s il a des positions valides ailleurs.
+ */
+export async function fetchAniIdsAvecGeom(token) {
+  // Recupere uniquement les ani_id distincts ayant au moins une position avec geom
+  const res = await fetch(
+    `${API_URL}/v_localisation?select=ani_id&geom=not.is.null&loc_anomalie=not.is.true&loc_outlier=is.null`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchAniIdsAvecGeom error: ${res.status}`);
+  const data = await res.json();
+  return new Set(data.map(r => String(r.ani_id)));
 }
