@@ -11,8 +11,16 @@ import {
   ajouterBadge, supprimerBadgeById, mettreAJourFiltresActifs,
   mettreAJourSelectN, mettreAJourBoutonAppliquer,
   setDernierNPositions, setDernierNTrajectoire,
-  mettreAJourBadgeNPositions
+  mettreAJourBadgeNPositions,
+  getAniCalendrier
 } from './app.js';
+
+// Convertit le format flatpickr JJ/MM en MM-JJ attendu par loc_mois_jour_local (PostgREST)
+function formatSaisonPourAPI(dateJJMM) {
+  if (!dateJJMM || !/^\d{2}\/\d{2}$/.test(dateJJMM)) return null;
+  const [j, m] = dateJJMM.split('/');
+  return `${m}-${j}`;
+}
 
 export function getPeriodesActives() {
   // CHEMIN 1 — Periode (champs dateFrom/dateTo avec JJ/MM/AAAA)
@@ -119,6 +127,50 @@ export function getPeriodesActives() {
   }
 
   return [];
+}
+
+/**
+ * Masque dans #listeIndividus les animaux absents des resultats retournes par l API
+ * lorsque un filtre temporel (periode, saison ou annee) est actif — pas de moyen fiable
+ * de savoir a l avance si un animal a des positions dans la plage sans interroger l API,
+ * donc on se base sur le resultat reel de la requete deja effectuee par applyFilters().
+ */
+function masquerIndividusSansPositions(locations) {
+  const aniIdsAvecPositions = new Set(locations.map(l => String(l.ani_id)));
+
+  const filtreTemporelActif = !!(
+    document.getElementById('dateFrom')?.value ||
+    document.getElementById('dateTo')?.value ||
+    document.getElementById('saisonFrom')?.value ||
+    document.getElementById('saisonTo')?.value ||
+    document.getElementById('selectAnnee')?.tomselect?.getValue()?.length
+  );
+
+  document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+    const checkbox = label.querySelector('input');
+    if (!checkbox) return;
+    const aniId = String(checkbox.value);
+
+    if (filtreTemporelActif) {
+      if (!aniIdsAvecPositions.has(aniId)) {
+        // Masquer si l animal n a pas de positions dans les resultats
+        label.style.display = 'none';
+        label.dataset.masqueParDate = 'true';
+        if (checkbox.checked) {
+          checkbox.checked = false;
+          label.dataset.cocheAuto = 'false';
+          supprimerBadgeById(`ani-${aniId}`);
+        }
+      } else if (label.dataset.sansGeom !== 'true') {
+        label.style.display = 'flex';
+        label.dataset.masqueParDate = 'false';
+      }
+    } else if (label.dataset.sansGeom !== 'true' && label.dataset.masqueParDate === 'true') {
+      // Pas de filtre temporel — restaurer visibilite normale
+      label.style.display = 'flex';
+      label.dataset.masqueParDate = 'false';
+    }
+  });
 }
 
 /**
@@ -288,133 +340,37 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
             .map(l => l.querySelector('input')?.value)
             .filter(Boolean);
 
-        const saisonnaliteExacte = hasSaisonnalite
-          && periodes.length === 1
-          && periodes[0].source === 'saisonnalite';
+        // Bornes saisonnieres MM-JJ pour filtrage direct via loc_mois_jour_local (API)
+        const saisonFromApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
+        const saisonToApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
 
-        const saisonnaliteAllSansAnnee = hasSaisonnalite
-          && periodes.some(p => p.source === 'saisonnalite_all');
-
-        if (!toutesPositions && n && (!hasSaisonnalite || saisonnaliteExacte)) {
-          // Chemin A+C — API direct par animal, limit:n, dates exactes
-          // Couvre : periode dateFrom/dateTo ET saison+1annee precise
+        if (!toutesPositions && n) {
+          // Chemin A — API direct par animal, limit:n, dates exactes
+          // Saisonnalite (avec ou sans annee precise) geree directement par loc_mois_jour_local — plus de fetch par annee
           const nPromises = idsAChercher.map(id =>
             fetchLocations(token, {
               ani_id: id,
               date_from: dateMin || null,
               date_to: dateMax || null,
+              saisonFrom: saisonFromApi,
+              saisonTo: saisonToApi,
               include_outliers: filters.include_outliers,
               limit: n
             })
           );
           locations = (await Promise.all(nPromises)).flat();
-
-          // Filtre JS saison en finition de precision si saisonnaliteExacte
-          if (saisonnaliteExacte) {
-            const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
-            const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
-            if (jFrom && mFrom && jTo && mTo) {
-              const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
-              const toMD = parseInt(mTo) * 100 + parseInt(jTo);
-              const chevauche = fromMD > toMD;
-              locations = locations.filter(loc => {
-                const d = loc.loc_datetime_local || loc.loc_date_local;
-                if (!d) return false;
-                const date = new Date(d);
-                const md = (date.getMonth() + 1) * 100 + date.getDate();
-                return chevauche ? (md >= fromMD || md <= toMD) : (md >= fromMD && md <= toMD);
-              });
-            }
-          }
-        } else if (!toutesPositions && n && saisonnaliteAllSansAnnee) {
-          // Chemin D — saisonnalite sans annee + N : requete par animal x par annee, limit:n chacune
-          // Evite le download massif sur toute la plage multi-annees
-          const saisonFromVal = document.getElementById('saisonFrom')?.value || '';
-          const saisonToVal = document.getElementById('saisonTo')?.value || '';
-          const [jFrom, mFrom] = saisonFromVal.split('/');
-          const [jTo, mTo] = saisonToVal.split('/');
-          const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
-          const toMD = parseInt(mTo) * 100 + parseInt(jTo);
-          const chevauche = fromMD > toMD;
-
-          const anneeOptions = (window._anneeOptions || []).map(Number).sort((a, b) => a - b);
-
-          // Une requete par animal x par annee avec les bornes exactes de la saison
-          const requetes = [];
-          idsAChercher.forEach(id => {
-            anneeOptions.forEach(a => {
-              const from = `${a}-${mFrom}-${jFrom}`;
-              const to = chevauche ? `${a + 1}-${mTo}-${jTo}` : `${a}-${mTo}-${jTo}`;
-              requetes.push(
-                fetchLocations(token, {
-                  ani_id: id,
-                  date_from: from,
-                  date_to: to,
-                  include_outliers: filters.include_outliers,
-                  limit: n
-                })
-              );
-            });
-          });
-
-          const resultats = (await Promise.all(requetes)).flat();
-
-          // Fusionner par animal et garder les N plus recentes toutes annees confondues
-          const parAnimal = new Map();
-          resultats.forEach(loc => {
-            const id = String(loc.ani_id);
-            if (!parAnimal.has(id)) parAnimal.set(id, []);
-            parAnimal.get(id).push(loc);
-          });
-          locations = Array.from(parAnimal.values()).flatMap(locs =>
-            locs.sort((a, b) => {
-              const da = a.loc_datetime_local || a.loc_date_local || '';
-              const db = b.loc_datetime_local || b.loc_date_local || '';
-              return db < da ? -1 : db > da ? 1 : 0;
-            }).slice(0, n)
-          );
         } else {
-          let totalPositions;
-          let countFilters;
-
-          if (hasSaisonnalite) {
-            // Compte exact par annee — somme de COUNT par tranche saisonniere, aucun download
-            const [jFromC, mFromC] = (document.getElementById('saisonFrom')?.value || '').split('/');
-            const [jToC, mToC] = (document.getElementById('saisonTo')?.value || '').split('/');
-            const fromMDC = parseInt(mFromC) * 100 + parseInt(jFromC);
-            const toMDC = parseInt(mToC) * 100 + parseInt(jToC);
-            const chevaucheC = fromMDC > toMDC;
-            const anneeOptionsCount = (window._anneeOptions || []).map(Number).sort((a, b) => a - b);
-
-            const countPromises = anneeOptionsCount.map(a => {
-              const from = `${a}-${mFromC}-${jFromC}`;
-              const to = chevaucheC ? `${a + 1}-${mToC}-${jToC}` : `${a}-${mToC}-${jToC}`;
-              return fetchCountLocations(token, {
-                ani_id: idsAChercher,
-                date_from: from,
-                date_to: to,
-                include_outliers: filters.include_outliers
-              });
-            });
-
-            const countsParAnnee = await Promise.all(countPromises);
-            totalPositions = countsParAnnee.reduce((sum, c) => sum + c, 0);
-
-            countFilters = {
-              ani_id: idsAChercher,
-              date_from: dateMin || null,
-              date_to: dateMax || null,
-              include_outliers: filters.include_outliers
-            };
-          } else {
-            countFilters = {
-              ani_id: idsAChercher,
-              date_from: dateMin || null,
-              date_to: dateMax || null,
-              include_outliers: filters.include_outliers
-            };
-            totalPositions = await fetchCountLocations(token, countFilters);
-          }
+          // Chemin B — Toutes positions ou cas residuels
+          // Saisonnalite geree directement par loc_mois_jour_local — comptage exact en une requete, plus de filtre JS
+          const countFilters = {
+            ani_id: idsAChercher,
+            date_from: dateMin || null,
+            date_to: dateMax || null,
+            saisonFrom: saisonFromApi,
+            saisonTo: saisonToApi,
+            include_outliers: filters.include_outliers
+          };
+          const totalPositions = await fetchCountLocations(token, countFilters);
           let confirmed = 500000;
 
           if (totalPositions > SEUIL_ALERTE_VOLUME) {
@@ -437,39 +393,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           }
 
           locations = await fetchLocations(token, { ...countFilters, limit: confirmed });
-
-          if (hasSaisonnalite) {
-            const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
-            const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
-            if (jFrom && mFrom && jTo && mTo) {
-              const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
-              const toMD = parseInt(mTo) * 100 + parseInt(jTo);
-              const chevauche = fromMD > toMD;
-              locations = locations.filter(loc => {
-                const d = loc.loc_datetime_local || loc.loc_date_local;
-                if (!d) return false;
-                const date = new Date(d);
-                const md = (date.getMonth() + 1) * 100 + date.getDate();
-                return chevauche ? (md >= fromMD || md <= toMD) : (md >= fromMD && md <= toMD);
-              });
-            }
-          }
-
-          if (!toutesPositions && n) {
-            const nMap = new Map();
-            locations.forEach(l => {
-              const id = String(l.ani_id);
-              if (!nMap.has(id)) nMap.set(id, []);
-              nMap.get(id).push(l);
-            });
-            locations = Array.from(nMap.values()).flatMap(locs =>
-              locs.sort((a, b) => {
-                const da = a.loc_datetime_local || a.loc_date_local || '';
-                const db = b.loc_datetime_local || b.loc_date_local || '';
-                return db < da ? -1 : db > da ? 1 : 0;
-              }).slice(0, n)
-            );
-          }
         }
       }
 
@@ -503,6 +426,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       clearMapPoints();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
       const count = renderPoints(locations, true, false, modeCouleur);
+      masquerIndividusSansPositions(locations);
       mettreAJourPanneau(locations);
       mettreAJourIndividus(getAnimals().filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
 
@@ -560,124 +484,44 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const nTraj = toutesPositionsTraj ? null : (parseInt(nValTraj) || 25);
 
       const hasSaisonnaliteTraj = periodesT.some(p => p.source === 'saisonnalite' || p.source === 'saisonnalite_all');
-      const saisonnaliteExacteTraj = hasSaisonnaliteTraj && periodesT.length === 1 && periodesT[0].source === 'saisonnalite';
-      const saisonnaliteAllTraj = hasSaisonnaliteTraj && periodesT.some(p => p.source === 'saisonnalite_all');
+
+      // Bornes saisonnieres MM-JJ pour filtrage direct via loc_mois_jour_local (API)
+      const saisonFromApiTraj = hasSaisonnaliteTraj ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
+      const saisonToApiTraj = hasSaisonnaliteTraj ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
 
       if (!dateFromApi && !dateToApi && !toutesPositionsTraj) {
         // Pas de periode — N dernieres localisations par individu, pas de COUNT ni modale
         locations = await fetchNDernieresLocalisations(token, idsAChercher, nTraj);
 
-      } else if (!toutesPositionsTraj && nTraj && (!hasSaisonnaliteTraj || saisonnaliteExacteTraj)) {
-        // Chemin A+C Trajectoire — periode simple ou saison+1annee + N
+      } else if (!toutesPositionsTraj && nTraj) {
+        // Chemin A Trajectoire — API direct par animal, limit:n
+        // Saisonnalite (avec ou sans annee precise) geree directement par loc_mois_jour_local — plus de fetch par annee
         const nPromisesTraj = idsAChercher.map(id =>
           fetchLocations(token, {
             ani_id: id,
             date_from: dateFromApi,
             date_to: dateToApi,
+            saisonFrom: saisonFromApiTraj,
+            saisonTo: saisonToApiTraj,
             include_outliers: false,
             limit: nTraj
           })
         );
         locations = (await Promise.all(nPromisesTraj)).flat();
 
-        if (saisonnaliteExacteTraj) {
-          const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
-          const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
-          if (jFrom && mFrom && jTo && mTo) {
-            const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
-            const toMD = parseInt(mTo) * 100 + parseInt(jTo);
-            const chevauche = fromMD > toMD;
-            locations = locations.filter(loc => {
-              const d = loc.loc_datetime_local || loc.loc_date_local;
-              if (!d) return false;
-              const date = new Date(d);
-              const md = (date.getMonth() + 1) * 100 + date.getDate();
-              return chevauche ? (md >= fromMD || md <= toMD) : (md >= fromMD && md <= toMD);
-            });
-          }
-        }
-
-      } else if (!toutesPositionsTraj && nTraj && saisonnaliteAllTraj) {
-        // Chemin D Trajectoire — saisonnalite sans annee + N : requete par animal x par annee, limit:n
-        const saisonFromVal = document.getElementById('saisonFrom')?.value || '';
-        const saisonToVal = document.getElementById('saisonTo')?.value || '';
-        const [jFrom, mFrom] = saisonFromVal.split('/');
-        const [jTo, mTo] = saisonToVal.split('/');
-        const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
-        const toMD = parseInt(mTo) * 100 + parseInt(jTo);
-        const chevauche = fromMD > toMD;
-        const anneeOptionsTraj = (window._anneeOptions || []).map(Number).sort((a, b) => a - b);
-
-        const requetesTraj = [];
-        idsAChercher.forEach(id => {
-          anneeOptionsTraj.forEach(a => {
-            const from = `${a}-${mFrom}-${jFrom}`;
-            const to = chevauche ? `${a + 1}-${mTo}-${jTo}` : `${a}-${mTo}-${jTo}`;
-            requetesTraj.push(
-              fetchLocations(token, {
-                ani_id: id,
-                date_from: from,
-                date_to: to,
-                include_outliers: false,
-                limit: nTraj
-              })
-            );
-          });
-        });
-
-        const resultatsTraj = (await Promise.all(requetesTraj)).flat();
-        const parAnimalTraj = new Map();
-        resultatsTraj.forEach(loc => {
-          const id = String(loc.ani_id);
-          if (!parAnimalTraj.has(id)) parAnimalTraj.set(id, []);
-          parAnimalTraj.get(id).push(loc);
-        });
-        locations = Array.from(parAnimalTraj.values()).flatMap(locs =>
-          locs.sort((a, b) => {
-            const da = a.loc_datetime_local || a.loc_date_local || '';
-            const db = b.loc_datetime_local || b.loc_date_local || '';
-            return db < da ? -1 : db > da ? 1 : 0;
-          }).slice(0, nTraj)
-        );
-
       } else {
         // Chemin B Trajectoire — Toutes positions ou cas residuels
+        // Saisonnalite geree directement par loc_mois_jour_local — comptage exact en une requete, plus de filtre JS
         const trajCountFilters = {
           ani_id: idsAChercher,
           date_from: dateFromApi,
           date_to: dateToApi,
+          saisonFrom: saisonFromApiTraj,
+          saisonTo: saisonToApiTraj,
           include_outliers: false
         };
 
-        let totalTrajPositions;
-
-        if (hasSaisonnaliteTraj) {
-          // Compte exact par annee — somme de COUNT, aucun download
-          const saisonFromValTraj = document.getElementById('saisonFrom')?.value || '';
-          const saisonToValTraj = document.getElementById('saisonTo')?.value || '';
-          const [jFromT, mFromT] = saisonFromValTraj.split('/');
-          const [jToT, mToT] = saisonToValTraj.split('/');
-          const fromMDT = parseInt(mFromT) * 100 + parseInt(jFromT);
-          const toMDT = parseInt(mToT) * 100 + parseInt(jToT);
-          const chevaucheT = fromMDT > toMDT;
-          const anneeOptionsCountTraj = (window._anneeOptions || []).map(Number).sort((a, b) => a - b);
-
-          const countPromisesTraj = anneeOptionsCountTraj.map(a => {
-            const from = `${a}-${mFromT}-${jFromT}`;
-            const to = chevaucheT ? `${a + 1}-${mToT}-${jToT}` : `${a}-${mToT}-${jToT}`;
-            return fetchCountLocations(token, {
-              ani_id: idsAChercher,
-              date_from: from,
-              date_to: to,
-              include_outliers: false
-            });
-          });
-
-          const countsParAnneeTraj = await Promise.all(countPromisesTraj);
-          totalTrajPositions = countsParAnneeTraj.reduce((sum, c) => sum + c, 0);
-        } else {
-          totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
-        }
+        const totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
 
         let confirmedTraj = 500000;
 
@@ -711,23 +555,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           ...trajCountFilters,
           limit: confirmedTraj
         });
-
-        if (hasSaisonnaliteTraj) {
-          const [jFrom, mFrom] = (document.getElementById('saisonFrom')?.value || '').split('/');
-          const [jTo, mTo] = (document.getElementById('saisonTo')?.value || '').split('/');
-          if (jFrom && mFrom && jTo && mTo) {
-            const fromMD = parseInt(mFrom) * 100 + parseInt(jFrom);
-            const toMD = parseInt(mTo) * 100 + parseInt(jTo);
-            const chevauche = fromMD > toMD;
-            locations = locations.filter(loc => {
-              const d = loc.loc_datetime_local || loc.loc_date_local;
-              if (!d) return false;
-              const date = new Date(d);
-              const md = (date.getMonth() + 1) * 100 + date.getDate();
-              return chevauche ? (md >= fromMD || md <= toMD) : (md >= fromMD && md <= toMD);
-            });
-          }
-        }
       }
 
       // Outliers - requête séparée, inchangée
@@ -740,6 +567,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
               ani_id: [id],
               date_from: dateFromApi,
               date_to: dateToApi,
+              saisonFrom: saisonFromApiTraj,
+              saisonTo: saisonToApiTraj,
               limit: 999999,
               include_outliers: true,
               only_outliers: true
@@ -760,6 +589,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       clearTrajectoire();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
       const count = renderPoints(locations, true, true, modeCouleur);
+      masquerIndividusSansPositions(locations);
       mettreAJourPanneau(locations);
       mettreAJourIndividus(getAnimals().filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
       ouvrirPanneauSiNecessaire();
@@ -895,14 +725,45 @@ export async function mettreAJourListeParDate() {
     return;
   }
 
+  // Saison seule, sans annee precise — le calendrier preloade (ani_id -> Set(mois_jour))
+  // suffit a verifier la presence, aucune requete API necessaire, mise a jour instantanee
+  const saisonSansAnnee = periodes.every(p => p.source === 'saisonnalite_all');
+  if (saisonSansAnnee) {
+    const saisonFromApi = formatSaisonPourAPI(document.getElementById('saisonFrom')?.value);
+    const saisonToApi = formatSaisonPourAPI(document.getElementById('saisonTo')?.value);
+    const chevauchante = !!(saisonFromApi && saisonToApi && saisonFromApi > saisonToApi);
+    const calendrier = getAniCalendrier();
+
+    const idsAvecPositions = new Set();
+    calendrier.forEach((mjSet, aniId) => {
+      const aDesPositions = [...mjSet].some(mj => chevauchante
+        ? (mj >= saisonFromApi || mj <= saisonToApi)
+        : (mj >= saisonFromApi && mj <= saisonToApi));
+      if (aDesPositions) idsAvecPositions.add(aniId);
+    });
+
+    _appliquerFiltreListeAvecIds(idsAvecPositions);
+    return;
+  }
+
+  // Periode simple, annee precise, ou saison + annee precise — le calendrier (mois_jour seul,
+  // sans annee) ne suffit pas a verifier la precision exacte, on interroge l API comme avant
   try {
     const idsUnion = new Set();
 
-    // Pour chaque periode, recuperer les ani_id ayant des donnees
+    const hasSaisonnalite = periodes.some(p =>
+      p.source === 'saisonnalite' || p.source === 'saisonnalite_all'
+    );
+    const saisonFromApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
+    const saisonToApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
+
+    // Pour chaque periode, recuperer les ani_id ayant des donnees dans la saison
     const promises = periodes.map(p =>
       fetchAnimalIdsParPeriode(getCurrentToken(), {
         date_from: p.from,
         date_to: p.to,
+        saisonFrom: saisonFromApi,
+        saisonTo: saisonToApi,
         include_outliers: false
       })
     );
@@ -911,20 +772,6 @@ export async function mettreAJourListeParDate() {
     results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
 
     if (requeteId !== _derniereRequeteId) return;
-
-    // Si saisonnalite — filtrer JS par mois/jour
-    const hasSaisonnalite = periodes.some(p =>
-      p.source === 'saisonnalite' || p.source === 'saisonnalite_all'
-    );
-
-    if (hasSaisonnalite) {
-      const saisonFrom = document.getElementById('saisonFrom')?.value || '';
-      const saisonTo = document.getElementById('saisonTo')?.value || '';
-      if (/^\d{2}\/\d{2}$/.test(saisonFrom) && /^\d{2}\/\d{2}$/.test(saisonTo)) {
-        // Le filtrage JS fin par mois/jour est fait dans applyFilters
-        // Ici on garde juste l union des IDs par periode
-      }
-    }
 
     _appliquerFiltreListeAvecIds(idsUnion);
   } catch (err) {
