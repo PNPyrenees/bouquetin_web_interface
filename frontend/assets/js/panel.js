@@ -73,6 +73,14 @@ export function initPanneau() {
     </div>
     <div class="panel-tab-content" id="panelContentDonnees" style="display:flex">
       <div class="panel-toolbar">
+        <button id="btnExportCSV" class="panel-btn-filtres" title="Exporter toutes les localisations en CSV">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Exporter CSV
+        </button>
         <div style="position:relative; margin-left:auto;">
           <button class="panel-btn-filtres" id="panelBtnFiltres">
             <img src="assets/img/filtre_horizontal.png" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"> Filtres colonnes
@@ -432,7 +440,7 @@ function rendrePage() {
 
   // Rendu des lignes
   tbody.innerHTML = page.map(loc => `
-    <tr class="panel-table-row" data-ani-id="${loc.ani_id}">
+    <tr class="panel-table-row" data-ani-id="${loc.ani_id}" data-loc-datetime="${loc.loc_datetime_local || loc.loc_date_local || ''}">
       ${colonnesDisponibles
       .filter(c => colonnesActives.includes(c.key))
       .map(c => `<td>${formaterValeur(c.key, loc[c.key], loc)}</td>`)
@@ -461,7 +469,6 @@ function rendrePage() {
         const coord = ol.proj.fromLonLat(wgs84);
         window._getMap?.().getView().animate({
           center: coord,
-          zoom: window._ZOOM_POINT_SINGLE || 14,
           duration: 400
         });
       }
@@ -613,6 +620,88 @@ function appliquerFiltresColonnes() {
   pageCourante = 1;
   reconstruireSelectPageSize(donneesFiltrees.length);
   rendrePage();
+
+  // Synchroniser les points carte avec les lignes visibles dans le tableau
+  if (Object.keys(filtres).length === 0) {
+    window._filtrerPointsCarte?.(null);
+  } else {
+    filtrerCarteDepuisTableau(donneesFiltrees);
+  }
+}
+
+/**
+ * Exporte en CSV toutes les localisations des animaux donnes — requete dediee
+ * tous champs de v_localisation, independante de la pagination et des filtres colonnes.
+ */
+export async function exporterCSV(token, aniIds, params = {}) {
+  if (!aniIds || aniIds.length === 0) {
+    window._showToast?.('Aucun individu a exporter');
+    return;
+  }
+
+  window._showToast?.('Export en cours...');
+
+  try {
+    const { fetchLocationsExportCSV } = await import('./api.js');
+    const locs = await fetchLocationsExportCSV(token, aniIds, params);
+
+    if (locs.length === 0) {
+      window._showToast?.('Aucune donnee a exporter');
+      return;
+    }
+
+    // Generer le CSV
+    const colonnes = [
+      'loc_id', 'ani_id', 'ani_code', 'ani_nom', 'ani_sexe',
+      'ani_pop_rattach', 'ani_date_relache', 'ani_gestionnaire',
+      'capt_id', 'capt_actif', 'capt_frequence', 'capt_constructeur', 'capt_id_constructeur',
+      'loc_dop', 'fix_status_label', 'loc_nb_satellites', 'loc_outlier', 'loc_anomalie',
+      'loc_altitude_capteur', 'loc_temperature_capteur',
+      'loc_datetime_utc', 'loc_datetime_local', 'loc_date_local',
+      'loc_mois_jour_local', 'loc_commentaire'
+    ];
+
+    const header = colonnes.join(';');
+    const lignes = locs.map(loc =>
+      colonnes.map(col => {
+        const val = loc[col];
+        if (val === null || val === undefined) return '';
+        const str = String(val);
+        // Echapper les valeurs contenant des points-virgules ou guillemets
+        if (str.includes(';') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      }).join(';')
+    );
+
+    const csvContent = '﻿' + [header, ...lignes].join('\n'); // BOM UTF-8 pour Excel
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const date = new Date().toISOString().slice(0, 10);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bouquetins_localisations_${date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    window._showToast?.(`${locs.length} localisations exportees`);
+  } catch (err) {
+    console.error('Erreur export CSV:', err);
+    window._showToast?.('Erreur lors de l export');
+  }
+}
+
+/**
+ * Masque sur la carte les points dont la localisation n'est pas visible
+ * dans le tableau apres filtrage colonnes.
+ */
+export function filtrerCarteDepuisTableau(locs) {
+  const visiblesSet = new Set(
+    locs.map(l => `${l.ani_id}__${l.loc_datetime_local || l.loc_date_local}`)
+  );
+  window._filtrerPointsCarte?.(visiblesSet);
 }
 
 /**
@@ -881,8 +970,15 @@ export function setAniIdSelectionne(id) {
   aniIdSelectionne = id ? String(id) : null;
 }
 
-export function scrollToAniId(aniId) {
-  const index = donneesFiltrees.findIndex(l => String(l.ani_id) === String(aniId));
+export function scrollToAniId(aniId, locDatetime = null) {
+  let index = locDatetime
+    ? donneesFiltrees.findIndex(l =>
+        String(l.ani_id) === String(aniId) &&
+        (l.loc_datetime_local || l.loc_date_local) === locDatetime)
+    : -1;
+  if (index === -1) {
+    index = donneesFiltrees.findIndex(l => String(l.ani_id) === String(aniId));
+  }
   if (index === -1) return;
 
   const size = lignesParPage === 'all' ? donneesFiltrees.length : parseInt(lignesParPage, 10);
@@ -894,9 +990,17 @@ export function scrollToAniId(aniId) {
   }
 
   setTimeout(() => {
-    const tr = document.querySelector(`.panel-table-row[data-ani-id='${aniId}']`);
+    let tr = locDatetime
+      ? [...document.querySelectorAll('.panel-table-row')]
+          .find(t => t.dataset.aniId === String(aniId) && t.dataset.locDatetime === locDatetime)
+      : null;
+    if (!tr) {
+      tr = document.querySelector(`.panel-table-row[data-ani-id='${aniId}']`);
+    }
     const wrapper = tr?.closest('.panel-table-wrapper');
     if (tr && wrapper) {
+      document.querySelectorAll('.panel-table-row.selected-carte').forEach(r => r.classList.remove('selected-carte'));
+      tr.classList.add('selected-carte');
       const trRect = tr.getBoundingClientRect();
       const wrapperRect = wrapper.getBoundingClientRect();
       const offset = trRect.top - wrapperRect.top - (wrapperRect.height / 2) + (trRect.height / 2);
