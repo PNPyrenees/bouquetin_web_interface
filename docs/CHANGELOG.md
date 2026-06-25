@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [0.39.0] - 2026-06-25
+
+### Ajouts
+- fetchAniCalendrier() - cache leger ani_id vers Set(mois_jour) pour filtrage instantane liste individus
+- fetchAniIdsAvecGeom() - construit idsAvecGeom depuis v_localisation au lieu de v_animal_last_loc
+- Filtre saisonnier loc_mois_jour_local dans fetchAnimalIdsParPeriode() - coherence avec fetchLocations()
+- Trajectoire outliers - filtre saisonnier applique aussi sur la branche include_outliers
+- Clic table vers carte - recentrage sans zoom (suppression parametre zoom)
+- Clic carte vers table - scroll vers la ligne exacte (ani_id + datetime)
+- Sous-filtrage visuel - filtres colonnes tableau masquent les points carte en temps reel
+- filtrerPointsParVisibilite() exportee depuis map.js
+- Export CSV - bouton dans toolbar panneau, requete dedicee tous champs sauf geom, separateur point-virgule, BOM UTF-8
+- mettreAJourListeParDate() synchrone pour saison sans annee - zero requete API grace au cache calendrier
+
+### Corrections
+- RangeError Maximum call stack exceeded - Math.min/max spread remplace par reduce dans preparerCouleurs()
+- Animaux inactifs avec positions valides desormais visibles dans la liste (idsAvecGeom depuis v_localisation)
+- Bergon et animaux sans positions dans la saison selectionnee masques immediatement sans clic Appliquer
+- fetchAnimalIdsParPeriode() filtre desormais par loc_mois_jour_local comme fetchLocations()
+- Double clic checkSuivis corrige - mise a jour synchrone immediate
+
 ## [0.38.0] - 2026-06-24
 
 ### Ajouts
