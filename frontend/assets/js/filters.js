@@ -22,6 +22,42 @@ function formatSaisonPourAPI(dateJJMM) {
   return `${m}-${j}`;
 }
 
+const BATCH_SIZE = 10000;
+
+/**
+ * Recupere toutes les positions par batches de BATCH_SIZE (offset successifs) au lieu
+ * d'une requete unique avec un limit eleve — evite ERR_CONTENT_LENGTH_MISMATCH sur les
+ * gros volumes. onBatch(batch, premierBatch) permet un rendu progressif (apercu) pendant
+ * le chargement ; le rendu final/autoritaire reste fait par l appelant sur le resultat complet.
+ */
+async function fetchLocationsAvecPagination(token, filters, onBatch) {
+  let offset = 0;
+  let premierBatch = true;
+  let totalLocations = [];
+
+  while (true) {
+    const batch = await fetchLocations(token, {
+      ...filters,
+      limit: BATCH_SIZE,
+      offset: offset
+    });
+
+    if (!Array.isArray(batch) || batch.length === 0) break;
+
+    // Rendu progressif sur la carte
+    onBatch(batch, premierBatch);
+    totalLocations = totalLocations.concat(batch);
+    premierBatch = false;
+
+    // Si le batch est inferieur a BATCH_SIZE — c est le dernier
+    if (batch.length < BATCH_SIZE) break;
+
+    offset += BATCH_SIZE;
+  }
+
+  return totalLocations;
+}
+
 export function getPeriodesActives() {
   // CHEMIN 1 — Periode (champs dateFrom/dateTo avec JJ/MM/AAAA)
   const dateFrom = document.getElementById('dateFrom')?.value || '';
@@ -392,7 +428,22 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
             }
           }
 
-          locations = await fetchLocations(token, { ...countFilters, limit: confirmed });
+          locations = await fetchLocationsAvecPagination(
+            token,
+            { ...countFilters },
+            (batch, clearBefore) => {
+              // Rendu progressif (apercu) — le rendu final/filtre est fait plus bas une fois tous les batches recus
+              const enrichis = enrichirLocations(batch);
+              const modeCouleurPreview = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+              renderPoints(enrichis, clearBefore, false, modeCouleurPreview);
+              // Mettre a jour le compteur en temps reel
+              const posEl = document.getElementById('positionsCount');
+              if (posEl) {
+                const current = parseInt(posEl.textContent) || 0;
+                posEl.textContent = clearBefore ? batch.length : current + batch.length;
+              }
+            }
+          );
         }
       }
 
@@ -551,10 +602,22 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           }
         }
 
-        locations = await fetchLocations(token, {
-          ...trajCountFilters,
-          limit: confirmedTraj
-        });
+        locations = await fetchLocationsAvecPagination(
+          token,
+          { ...trajCountFilters },
+          (batch, clearBefore) => {
+            // Rendu progressif (apercu) — le rendu final/filtre est fait plus bas une fois tous les batches recus
+            const enrichis = enrichirLocations(batch);
+            const modeCouleurPreview = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+            renderPoints(enrichis, clearBefore, true, modeCouleurPreview);
+            // Mettre a jour le compteur en temps reel
+            const posEl = document.getElementById('positionsCount');
+            if (posEl) {
+              const current = parseInt(posEl.textContent) || 0;
+              posEl.textContent = clearBefore ? batch.length : current + batch.length;
+            }
+          }
+        );
       }
 
       // Outliers - requête séparée, inchangée
