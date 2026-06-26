@@ -1,4 +1,4 @@
-import { API_URL, DEFAULT_LIMIT } from './config.js';
+import { API_URL } from './config.js';
 
 // Cache des requêtes API
 const _cache = new Map();
@@ -110,7 +110,13 @@ export async function fetchLocations(token, filters = {}) {
   params.append('geom', 'not.is.null');
 
   // Paramètres de pagination et de tri
-  params.append('limit', filters.limit || DEFAULT_LIMIT);
+  // Si limit est fourni, l'utiliser — sinon pas de limit (laisser PostgREST décider)
+  if (filters.limit) {
+    params.append('limit', filters.limit);
+  }
+  if (filters.offset) {
+    params.append('offset', filters.offset);
+  }
   params.append('order', 'loc_datetime_local.desc');
 
   const res = await fetch(`${API_URL}/v_localisation?${params.toString()}`, {
