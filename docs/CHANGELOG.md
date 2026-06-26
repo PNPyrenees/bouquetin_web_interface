@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [0.40.0] - 2026-06-25
+
+### Ajouts
+- Pagination par batches de 10 000 positions - remplace la requete unique limit 500000
+- fetchLocationsAvecPagination() dans filters.js - batches offset incremental rendu progressif
+- Rendu progressif sur la carte pendant le chargement des batches
+- Support offset dans fetchLocations() api.js
+
+### Corrections
+- ERR_CONTENT_LENGTH_MISMATCH resolu pour les gros volumes (131 000+ positions)
+- confirmed devient sentinel oui/non - plus de troncature silencieuse des donnees
+- Limite hardcodee DEFAULT_LIMIT retiree de fetchLocations()
+
 ## [0.39.0] - 2026-06-25
 
 ### Ajouts
