@@ -55,11 +55,6 @@ export async function login(username, password) {
  * @param {Object} filters - Objet contenant les critères de filtrage
  */
 export async function fetchLocations(token, filters = {}) {
-  const cle = _cleCache('v_localisation', filters);
-  const cached = _getCache(cle);
-  if (cached) return cached;
-
-
   const params  = new URLSearchParams();
 
 
@@ -128,9 +123,6 @@ export async function fetchLocations(token, filters = {}) {
   
   if (!res.ok) throw new Error('Échec chargement données');
   const data = await res.json();
-  if (data && data.length > 0) {
-    _setCache(cle, data);
-  }
   return data;
 }
 
@@ -276,10 +268,6 @@ export async function fetchLastLocationsInactifs(token, filters = {}) {
  * depuis la vue v_animal_last_loc modifiée (actifs + inactifs).
  */
 export async function fetchAllLastLocations(token, filters = {}) {
-  const cle = _cleCache('v_animal_last_loc', filters);
-  const cached = _getCache(cle);
-  if (cached) return cached;
-
   const params = new URLSearchParams();
   params.append('geom', 'not.is.null');
 
@@ -300,9 +288,6 @@ export async function fetchAllLastLocations(token, filters = {}) {
 
   if (!res.ok) throw new Error('Échec chargement positions');
   const data = await res.json();
-  if (data && data.length > 0) {
-    _setCache(cle, data);
-  }
   return data;
 }
 
@@ -311,11 +296,6 @@ export async function fetchAllLastLocations(token, filters = {}) {
  * Utilisé en mode Positions quand une date est sélectionnée.
  */
 export async function fetchLastLocationsParPeriode(token, filters = {}) {
-  // Vérification du cache — si même requête déjà faite, retourner résultat en mémoire
-  const cle = _cleCache('v_localisation_periode', filters);
-  const cached = _getCache(cle);
-  if (cached) return cached;
-
   const ids = filters.ani_id || [];
   if (ids.length === 0) return []; // Rien à chercher
 
@@ -365,7 +345,6 @@ export async function fetchLastLocationsParPeriode(token, filters = {}) {
   });
 
   const locations = Array.from(locParAnimal.values());
-  if (locations.length > 0) _setCache(cle, locations); // Mettre en cache
   return locations;
 }
 
@@ -374,10 +353,6 @@ export async function fetchLastLocationsParPeriode(token, filters = {}) {
  * Une seule requête au lieu de N requêtes par animal.
  */
 export async function fetchAnimalIdsParPeriode(token, filters = {}) {
-  const cle = _cleCache('v_localisation_ids', filters);
-  const cached = _getCache(cle);
-  if (cached) return cached;
-
   const params = new URLSearchParams();
 
   params.append('select', 'ani_id');
@@ -415,9 +390,6 @@ export async function fetchAnimalIdsParPeriode(token, filters = {}) {
 
   // Retourner uniquement les ani_id distincts
   const ids = [...new Set(data.map(l => String(l.ani_id)))];
-  if (ids.length > 0) {
-    _setCache(cle, ids);
-  }
   return ids;
 }
 
@@ -591,4 +563,130 @@ export async function fetchAniIdsAvecGeom(token) {
   if (!res.ok) throw new Error(`fetchAniIdsAvecGeom error: ${res.status}`);
   const data = await res.json();
   return new Set(data.map(r => String(r.ani_id)));
+}
+
+/**
+ * Récupère les années distinctes ayant des positions valides — utilisé pour peupler
+ * le select d'années sans dépendre des positions déjà chargées (qui ne couvrent
+ * parfois que les dernières années).
+ */
+export async function fetchAnneesDisponibles(token) {
+  const res = await fetch(
+    `${API_URL}/v_localisation?select=loc_datetime_local&loc_anomalie=not.is.true&loc_outlier=is.null&geom=not.is.null`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchAnneesDisponibles error: ${res.status}`);
+  const data = await res.json();
+  return [...new Set(
+    data
+      .map(l => new Date(l.loc_datetime_local).getFullYear())
+      .filter(y => !isNaN(y))
+  )].sort((a, b) => b - a);
+}
+
+/**
+ * Appelle la fonction SQL get_localisation_with_json_filter via PostgREST RPC.
+ * Gère la pagination par batches avec rendu progressif via onBatch.
+ *
+ * @param {string} token - Jeton JWT
+ * @param {Object} filters - Filtres au format interne (date_from, date_to, saisonFrom...)
+ * @param {Function} onBatch - Callback(batch, premierBatch) pour rendu progressif
+ */
+export async function fetchLocalisationsRPC(token, filters = {}, onBatch = null) {
+  const BATCH_SIZE = 10000;
+  let offset = 0;
+  let premierBatch = true;
+  let totalLocations = [];
+
+  while (true) {
+    const body = {};
+
+    // Identifiants animaux
+    if (Array.isArray(filters.ani_id) && filters.ani_id.length > 0) {
+      body.ani_id = filters.ani_id.map(Number);
+    }
+
+    // Dates absolues — conversion date_from/date_to → date_min/date_max
+    if (filters.date_from) body.date_min = filters.date_from;
+    if (filters.date_to)   body.date_max = filters.date_to;
+
+    // Années
+    if (Array.isArray(filters.annees) && filters.annees.length > 0) {
+      body.annees = filters.annees.map(Number);
+    }
+
+    // Saisonnalité — conversion saisonFrom/saisonTo → periode_min/periode_max
+    if (filters.saisonFrom) body.periode_min = filters.saisonFrom;
+    if (filters.saisonTo)   body.periode_max = filters.saisonTo;
+
+    // Attributs animaux
+    if (filters.sexe)          body.ani_sexe = filters.sexe;
+    if (filters.gestionnaire)  body.ani_gestionnaire = [filters.gestionnaire];
+    if (filters.population)    body.ani_pop_rattach = [filters.population];
+    if (filters.programmation) body.prog_id = [Number(filters.programmation)];
+
+    // Qualité des données
+    if (!filters.include_outliers) body.without_loc_outlier = true;
+
+    // Animaux en cours de suivi
+    if (filters.ani_is_followed) body.ani_is_followed = true;
+
+    // Âge à la capture
+    if (filters.age_capture_min != null) body.age_capture_min = filters.age_capture_min;
+    if (filters.age_capture_max != null) body.age_capture_max = filters.age_capture_max;
+
+    // Translocation
+    if (filters.was_translocated != null) body.was_translocated = filters.was_translocated;
+
+    // Filtre spatial
+    if (filters.geom) {
+      body.geom     = filters.geom;
+      body.geom_src = filters.geom_src || 4326;
+    }
+
+    // N dernières positions par animal
+    if (filters.limit_par_animal) body.limit_par_animal = filters.limit_par_animal;
+
+    // Pagination
+    body.limit  = BATCH_SIZE;
+    body.offset = offset;
+
+    const res = await fetch(`${API_URL}/rpc/get_localisation_with_json_filter`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Content-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      },
+      body: JSON.stringify({ filters: body })
+    });
+
+    if (!res.ok) throw new Error(`fetchLocalisationsRPC error: ${res.status}`);
+    const batch = await res.json();
+
+    if (!Array.isArray(batch) || batch.length === 0) break;
+
+    // Rendu progressif si callback fourni
+    if (onBatch) onBatch(batch, premierBatch);
+
+    totalLocations = totalLocations.concat(batch);
+    premierBatch = false;
+
+    // Dernier batch si inférieur à BATCH_SIZE
+    if (batch.length < BATCH_SIZE) break;
+
+    // Si limit_par_animal défini — une seule requête suffit
+    if (filters.limit_par_animal) break;
+
+    offset += BATCH_SIZE;
+  }
+
+  return totalLocations;
 }
