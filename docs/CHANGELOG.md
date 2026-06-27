@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [0.41.0] - 2026-06-26
+
+### Ajouts
+- fetchLocalisationsRPC() dans api.js - appel POST vers get_localisation_with_json_filter avec pagination batches
+- fetchAnneesDisponibles() dans api.js - annees distinctes en arriere-plan
+- Chargement initial migre vers RPC - fetchLocalisationsRPC remplace fetchNDernieresLocalisations et fetchAllLastLocations
+
+### Modifications
+- Promise.all de 4 requetes paralleles au demarrage - fetchAnimals, fetchPopulations, fetchGestionnaires, fetchProgrammations
+- fetchAniCalendrier lancee en arriere-plan sans bloquer le rendu carte
+- fetchAnneesDisponibles lancee en arriere-plan pour peupler le select annees
+- Cache retire des fonctions fetchLocations, fetchAllLastLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode
+
+### Corrections
+- Select annees affiche toutes les annees disponibles et non uniquement les plus recentes
+- Garde ajoutee dans mettreAJourListeParDate si calendrier pas encore charge
+
 ## [0.40.0] - 2026-06-25
 
 ### Ajouts
