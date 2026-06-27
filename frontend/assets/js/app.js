@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom } from './api.js';
+import { login, fetchAnimals, fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC, fetchAnneesDisponibles } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -377,14 +377,18 @@ async function startApp(token) {
     };
 
     // Récupération des données depuis l'API via le module api.js
-    setAnimals(await fetchAnimals(token));
     setCurrentToken(token);
     sessionStorage.setItem('bqt_token', token);
 
-    const [populations, gestionnaires] = await Promise.all([
+    const [animaux, populations, gestionnaires, programmations] = await Promise.all([
+      fetchAnimals(token),
       fetchPopulations(token),
-      fetchGestionnaires(token)
+      fetchGestionnaires(token),
+      fetchProgrammations(token)
     ]);
+
+    setAnimals(animaux);
+
     const selectPop = document.getElementById('selectPopulation');
     if (selectPop) {
       if (selectPop.tomselect) {
@@ -418,7 +422,6 @@ async function startApp(token) {
       }
     }
 
-    const programmations = await fetchProgrammations(token);
     programmations.forEach(p => {
       if (!programmationsMap.has(String(p.ani_id))) {
         programmationsMap.set(String(p.ani_id), p.prog_id);
@@ -458,23 +461,59 @@ async function startApp(token) {
       await exporterCSV(currentToken, aniIds, params);
     });
 
-    // Chargement initial via fetchAllLastLocations pour calculer activeIds et idsAvecGeom
-    const locationsAll = await fetchAllLastLocations(currentToken);
-    const locationsEnrichiesAll = enrichirLocations(locationsAll);
-
-    // Precharger l index leger ani_id -> Set(mois_jour) pour le filtrage saison instantane
-    _aniCalendrier = await fetchAniCalendrier(currentToken);
-
-    // Calculer activeIds directement depuis les données - cor_date_fin null = actif
-    setActiveIds(new Set(
-      locationsAll.filter(l => l.cor_date_fin === null).map(l => l.ani_id)
-    ));
-
-    // Chargement N dernières positions par animal suivi
     const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
-    const idsActifsInit2 = Array.from(getActiveIds()).map(String);
-    const locationsN = await fetchNDernieresLocalisations(currentToken, idsActifsInit2, n);
-    const locationsSuivies = enrichirLocations(locationsN);
+
+    // Deux requêtes en parallèle pour le chargement initial
+    const [locationsAll, locationsSuiviesRaw] = await Promise.all([
+      // Dernière position par animal suivi — pour activeIds, années, liste individus
+      fetchLocalisationsRPC(currentToken, {
+        ani_is_followed: true,
+        limit_par_animal: 1
+      }),
+      // N dernières positions par animal suivi — pour le rendu carte
+      fetchLocalisationsRPC(currentToken, {
+        ani_is_followed: true,
+        limit_par_animal: n
+      })
+    ]);
+
+    // Calendrier en arrière-plan — ne bloque pas le rendu carte
+    fetchAniCalendrier(currentToken).then(calendrier => {
+      _aniCalendrier = calendrier;
+    }).catch(err => console.warn('fetchAniCalendrier échoué:', err));
+
+    // Années disponibles en arrière-plan — locationsAll ne couvre que les dernières positions
+    fetchAnneesDisponibles(currentToken).then(annees => {
+      const selectAnnee = document.getElementById('selectAnnee');
+      if (selectAnnee) {
+        if (selectAnnee.tomselect) {
+          selectAnnee.tomselect.clearOptions();
+          annees.forEach(annee => selectAnnee.tomselect.addOption({ value: String(annee), text: String(annee) }));
+          selectAnnee.tomselect.addOption({ value: 'toutes', text: 'Toutes les années' });
+          selectAnnee.tomselect.refreshOptions(false);
+        } else {
+          while (selectAnnee.options.length > 1) selectAnnee.remove(1);
+          annees.forEach(annee => {
+            const opt = document.createElement('option');
+            opt.value = annee;
+            opt.textContent = annee;
+            selectAnnee.appendChild(opt);
+          });
+          const optToutes = document.createElement('option');
+          optToutes.value = 'toutes';
+          optToutes.textContent = 'Toutes les années';
+          selectAnnee.appendChild(optToutes);
+        }
+        window._anneeOptions = annees.map(String);
+      }
+    }).catch(err => console.warn('fetchAnneesDisponibles échoué:', err));
+
+    const locationsEnrichiesAll = enrichirLocations(locationsAll);
+    const locationsSuivies = enrichirLocations(locationsSuiviesRaw);
+
+    // activeIds = tous les ani_id retournés par la RPC ani_is_followed
+    // (la RPC filtre déjà cor_date_fin IS NULL côté SQL)
+    setActiveIds(new Set(locationsAll.map(l => l.ani_id)));
 
     adapterSelectNPourMode('positions');
     mettreAJourBadgeNPositions();
@@ -485,38 +524,6 @@ async function startApp(token) {
     mettreAJourIndividus(enrichirAnimauxAvecPositions(locationsSuivies));
     mettreAJourLegende();
     setLabelDatetime('Date de localisation');
-
-    // Peupler le select d'années depuis les positions disponibles
-    const annees = [...new Set(
-      locationsEnrichiesAll
-        .map(l => l.loc_datetime_local || l.loc_date_local)
-        .filter(Boolean)
-        .map(d => new Date(d).getFullYear())
-        .filter(y => !isNaN(y))
-    )].sort((a, b) => b - a);
-
-    const selectAnnee = document.getElementById('selectAnnee');
-    if (selectAnnee) {
-      if (selectAnnee.tomselect) {
-        selectAnnee.tomselect.clearOptions();
-        annees.forEach(annee => selectAnnee.tomselect.addOption({ value: String(annee), text: String(annee) }));
-        selectAnnee.tomselect.addOption({ value: 'toutes', text: 'Toutes les années' });
-        selectAnnee.tomselect.refreshOptions(false);
-      } else {
-        while (selectAnnee.options.length > 1) selectAnnee.remove(1);
-        annees.forEach(annee => {
-          const opt = document.createElement('option');
-          opt.value = annee;
-          opt.textContent = annee;
-          selectAnnee.appendChild(opt);
-        });
-        const optToutes = document.createElement('option');
-        optToutes.value = 'toutes';
-        optToutes.textContent = 'Toutes les années';
-        selectAnnee.appendChild(optToutes);
-      }
-    }
-    window._anneeOptions = annees.map(String);
 
     // Identifier tous les animaux qui ont au moins une géométrie — sur tout l historique
     // (v_localisation), pas seulement leur derniere position (v_animal_last_loc), pour ne pas
