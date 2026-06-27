@@ -792,10 +792,20 @@ export async function mettreAJourListeParDate() {
   // suffit a verifier la presence, aucune requete API necessaire, mise a jour instantanee
   const saisonSansAnnee = periodes.every(p => p.source === 'saisonnalite_all');
   if (saisonSansAnnee) {
+    const calendrier = getAniCalendrier();
+
+    // Calendrier pas encore disponible (chargement en arrière-plan) — ne pas filtrer
+    // par saison, afficher tous les individus en attendant qu'il soit prêt
+    if (calendrier.size === 0) {
+      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+        label.style.display = label.dataset.sansGeom === 'true' ? 'none' : 'flex';
+      });
+      return;
+    }
+
     const saisonFromApi = formatSaisonPourAPI(document.getElementById('saisonFrom')?.value);
     const saisonToApi = formatSaisonPourAPI(document.getElementById('saisonTo')?.value);
     const chevauchante = !!(saisonFromApi && saisonToApi && saisonFromApi > saisonToApi);
-    const calendrier = getAniCalendrier();
 
     const idsAvecPositions = new Set();
     calendrier.forEach((mjSet, aniId) => {
