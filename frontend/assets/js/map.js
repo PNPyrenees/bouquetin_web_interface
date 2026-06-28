@@ -345,14 +345,26 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
       strokeR = cR; strokeG = cG; strokeB = cB; strokeA = cA;
       strokeWidth = 2.5;
     } else if (modeTrajectoire && estDernier) {
+      // Meme contour par index que les autres points — coherent avec la legende
+      const idxDernier = indicesIndividus.get(loc.ani_id) ?? 0;
+      const contourDernier = getContourParIndex(idxDernier);
       radius = 8;
       fillR = cR; fillG = cG; fillB = cB; fillA = cA;
-      strokeR = 0; strokeG = 0; strokeB = 0; strokeA = 0;
-      strokeWidth = 0;
+      strokeR = contourDernier.strokeR;
+      strokeG = contourDernier.strokeG;
+      strokeB = contourDernier.strokeB;
+      strokeA = contourDernier.strokeA;
+      strokeWidth = contourDernier.strokeWidth;
     } else if (modeTrajectoire) {
+      // Contour variable selon l index de l individu — coherent avec la legende et le mode Positions
+      const idxTraj = indicesIndividus.get(loc.ani_id) ?? 0;
+      const contourTraj = getContourParIndex(idxTraj);
       radius = 4;
       fillR = cR; fillG = cG; fillB = cB; fillA = cA;
-      strokeR = 255; strokeG = 255; strokeB = 255; strokeA = 1;
+      strokeR = contourTraj.strokeR;
+      strokeG = contourTraj.strokeG;
+      strokeB = contourTraj.strokeB;
+      strokeA = contourTraj.strokeA;
       strokeWidth = 1;
     } else {
       // Mode Positions — contour variable selon l index de l individu
