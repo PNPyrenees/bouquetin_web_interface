@@ -1364,14 +1364,16 @@ input[type="checkbox"] {
   gap: 10px;
   min-width: unset;
   max-width: unset;
+  pointer-events: none; /* La boite wrapper ne capture plus les clics */
 }
 
 .legende-panel {
-  background: white;
+  background: #d9d9d9;
   border-radius: 4px 4px 0 0;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
   font-family: var(--font-family);
   font-size: 12px;
+  pointer-events: auto; /* Le panneau légende reste cliquable */
 }
 
 .legende-header {
@@ -1605,6 +1607,7 @@ input[type="checkbox"] {
   padding: 4px 8px;
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  pointer-events: auto; /* L'échelle reste cliquable */
 }
 
 #scaleTarget .ol-scale-line {
