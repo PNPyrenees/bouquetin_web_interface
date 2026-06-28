@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [0.43.0] - 2026-06-28
+
+### Modifications
+- mettreAJourListeParDate() migre vers fetchLocalisationsRPC avec limit_par_animal 1
+- fetchAnimalIdsParPeriode retire des imports filters.js - plus utilise dans ce fichier
+
 ## [0.42.0] - 2026-06-28
 
 ### Ajouts
