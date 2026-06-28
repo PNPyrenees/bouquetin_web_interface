@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [0.42.0] - 2026-06-28
+
+### Ajouts
+- construireFiltersRPC() helper dans filters.js - construit les filtres RPC depuis l etat UI
+
+### Modifications
+- applyFilters() migre vers fetchLocalisationsRPC() - 2 chemins unifies au lieu de 4
+- Chemin A : limit_par_animal via RPC remplace les requetes paralleles par animal
+- Chemin B : pagination RPC remplace fetchLocationsAvecPagination
+- Filtres attributaires appliques cote serveur par la RPC - suppression filtres JS post-fetch
+- masquerIndividusSansPositions() corrigee - respecte checkSuivis et filtres attributaires
+- Parametre requeteRestreinte pour eviter masquage des individus non coches
+- Contour point final trajectoire aligne sur le contour par index de l individu
+- pointer-events none sur legende-wrapper - zone invisible ne bloque plus les clics carte
+
+### Corrections
+- Cas 1 : liste individus reste limitee aux suivis apres Appliquer
+- Cas 2 : liste individus affiche tous les individus filtres meme avec individus coches
+- Legende Trajectoire - contour pastilles coherent avec les points carte
+- Zone invisible legende ne bloque plus les clics sur les points GPS
+
 ## [0.41.0] - 2026-06-26
 
 ### Ajouts
