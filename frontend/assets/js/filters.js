@@ -1,4 +1,4 @@
-import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations, fetchNDernieresLocalisations, fetchLocalisationsRPC } from './api.js';
+import { fetchLocations, fetchLastLocationsParPeriode, fetchAllLastLocations, fetchCountLocations, fetchNDernieresLocalisations, fetchLocalisationsRPC } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
 import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, SAISONS_CONFIG, CLASSES_AGE } from './config.js';
@@ -740,17 +740,18 @@ export async function mettreAJourListeParDate() {
 
     // Pour chaque periode, recuperer les ani_id ayant des donnees dans la saison
     const promises = periodes.map(p =>
-      fetchAnimalIdsParPeriode(getCurrentToken(), {
+      fetchLocalisationsRPC(getCurrentToken(), {
         date_from: p.from,
         date_to: p.to,
         saisonFrom: saisonFromApi,
         saisonTo: saisonToApi,
-        include_outliers: false
+        include_outliers: false,
+        limit_par_animal: 1
       })
     );
 
     const results = await Promise.all(promises);
-    results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
+    results.forEach(locs => locs.forEach(l => idsUnion.add(String(l.ani_id))));
 
     if (requeteId !== _derniereRequeteId) return;
 
