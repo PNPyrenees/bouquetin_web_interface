@@ -1,4 +1,4 @@
-import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations, fetchNDernieresLocalisations } from './api.js';
+import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations, fetchNDernieresLocalisations, fetchLocalisationsRPC } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
 import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, SAISONS_CONFIG, CLASSES_AGE } from './config.js';
@@ -166,13 +166,17 @@ export function getPeriodesActives() {
 }
 
 /**
- * Masque dans #listeIndividus les animaux absents des resultats retournes par l API
- * lorsque un filtre temporel (periode, saison ou annee) est actif — pas de moyen fiable
- * de savoir a l avance si un animal a des positions dans la plage sans interroger l API,
- * donc on se base sur le resultat reel de la requete deja effectuee par applyFilters().
+ * Masque dans #listeIndividus les animaux qui ne passent pas les filtres attributaires
+ * actifs (suivis, sexe, gestionnaire, population), et — quand la requete couvrait tous
+ * les animaux filtres (pas seulement des individus coches manuellement) — ceux absents
+ * des resultats retournes par l API lorsqu un filtre temporel (periode, saison, annee)
+ * est actif. requeteRestreinte indique que locations ne contient que les positions des
+ * individus coches manuellement : dans ce cas on ne peut pas s en servir pour juger de
+ * la presence de positions des autres individus, donc on ne les masque pas sur ce critere.
  */
-function masquerIndividusSansPositions(locations) {
+function masquerIndividusSansPositions(locations, requeteRestreinte = false) {
   const aniIdsAvecPositions = new Set(locations.map(l => String(l.ani_id)));
+  const suivisSeulement = document.getElementById('checkSuivis')?.checked;
 
   const filtreTemporelActif = !!(
     document.getElementById('dateFrom')?.value ||
@@ -187,9 +191,31 @@ function masquerIndividusSansPositions(locations) {
     if (!checkbox) return;
     const aniId = String(checkbox.value);
 
-    if (filtreTemporelActif) {
+    if (label.dataset.sansGeom === 'true') return;
+
+    // Verifier si l animal passe les filtres attributaires actifs
+    const matchSuivis = !suivisSeulement || getActiveIds().has(Number(aniId));
+    const sexeFiltreEl = document.getElementById('selectSexe');
+    const sexeFiltre = sexeFiltreEl?.tomselect?.getValue() || sexeFiltreEl?.value || '';
+    const matchSexe = !sexeFiltre || label.dataset.sexe === sexeFiltre;
+    const gestFiltreEl = document.getElementById('selectGestionnaire');
+    const gestFiltre = gestFiltreEl?.tomselect?.getValue() || gestFiltreEl?.value || '';
+    const matchGest = !gestFiltre || label.dataset.gestionnaire === gestFiltre;
+    const popFiltreEl = document.getElementById('selectPopulation');
+    const popFiltre = popFiltreEl?.tomselect?.getValue() || popFiltreEl?.value || '';
+    const matchPop = !popFiltre || label.dataset.population === popFiltre;
+
+    const matchAttributs = matchSuivis && matchSexe && matchGest && matchPop;
+
+    if (!matchAttributs) {
+      // Masquer les animaux qui ne passent pas les filtres attributaires
+      label.style.display = 'none';
+      return;
+    }
+
+    if (filtreTemporelActif && !requeteRestreinte) {
+      // Masquage par date uniquement si la requete couvrait tous les animaux filtres
       if (!aniIdsAvecPositions.has(aniId)) {
-        // Masquer si l animal n a pas de positions dans les resultats
         label.style.display = 'none';
         label.dataset.masqueParDate = 'true';
         if (checkbox.checked) {
@@ -197,16 +223,60 @@ function masquerIndividusSansPositions(locations) {
           label.dataset.cocheAuto = 'false';
           supprimerBadgeById(`ani-${aniId}`);
         }
-      } else if (label.dataset.sansGeom !== 'true') {
+      } else {
         label.style.display = 'flex';
         label.dataset.masqueParDate = 'false';
       }
-    } else if (label.dataset.sansGeom !== 'true' && label.dataset.masqueParDate === 'true') {
-      // Pas de filtre temporel — restaurer visibilite normale
+    } else {
+      // Pas de filtre temporel, ou requete restreinte aux coches — ne pas se baser sur
+      // locations pour les non-coches, ils passent peut-etre quand meme les filtres attributaires
       label.style.display = 'flex';
       label.dataset.masqueParDate = 'false';
     }
   });
+}
+
+/**
+ * Construit l'objet de filtres attendu par fetchLocalisationsRPC() depuis l'etat
+ * courant des filtres UI (deja resolus : ids, dates/saisons consolidees, attributs).
+ */
+function construireFiltersRPC(token, idsAnimaux, filters, suivisSeulement) {
+  const rpcFilters = {};
+
+  // Animaux
+  if (idsAnimaux && idsAnimaux.length > 0) {
+    rpcFilters.ani_id = idsAnimaux.map(Number);
+  } else if (suivisSeulement) {
+    rpcFilters.ani_is_followed = true;
+  }
+
+  // Dates absolues
+  if (filters.date_from) rpcFilters.date_from = filters.date_from;
+  if (filters.date_to)   rpcFilters.date_to   = filters.date_to;
+
+  // Années
+  if (Array.isArray(filters.annees) && filters.annees.length > 0) {
+    rpcFilters.annees = filters.annees.map(Number);
+  }
+
+  // Saisonnalité
+  if (filters.saisonFrom) rpcFilters.saisonFrom = filters.saisonFrom;
+  if (filters.saisonTo)   rpcFilters.saisonTo   = filters.saisonTo;
+
+  // Attributs
+  if (filters.sexe)          rpcFilters.sexe          = filters.sexe;
+  if (filters.gestionnaire)  rpcFilters.gestionnaire  = filters.gestionnaire;
+  if (filters.population)    rpcFilters.population    = filters.population;
+  if (filters.programmation) rpcFilters.programmation = filters.programmation;
+
+  // Qualité
+  rpcFilters.include_outliers = filters.include_outliers || false;
+
+  // Age capture
+  if (filters.age_capture_min != null) rpcFilters.age_capture_min = filters.age_capture_min;
+  if (filters.age_capture_max != null) rpcFilters.age_capture_max = filters.age_capture_max;
+
+  return rpcFilters;
 }
 
 /**
@@ -257,215 +327,85 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const toutesPositions = nModeToutes?.checked || nVal === 'toutes';
       const n = toutesPositions ? null : (parseInt(nVal) || 5);
 
-      if (periodes.length === 0) {
-        const filtreAttributaireActif =
-          !!filters.sexe || !!filters.gestionnaire || !!filters.population ||
-          !!document.getElementById('selectClasseAge')?.value ||
-          !!filters.programmation ||
-          Array.from(document.querySelectorAll('#listeIndividus input:checked'))
-            .filter(cb => {
-              const label = cb.closest('label');
-              return label && label.dataset.cocheAuto !== 'true';
-            }).length > 0 ||
-          !!filters.include_outliers;
+      const idsAChercher = selectedIds.length > 0 ? selectedIds :
+        Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
+          .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
+          .map(l => l.querySelector('input')?.value)
+          .filter(Boolean);
 
-        if (!filtreAttributaireActif) {
+      // Consolidation periode/saison en une seule plage min/max — getPeriodesActives() peut
+      // retourner plusieurs periodes (ex: N annees x 1 periode recurrente)
+      const dateMin = periodes.length > 0
+        ? periodes.reduce((min, p) => p.from && p.from < min ? p.from : min, periodes.find(p => p.from)?.from || '')
+        : '';
+      const dateMax = periodes.length > 0
+        ? periodes.reduce((max, p) => p.to && p.to > max ? p.to : max, periodes.find(p => p.to)?.to || '')
+        : '';
+      const hasSaisonnalite = periodes.some(p => p.source === 'saisonnalite' || p.source === 'saisonnalite_all');
+      // Bornes saisonnieres MM-JJ pour filtrage direct via loc_mois_jour_local (RPC)
+      const saisonFromApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
+      const saisonToApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
 
-          let idsActifs = suivisSeulement
-            ? Array.from(getActiveIds()).map(String)
-            : getAnimals().map(a => String(a.ani_id));
+      const rpcFilters = construireFiltersRPC(token, idsAChercher, {
+        ...filters,
+        date_from: dateMin || null,
+        date_to: dateMax || null,
+        saisonFrom: saisonFromApi,
+        saisonTo: saisonToApi
+      }, suivisSeulement);
 
-          if (toutesPositions) {
-            const countFilters = {
-              ani_id: idsActifs,
-              include_outliers: filters.include_outliers
-            };
-            const totalPositions = await fetchCountLocations(token, countFilters);
-            const SEUIL = SEUIL_ALERTE_VOLUME;
-            let confirmed = 500000;
-            if (totalPositions > SEUIL) {
-              const modal = document.getElementById('modalVolume');
-              document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
-              modal.style.display = 'flex';
-              confirmed = await new Promise(resolve => {
-                document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
-                document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
-              });
-              if (confirmed === null) {
-                hideMapLoading();
-                unlockSidebar();
-                if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
-                mettreAJourBoutonAppliquer();
-                return false;
-              }
-            }
-            locations = await fetchLocations(token, { ...countFilters, limit: confirmed });
-          } else if (n === 1) {
-            locations = await fetchAllLastLocations(token, {
-              population: filters.population,
-              include_outliers: filters.include_outliers
-            });
-            if (suivisSeulement) {
-              locations = locations.filter(l => getActiveIds().has(Number(l.ani_id)));
-            }
-          } else {
-            locations = await fetchNDernieresLocalisations(token, idsActifs, n);
-          }
-        } else {
-          // Un ou plusieurs filtres actifs → positions historiques correspondantes
-          const idsAChercher = selectedIds.length > 0 ? selectedIds :
-            Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
-              .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
-              .map(l => l.querySelector('input')?.value)
-              .filter(Boolean);
-
-          if (idsAChercher.length === 0) {
-            locations = [];
-          } else if (!toutesPositions && n) {
-            // N positions par animal — appel API direct, pas de comptage ni de modale
-            const nPromises = idsAChercher.map(id =>
-              fetchLocations(token, { ani_id: id, include_outliers: filters.include_outliers, limit: n })
-            );
-            locations = (await Promise.all(nPromises)).flat();
-          } else {
-            const countFilters = {
-              ani_id: idsAChercher,
-              include_outliers: filters.include_outliers
-            };
-
-            const totalPositions = await fetchCountLocations(token, countFilters);
-            const SEUIL = SEUIL_ALERTE_VOLUME;
-            let confirmed = 500000;
-
-            if (totalPositions > SEUIL) {
-              const modal = document.getElementById('modalVolume');
-              document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
-              modal.style.display = 'flex';
-
-              confirmed = await new Promise(resolve => {
-                document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
-                document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
-              });
-
-              if (confirmed === null) {
-                hideMapLoading();
-                unlockSidebar();
-                if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
-                mettreAJourBoutonAppliquer();
-                return false;
-              }
-            }
-
-            locations = await fetchLocations(token, {
-              ...countFilters,
-              limit: confirmed
-            });
-          }
-        }
+      if (!toutesPositions && n) {
+        // Chemin A — N dernieres positions par animal via RPC
+        rpcFilters.limit_par_animal = n;
+        locations = await fetchLocalisationsRPC(token, rpcFilters);
       } else {
-        // Avec periodes — consolider en une seule plage min/max
-        const dateMin = periodes.reduce((min, p) => p.from && p.from < min ? p.from : min,
-          periodes.find(p => p.from)?.from || '');
-        const dateMax = periodes.reduce((max, p) => p.to && p.to > max ? p.to : max,
-          periodes.find(p => p.to)?.to || '');
-        const hasSaisonnalite = periodes.some(p => p.source === 'saisonnalite' || p.source === 'saisonnalite_all');
+        // Chemin B — Toutes positions, avec modal volume + pagination RPC
+        const totalPositions = await fetchCountLocations(token, {
+          ani_id: rpcFilters.ani_id,
+          date_from: rpcFilters.date_from,
+          date_to: rpcFilters.date_to,
+          saisonFrom: rpcFilters.saisonFrom,
+          saisonTo: rpcFilters.saisonTo,
+          include_outliers: rpcFilters.include_outliers
+        });
 
-        const idsAChercher = selectedIds.length > 0 ? selectedIds :
-          Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
-            .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
-            .map(l => l.querySelector('input')?.value)
-            .filter(Boolean);
+        let confirmed = true;
+        if (totalPositions > SEUIL_ALERTE_VOLUME) {
+          const modal = document.getElementById('modalVolume');
+          document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
+          modal.style.display = 'flex';
 
-        // Bornes saisonnieres MM-JJ pour filtrage direct via loc_mois_jour_local (API)
-        const saisonFromApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
-        const saisonToApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
+          confirmed = await new Promise(resolve => {
+            document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(false); };
+            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(true); };
+          });
 
-        if (!toutesPositions && n) {
-          // Chemin A — API direct par animal, limit:n, dates exactes
-          // Saisonnalite (avec ou sans annee precise) geree directement par loc_mois_jour_local — plus de fetch par annee
-          const nPromises = idsAChercher.map(id =>
-            fetchLocations(token, {
-              ani_id: id,
-              date_from: dateMin || null,
-              date_to: dateMax || null,
-              saisonFrom: saisonFromApi,
-              saisonTo: saisonToApi,
-              include_outliers: filters.include_outliers,
-              limit: n
-            })
-          );
-          locations = (await Promise.all(nPromises)).flat();
-        } else {
-          // Chemin B — Toutes positions ou cas residuels
-          // Saisonnalite geree directement par loc_mois_jour_local — comptage exact en une requete, plus de filtre JS
-          const countFilters = {
-            ani_id: idsAChercher,
-            date_from: dateMin || null,
-            date_to: dateMax || null,
-            saisonFrom: saisonFromApi,
-            saisonTo: saisonToApi,
-            include_outliers: filters.include_outliers
-          };
-          const totalPositions = await fetchCountLocations(token, countFilters);
-          let confirmed = 500000;
+          if (!confirmed) {
+            hideMapLoading();
+            unlockSidebar();
+            if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+            mettreAJourBoutonAppliquer();
+            return false;
+          }
+        }
 
-          if (totalPositions > SEUIL_ALERTE_VOLUME) {
-            const modal = document.getElementById('modalVolume');
-            document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
-            modal.style.display = 'flex';
-
-            confirmed = await new Promise(resolve => {
-              document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
-              document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
-            });
-
-            if (confirmed === null) {
-              hideMapLoading();
-              unlockSidebar();
-              if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
-              mettreAJourBoutonAppliquer();
-              return false;
+        locations = await fetchLocalisationsRPC(
+          token,
+          rpcFilters,
+          (batch, clearBefore) => {
+            // Rendu progressif (apercu) — le rendu final est fait plus bas une fois tous les batches recus
+            const enrichis = enrichirLocations(batch);
+            const modeCouleurPreview = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+            renderPoints(enrichis, clearBefore, false, modeCouleurPreview);
+            // Mettre a jour le compteur en temps reel
+            const posEl = document.getElementById('positionsCount');
+            if (posEl) {
+              const current = parseInt(posEl.textContent) || 0;
+              posEl.textContent = clearBefore ? batch.length : current + batch.length;
             }
           }
-
-          locations = await fetchLocationsAvecPagination(
-            token,
-            { ...countFilters },
-            (batch, clearBefore) => {
-              // Rendu progressif (apercu) — le rendu final/filtre est fait plus bas une fois tous les batches recus
-              const enrichis = enrichirLocations(batch);
-              const modeCouleurPreview = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-              renderPoints(enrichis, clearBefore, false, modeCouleurPreview);
-              // Mettre a jour le compteur en temps reel
-              const posEl = document.getElementById('positionsCount');
-              if (posEl) {
-                const current = parseInt(posEl.textContent) || 0;
-                posEl.textContent = clearBefore ? batch.length : current + batch.length;
-              }
-            }
-          );
-        }
-      }
-
-      // Filtres côté JS (sexe, gestionnaire, programmation, suivis)
-      if (filters.sexe) {
-        locations = locations.filter(l => {
-          const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
-          return ani?.ani_sexe === filters.sexe;
-        });
-      }
-      if (filters.gestionnaire) {
-        locations = locations.filter(l => {
-          const ani = getAnimals().find(a => String(a.ani_id) === String(l.ani_id));
-          return ani?.ani_gestionnaire === filters.gestionnaire;
-        });
-      }
-      if (filters.programmation) {
-        locations = locations.filter(l =>
-          String(getProgrammationsMap().get(String(l.ani_id))) === filters.programmation
         );
       }
-      if (suivisSeulement) locations = locations.filter(l => getActiveIds().has(Number(l.ani_id)));
 
       if (toutesPositions) { setDernierNPositions('toutes'); }
       else if (n) { setDernierNPositions(String(n)); }
@@ -477,7 +417,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       clearMapPoints();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
       const count = renderPoints(locations, true, false, modeCouleur);
-      masquerIndividusSansPositions(locations);
+      const idsSelectionnesManuel = selectedIds.length > 0;
+      masquerIndividusSansPositions(locations, idsSelectionnesManuel);
       mettreAJourPanneau(locations);
       mettreAJourIndividus(getAnimals().filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
 
@@ -540,41 +481,30 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const saisonFromApiTraj = hasSaisonnaliteTraj ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
       const saisonToApiTraj = hasSaisonnaliteTraj ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
 
-      if (!dateFromApi && !dateToApi && !toutesPositionsTraj) {
-        // Pas de periode — N dernieres localisations par individu, pas de COUNT ni modale
-        locations = await fetchNDernieresLocalisations(token, idsAChercher, nTraj);
+      const rpcFiltersTraj = construireFiltersRPC(token, idsAChercher, {
+        ...filters,
+        date_from: dateFromApi,
+        date_to: dateToApi,
+        saisonFrom: saisonFromApiTraj,
+        saisonTo: saisonToApiTraj
+      }, suivisSeulement);
 
-      } else if (!toutesPositionsTraj && nTraj) {
-        // Chemin A Trajectoire — API direct par animal, limit:n
-        // Saisonnalite (avec ou sans annee precise) geree directement par loc_mois_jour_local — plus de fetch par annee
-        const nPromisesTraj = idsAChercher.map(id =>
-          fetchLocations(token, {
-            ani_id: id,
-            date_from: dateFromApi,
-            date_to: dateToApi,
-            saisonFrom: saisonFromApiTraj,
-            saisonTo: saisonToApiTraj,
-            include_outliers: false,
-            limit: nTraj
-          })
-        );
-        locations = (await Promise.all(nPromisesTraj)).flat();
-
+      if (!toutesPositionsTraj && nTraj) {
+        // Chemin C — N dernieres positions par animal via RPC
+        rpcFiltersTraj.limit_par_animal = nTraj;
+        locations = await fetchLocalisationsRPC(token, rpcFiltersTraj);
       } else {
-        // Chemin B Trajectoire — Toutes positions ou cas residuels
-        // Saisonnalite geree directement par loc_mois_jour_local — comptage exact en une requete, plus de filtre JS
-        const trajCountFilters = {
-          ani_id: idsAChercher,
-          date_from: dateFromApi,
-          date_to: dateToApi,
-          saisonFrom: saisonFromApiTraj,
-          saisonTo: saisonToApiTraj,
-          include_outliers: false
-        };
+        // Chemin D — Toutes positions, avec modal volume + pagination RPC
+        const totalTrajPositions = await fetchCountLocations(token, {
+          ani_id: rpcFiltersTraj.ani_id,
+          date_from: rpcFiltersTraj.date_from,
+          date_to: rpcFiltersTraj.date_to,
+          saisonFrom: rpcFiltersTraj.saisonFrom,
+          saisonTo: rpcFiltersTraj.saisonTo,
+          include_outliers: rpcFiltersTraj.include_outliers
+        });
 
-        const totalTrajPositions = await fetchCountLocations(token, trajCountFilters);
-
-        let confirmedTraj = 500000;
+        let confirmedTraj = true;
 
         if (totalTrajPositions > SEUIL_ALERTE_VOLUME) {
           const modal = document.getElementById('modalVolume');
@@ -587,13 +517,13 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           modal.style.display = 'flex';
 
           confirmedTraj = await new Promise(resolve => {
-            document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(null); };
-            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(500000); };
+            document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(false); };
+            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(true); };
           });
 
           sousTexte.textContent = texteOriginalSous;
 
-          if (confirmedTraj === null) {
+          if (!confirmedTraj) {
             hideMapLoading();
             unlockSidebar();
             if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
@@ -602,11 +532,11 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           }
         }
 
-        locations = await fetchLocationsAvecPagination(
+        locations = await fetchLocalisationsRPC(
           token,
-          { ...trajCountFilters },
+          rpcFiltersTraj,
           (batch, clearBefore) => {
-            // Rendu progressif (apercu) — le rendu final/filtre est fait plus bas une fois tous les batches recus
+            // Rendu progressif (apercu) — le rendu final est fait plus bas une fois tous les batches recus
             const enrichis = enrichirLocations(batch);
             const modeCouleurPreview = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
             renderPoints(enrichis, clearBefore, true, modeCouleurPreview);
@@ -620,29 +550,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         );
       }
 
-      // Outliers - requête séparée, inchangée
-      if (filters.include_outliers) {
-        if (!dateFromApi || !dateToApi) {
-          showToast('Veuillez sélectionner une période pour inclure les outliers');
-        } else {
-          const outlierPromises = idsAChercher.map(async id => {
-            const toutesPositions = await fetchLocations(token, {
-              ani_id: [id],
-              date_from: dateFromApi,
-              date_to: dateToApi,
-              saisonFrom: saisonFromApiTraj,
-              saisonTo: saisonToApiTraj,
-              limit: 999999,
-              include_outliers: true,
-              only_outliers: true
-            });
-            return toutesPositions.filter(l => l.loc_outlier !== null || l.loc_anomalie === true);
-          });
-          const outlierResults = await Promise.all(outlierPromises);
-          locations = [...locations, ...outlierResults.flat()];
-        }
-      }
-
       if (toutesPositionsTraj) { setDernierNTrajectoire('toutes'); }
       else if (nTraj) { setDernierNTrajectoire(String(nTraj)); }
       mettreAJourBadgeNPositions();
@@ -652,7 +559,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       clearTrajectoire();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
       const count = renderPoints(locations, true, true, modeCouleur);
-      masquerIndividusSansPositions(locations);
+      const idsSelectionnesManuelTraj = selectedIds.length > 0;
+      masquerIndividusSansPositions(locations, idsSelectionnesManuelTraj);
       mettreAJourPanneau(locations);
       mettreAJourIndividus(getAnimals().filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
       ouvrirPanneauSiNecessaire();
