@@ -49,84 +49,6 @@ export async function login(username, password) {
 }
 
 /**
- * Récupère les positions GPS depuis la vue v_localisation.
- * PostgREST utilise une syntaxe de filtrage dans l'URL (ex: ?col=eq.valeur)
- * @param {string} token - Jeton JWT pour l'autorisation
- * @param {Object} filters - Objet contenant les critères de filtrage
- */
-export async function fetchLocations(token, filters = {}) {
-  const params  = new URLSearchParams();
-
-
-  // Filtrage par ID d'individus (multi-sélection ou individuel)
-  // Syntaxe PostgREST : in.(val1,val2,...) pour plusieurs valeurs
-  if (Array.isArray(filters.ani_id) && filters.ani_id.length > 0) {
-    params.append('ani_id', `in.(${filters.ani_id.join(',')})`);
-  } else if (filters.ani_id && !Array.isArray(filters.ani_id)) {
-    params.append('ani_id', `eq.${filters.ani_id}`);
-    
-  }
-
-  // Filtrage par date (gte: greater than or equal, lte: lower than or equal)
-  if (filters.date_from) params.append('loc_datetime_local', `gte.${filters.date_from}`);
-  if (filters.date_to) params.append('loc_datetime_local', `lte.${filters.date_to}`);
-
-  // Attributs de l'animal
-  if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
-  if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
-  if (filters.population) params.append('ani_pop_rattach', `eq.${filters.population}`);
-
-  // Gestion de la qualité des données : exclusion des anomalies/outliers par défaut
-  // PostgREST : 'not.is.true' permet de filtrer ce qui n'est pas TRUE (inclut FALSE et NULL)
-  if (!filters.include_outliers) {
-    params.append('loc_anomalie', 'not.is.true');
-    params.append('loc_outlier', 'is.null');
-  }
-
-  // Si on veut uniquement les positions aberrantes
-  if (filters.only_outliers) {
-    params.append('or', '(loc_outlier.not.is.null,loc_anomalie.eq.true)');
-  }
-
-  // Filtrage saisonnier direct via loc_mois_jour_local (format 'MM-JJ')
-  if (filters.saisonFrom && filters.saisonTo) {
-    const chevauchante = filters.saisonFrom > filters.saisonTo; // ex: '11-01' > '02-28'
-    if (chevauchante) {
-      // Saison a cheval — ex: nov → fev
-      params.append('or', `(loc_mois_jour_local.gte.${filters.saisonFrom},loc_mois_jour_local.lte.${filters.saisonTo})`);
-    } else {
-      // Saison simple — ex: mars → sept
-      params.append('loc_mois_jour_local', `gte.${filters.saisonFrom}`);
-      params.append('loc_mois_jour_local', `lte.${filters.saisonTo}`);
-    }
-  }
-
-  // On s'assure de n'avoir que des données possédant une géométrie valide
-  params.append('geom', 'not.is.null');
-
-  // Paramètres de pagination et de tri
-  // Si limit est fourni, l'utiliser — sinon pas de limit (laisser PostgREST décider)
-  if (filters.limit) {
-    params.append('limit', filters.limit);
-  }
-  if (filters.offset) {
-    params.append('offset', filters.offset);
-  }
-  params.append('order', 'loc_datetime_local.desc');
-
-  const res = await fetch(`${API_URL}/v_localisation?${params.toString()}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept-Profile': 'bouquetin'
-    }
-  });
-  
-  if (!res.ok) throw new Error('Échec chargement données');
-  const data = await res.json();
-  return data;
-}
-
-/**
  * Récupère tous les champs de v_localisation pour l'export CSV — sans limit,
  * indépendant de la pagination et des filtres colonnes du tableau.
  * @param {string} token - Jeton JWT pour l'autorisation
@@ -190,34 +112,6 @@ export async function fetchAnimals(token) {
   );
   if (!res.ok) throw new Error('Échec chargement animaux');
   return res.json();
-}
-
-/**
- * Récupère la dernière position de tous les animaux en une seule requête
- * depuis la vue v_animal_last_loc modifiée (actifs + inactifs).
- */
-export async function fetchAllLastLocations(token, filters = {}) {
-  const params = new URLSearchParams();
-  params.append('geom', 'not.is.null');
-
-  if (!filters.include_outliers) {
-    params.append('loc_anomalie', 'not.is.true');
-  }
-
-  if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
-  if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
-  if (filters.population) params.append('ani_pop_rattach', `eq.${filters.population}`);
-
-  const res = await fetch(`${API_URL}/v_animal_last_loc?${params.toString()}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept-Profile': 'bouquetin'
-    }
-  });
-
-  if (!res.ok) throw new Error('Échec chargement positions');
-  const data = await res.json();
-  return data;
 }
 
 /**
@@ -369,21 +263,6 @@ export async function fetchBibliothequeProgrammations(token) {
 }
 
 /**
- * Récupère les N dernières localisations de chaque animal spécifié
- */
-export async function fetchNDernieresLocalisations(token, ids, n) {
-  const promises = ids.map(id =>
-    fetchLocations(token, {
-      ani_id: id,
-      limit: n,
-      include_outliers: false
-    })
-  );
-  const results = await Promise.all(promises);
-  return results.flat();
-}
-
-/**
  * Precharge un index leger ani_id -> Set(mois_jour) pour filtrer la liste
  * individus instantanement cote client lors d'une selection de saison,
  * sans requete API supplementaire.
@@ -435,31 +314,6 @@ export async function fetchAniIdsAvecGeom(token) {
   if (!res.ok) throw new Error(`fetchAniIdsAvecGeom error: ${res.status}`);
   const data = await res.json();
   return new Set(data.map(r => String(r.ani_id)));
-}
-
-/**
- * Récupère les années distinctes ayant des positions valides — utilisé pour peupler
- * le select d'années sans dépendre des positions déjà chargées (qui ne couvrent
- * parfois que les dernières années).
- */
-export async function fetchAnneesDisponibles(token) {
-  const res = await fetch(
-    `${API_URL}/v_localisation?select=loc_datetime_local&loc_anomalie=not.is.true&loc_outlier=is.null&geom=not.is.null`,
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept-Profile': 'bouquetin',
-        'Prefer': 'count=none'
-      }
-    }
-  );
-  if (!res.ok) throw new Error(`fetchAnneesDisponibles error: ${res.status}`);
-  const data = await res.json();
-  return [...new Set(
-    data
-      .map(l => new Date(l.loc_datetime_local).getFullYear())
-      .filter(y => !isNaN(y))
-  )].sort((a, b) => b - a);
 }
 
 /**
