@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC } from './api.js';
+import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -1570,7 +1570,6 @@ let isResetting = false;
 async function reinitialiserTousLesFiltres() {
   if (isResetting) return;
   isResetting = true;
-  viderCache();
 
   showMapLoading();
   lockSidebar();
@@ -1782,7 +1781,6 @@ async function deconnecter() {
   clearTrajectoire();
 
   setCurrentToken(null);
-  viderCache();
 
   try {
     // Réinitialiser sans recharger depuis l'API (token null)
