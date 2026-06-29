@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.45.0] - 2026-06-29
+
+### Corrections
+- fetchAnneesDisponibles remplacee - causait ERR_CONTENT_LENGTH_MISMATCH au chargement
+- Annees extraites depuis locationsAll deja charge puis enrichies en arriere-plan via RPC
+- window._anneeOptions peuple immediatement - coche saison fonctionnelle des le demarrage
+- Select annees visible immediatement sans attente reseau supplementaire
+
+### Nettoyage
+- Import mort fetchAnneesDisponibles retire de app.js
+
 ## [0.44.0] - 2026-06-29
 
 ### Nettoyage
