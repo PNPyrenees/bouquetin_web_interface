@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.44.0] - 2026-06-29
+
+### Nettoyage
+- Suppression fetchLastLocationsParPeriode - dead code
+- Suppression fetchLastLocations - dead code
+- Suppression fetchLastLocationsInactifs - dead code
+- Suppression fetchLocationsAvecPagination - remplacee par fetchLocalisationsRPC
+- Retrait des imports morts dans app.js et filters.js
+
 ## [0.43.0] - 2026-06-28
 
 ### Modifications
