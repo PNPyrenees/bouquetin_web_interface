@@ -1,4 +1,4 @@
-import { fetchLocations, fetchLastLocationsParPeriode, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations, fetchNDernieresLocalisations, fetchLocalisationsRPC } from './api.js';
+import { fetchLocations, fetchAnimalIdsParPeriode, fetchAllLastLocations, fetchCountLocations, fetchNDernieresLocalisations, fetchLocalisationsRPC } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
 import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, SAISONS_CONFIG, CLASSES_AGE } from './config.js';
@@ -23,40 +23,6 @@ function formatSaisonPourAPI(dateJJMM) {
 }
 
 const BATCH_SIZE = 10000;
-
-/**
- * Recupere toutes les positions par batches de BATCH_SIZE (offset successifs) au lieu
- * d'une requete unique avec un limit eleve — evite ERR_CONTENT_LENGTH_MISMATCH sur les
- * gros volumes. onBatch(batch, premierBatch) permet un rendu progressif (apercu) pendant
- * le chargement ; le rendu final/autoritaire reste fait par l appelant sur le resultat complet.
- */
-async function fetchLocationsAvecPagination(token, filters, onBatch) {
-  let offset = 0;
-  let premierBatch = true;
-  let totalLocations = [];
-
-  while (true) {
-    const batch = await fetchLocations(token, {
-      ...filters,
-      limit: BATCH_SIZE,
-      offset: offset
-    });
-
-    if (!Array.isArray(batch) || batch.length === 0) break;
-
-    // Rendu progressif sur la carte
-    onBatch(batch, premierBatch);
-    totalLocations = totalLocations.concat(batch);
-    premierBatch = false;
-
-    // Si le batch est inferieur a BATCH_SIZE — c est le dernier
-    if (batch.length < BATCH_SIZE) break;
-
-    offset += BATCH_SIZE;
-  }
-
-  return totalLocations;
-}
 
 export function getPeriodesActives() {
   // CHEMIN 1 — Periode (champs dateFrom/dateTo avec JJ/MM/AAAA)
