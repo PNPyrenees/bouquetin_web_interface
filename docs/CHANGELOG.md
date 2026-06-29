@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.48.0] - 2026-06-29
+
+### Nettoyage
+- Suppression systeme de cache api.js - _cache _cleCache _getCache _setCache viderCache
+- Plus aucune fonction ne remplissait le cache depuis v0.41.0
+- Retrait des 2 appels viderCache() dans app.js
+- Retrait import mort viderCache dans app.js
+
 ## [0.47.0] - 2026-06-29
 
 ### Nettoyage
