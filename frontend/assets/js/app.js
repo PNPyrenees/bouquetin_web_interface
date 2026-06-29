@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchLocations, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC, fetchAnneesDisponibles } from './api.js';
+import { login, fetchAnimals, fetchLocations, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -384,7 +384,8 @@ async function startApp(token) {
       fetchAnimals(token),
       fetchPopulations(token),
       fetchGestionnaires(token),
-      fetchProgrammations(token)
+      fetchProgrammations(token),
+      chargerProgrammationsGPS(token)
     ]);
 
     setAnimals(animaux);
@@ -428,8 +429,6 @@ async function startApp(token) {
       }
     });
 
-    await chargerProgrammationsGPS(token);
-    
     // ← initPanneau() ici — après les données, avant le rendu
     initPanneau();
     window._scrollToAniId = scrollToAniId;
@@ -463,8 +462,8 @@ async function startApp(token) {
 
     const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
 
-    // Deux requêtes en parallèle pour le chargement initial
-    const [locationsAll, locationsSuiviesRaw] = await Promise.all([
+    // Trois requêtes en parallèle pour le chargement initial
+    const [locationsAll, locationsSuiviesRaw, idsAvecGeom] = await Promise.all([
       // Dernière position par animal suivi — pour activeIds, années, liste individus
       fetchLocalisationsRPC(currentToken, {
         ani_is_followed: true,
@@ -474,7 +473,11 @@ async function startApp(token) {
       fetchLocalisationsRPC(currentToken, {
         ani_is_followed: true,
         limit_par_animal: n
-      })
+      }),
+      // Identifier tous les animaux qui ont au moins une géométrie — sur tout l historique
+      // (v_localisation), pas seulement leur derniere position (v_animal_last_loc), pour ne pas
+      // exclure un animal inactif dont la derniere position n a pas de geom valide
+      fetchAniIdsAvecGeom(currentToken)
     ]);
 
     // Calendrier en arrière-plan — ne bloque pas le rendu carte
@@ -482,31 +485,57 @@ async function startApp(token) {
       _aniCalendrier = calendrier;
     }).catch(err => console.warn('fetchAniCalendrier échoué:', err));
 
-    // Années disponibles en arrière-plan — locationsAll ne couvre que les dernières positions
-    fetchAnneesDisponibles(currentToken).then(annees => {
-      const selectAnnee = document.getElementById('selectAnnee');
-      if (selectAnnee) {
-        if (selectAnnee.tomselect) {
-          selectAnnee.tomselect.clearOptions();
-          annees.forEach(annee => selectAnnee.tomselect.addOption({ value: String(annee), text: String(annee) }));
-          selectAnnee.tomselect.addOption({ value: 'toutes', text: 'Toutes les années' });
-          selectAnnee.tomselect.refreshOptions(false);
-        } else {
-          while (selectAnnee.options.length > 1) selectAnnee.remove(1);
-          annees.forEach(annee => {
-            const opt = document.createElement('option');
-            opt.value = annee;
-            opt.textContent = annee;
-            selectAnnee.appendChild(opt);
-          });
-          const optToutes = document.createElement('option');
-          optToutes.value = 'toutes';
-          optToutes.textContent = 'Toutes les années';
-          selectAnnee.appendChild(optToutes);
-        }
-        window._anneeOptions = annees.map(String);
+    // Extraire les années depuis locationsAll (déjà chargé — 1 position par animal suivi)
+    // puis enrichir en arrière-plan avec toutes les années via RPC paginée
+    const anneesInit = [...new Set(
+      locationsAll
+        .map(l => new Date(l.loc_datetime_local || l.loc_date_local).getFullYear())
+        .filter(y => !isNaN(y))
+    )].sort((a, b) => b - a);
+
+    // Peupler immédiatement le select avec les années des positions récentes
+    const selectAnnee = document.getElementById('selectAnnee');
+    if (selectAnnee) {
+      if (selectAnnee.tomselect) {
+        selectAnnee.tomselect.clearOptions();
+        anneesInit.forEach(annee => selectAnnee.tomselect.addOption({ value: String(annee), text: String(annee) }));
+        selectAnnee.tomselect.addOption({ value: 'toutes', text: 'Toutes les années' });
+        selectAnnee.tomselect.refreshOptions(false);
+      } else {
+        while (selectAnnee.options.length > 1) selectAnnee.remove(1);
+        anneesInit.forEach(annee => {
+          const opt = document.createElement('option');
+          opt.value = annee;
+          opt.textContent = annee;
+          selectAnnee.appendChild(opt);
+        });
+        const optToutes = document.createElement('option');
+        optToutes.value = 'toutes';
+        optToutes.textContent = 'Toutes les années';
+        selectAnnee.appendChild(optToutes);
       }
-    }).catch(err => console.warn('fetchAnneesDisponibles échoué:', err));
+      window._anneeOptions = anneesInit.map(String);
+    }
+
+    // Enrichir en arrière-plan avec toutes les années via RPC
+    fetchLocalisationsRPC(currentToken, {
+      ani_is_followed: false,
+      limit_par_animal: 1
+    }).then(allLocations => {
+      const toutesAnnees = [...new Set(
+        allLocations
+          .map(l => new Date(l.loc_datetime_local).getFullYear())
+          .filter(y => !isNaN(y))
+      )].sort((a, b) => b - a);
+
+      if (selectAnnee?.tomselect) {
+        selectAnnee.tomselect.clearOptions();
+        toutesAnnees.forEach(annee => selectAnnee.tomselect.addOption({ value: String(annee), text: String(annee) }));
+        selectAnnee.tomselect.addOption({ value: 'toutes', text: 'Toutes les années' });
+        selectAnnee.tomselect.refreshOptions(false);
+      }
+      window._anneeOptions = toutesAnnees.map(String);
+    }).catch(err => console.warn('Enrichissement années échoué:', err));
 
     const locationsEnrichiesAll = enrichirLocations(locationsAll);
     const locationsSuivies = enrichirLocations(locationsSuiviesRaw);
@@ -524,11 +553,6 @@ async function startApp(token) {
     mettreAJourIndividus(enrichirAnimauxAvecPositions(locationsSuivies));
     mettreAJourLegende();
     setLabelDatetime('Date de localisation');
-
-    // Identifier tous les animaux qui ont au moins une géométrie — sur tout l historique
-    // (v_localisation), pas seulement leur derniere position (v_animal_last_loc), pour ne pas
-    // exclure un animal inactif dont la derniere position n a pas de geom valide
-    const idsAvecGeom = await fetchAniIdsAvecGeom(currentToken);
 
     const listeIndividus = document.getElementById('listeIndividus');
     const searchIndividu = document.getElementById('searchIndividu');
