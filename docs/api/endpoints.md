@@ -133,6 +133,48 @@ Filtres optionnels supportés :
 
 ---
 
+## RPC — get_localisation_with_json_filter
+
+**Endpoint** : `POST /rpc/get_localisation_with_json_filter`
+**Headers** : `Content-Profile: bouquetin`, `Content-Type: application/json`
+**Fonction JS** : `fetchLocalisationsRPC(token, filters, onBatch)`
+
+### Paramètres (body JSON — clé `filters`)
+
+| Paramètre | Type | Description |
+|---|---|---|
+| `ani_id` | integer[] | Liste d'identifiants animaux |
+| `date_min` | string | Date minimum ISO (YYYY-MM-DD) |
+| `date_max` | string | Date maximum ISO (YYYY-MM-DD) |
+| `annees` | integer[] | Années exactes |
+| `periode_min` | string | Début saison format MM-JJ (ex: 06-01) |
+| `periode_max` | string | Fin saison format MM-JJ (ex: 08-31) |
+| `ani_sexe` | string | Sexe : M ou F |
+| `ani_gestionnaire` | string[] | Gestionnaire(s) : PNP, PNRPA |
+| `ani_pop_rattach` | string[] | Population(s) de rattachement |
+| `prog_id` | integer[] | Identifiant(s) de programmation GPS |
+| `without_loc_outlier` | boolean | Exclure les outliers (défaut : true) |
+| `ani_is_followed` | boolean | Uniquement animaux en cours de suivi |
+| `age_capture_min` | integer | Age minimum à la capture |
+| `age_capture_max` | integer | Age maximum à la capture |
+| `was_translocated` | boolean | Animaux transloques uniquement |
+| `geom` | GeoJSON | Polygone de filtre spatial |
+| `geom_src` | integer | SRID de la géométrie (défaut : 4326) |
+| `limit_par_animal` | integer | N dernières positions par animal |
+| `limit` | integer | Limite globale (défaut : 10000) |
+| `offset` | integer | Offset pour pagination |
+
+### Champs retournés
+
+`loc_id`, `ani_id`, `ani_nom`, `ani_sexe`, `ani_pop_rattach`, `ani_gestionnaire`,
+`loc_altitude_capteur`, `loc_temperature_capteur`, `loc_datetime_local`, `geom`, `loc_outlier`, `loc_anomalie`
+
+### Notes
+- Pagination par batches de 10 000 gérée automatiquement par `fetchLocalisationsRPC()`
+- Saison à cheval (ex: Hiver nov→fev) : `periode_min > periode_max` détecté automatiquement
+
+---
+
 ## Paramètres de Filtrage Recommandés
 
 Appliquez ces filtres sur `/v_localisation` ou `/v_animal_last_loc` :
