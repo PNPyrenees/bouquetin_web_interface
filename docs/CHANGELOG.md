@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.47.0] - 2026-06-29
+
+### Nettoyage
+- Suppression fetchAllLastLocations - plus aucun appelant
+- Suppression fetchNDernieresLocalisations - plus aucun appelant
+- Suppression fetchLocations - orpheline apres suppression de fetchNDernieresLocalisations
+- Suppression fetchAnneesDisponibles - orpheline
+- Imports morts retires de app.js et filters.js
+
 ## [0.46.0] - 2026-06-29
 
 ### Modifications
