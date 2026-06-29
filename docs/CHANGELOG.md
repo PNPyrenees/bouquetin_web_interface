@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.46.0] - 2026-06-29
+
+### Modifications
+- reinitialiserTousLesFiltres() migre vers fetchLocalisationsRPC
+- Promise.all de 2 requetes RPC paralleles au lieu de fetchAllLastLocations + fetchNDernieresLocalisations
+- activeIds calcule depuis ani_is_followed cote serveur au lieu de cor_date_fin cote client
+
+### Nettoyage
+- fetchAllLastLocations retire des imports app.js
+- fetchNDernieresLocalisations retire des imports app.js
+
 ## [0.45.0] - 2026-06-29
 
 ### Corrections
