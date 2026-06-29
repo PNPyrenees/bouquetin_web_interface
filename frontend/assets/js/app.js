@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchLocations, fetchAnimalIdsParPeriode, fetchProgrammations, fetchAllLastLocations, fetchNDernieresLocalisations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC } from './api.js';
+import { login, fetchAnimals, fetchLocations, fetchAnimalIdsParPeriode, fetchProgrammations, viderCache, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -1686,16 +1686,15 @@ async function reinitialiserTousLesFiltres() {
     // 11. Recharger la carte
     if (currentToken) {
       try {
-        const locationsAll = await fetchAllLastLocations(currentToken);
-        const idsActifsReinit = Array.from(
-          new Set(locationsAll.filter(l => l.cor_date_fin === null).map(l => String(l.ani_id)))
-        );
-        setActiveIds(new Set(
-          locationsAll.filter(l => l.cor_date_fin === null).map(l => l.ani_id)
-        ));
         const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
-        const locationsN = await fetchNDernieresLocalisations(currentToken, idsActifsReinit, n);
-        const locationsSuivies = enrichirLocations(locationsN);
+
+        const [locationsAllReinit, locationsSuiviesRaw] = await Promise.all([
+          fetchLocalisationsRPC(currentToken, { ani_is_followed: true, limit_par_animal: 1 }),
+          fetchLocalisationsRPC(currentToken, { ani_is_followed: true, limit_par_animal: n })
+        ]);
+
+        setActiveIds(new Set(locationsAllReinit.map(l => l.ani_id)));
+        const locationsSuivies = enrichirLocations(locationsSuiviesRaw);
         clearMapPoints();
         clearTrajectoire();
         const count = renderPoints(locationsSuivies, false);
