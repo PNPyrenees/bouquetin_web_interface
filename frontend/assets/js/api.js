@@ -1,28 +1,5 @@
 import { API_URL } from './config.js';
 
-// Cache des requêtes API
-const _cache = new Map();
-
-function _cleCache(endpoint, filters = {}) {
-  const filtresNormalises = Object.fromEntries(
-    Object.entries(filters).filter(([_, v]) => v !== '' && v !== false && v !== null && v !== undefined)
-  );
-  return `${endpoint}:${JSON.stringify(filtresNormalises)}`;
-}
-
-function _getCache(cle) {
-  return _cache.has(cle) ? _cache.get(cle) : null;
-}
-
-function _setCache(cle, data) {
-  _cache.set(cle, data);
-  return data;
-}
-
-export function viderCache() {
-  _cache.clear();
-}
-
 /**
  * Gère l'authentification de l'utilisateur.
  * @param {string} username - Nom d'utilisateur
