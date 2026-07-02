@@ -28,6 +28,14 @@
 - _derniersFiltresAppliques mis a jour dans les chemins Positions ET Trajectoire
 - Chemin Trajectoire utilise les noms de variables corrects
 
+### Interface carte
+- Boutons de controle carte reorganises : toggle sidebar/positions/trajectoire/filtre spatial/couches conserves en haut gauche, zoom+/zoom-/recentrer regroupes en haut droite sous le bouton plein ecran
+- Legende retravaillee : point de depart/positions/direction en ligne d'en-tete, liste des individus en grille 2 colonnes x 4 rangees avec defilement vertical
+- Theme vert transparent unifie (nouvelle :root dediee --map-ui-*) applique a la legende, aux boutons de la toolbar carte, a l'echelle et au bouton plein ecran
+- Panneau des fonds de carte aligne sur le theme vert, coins arrondis en haut
+- Logos du header redimensionnes (64-70px vers 48px) pour ne plus deborder de la barre de navigation
+- Attribution OpenLayers masquee en CSS (controle conserve, non supprime de la carte)
+
 ## [0.49.0] - 2026-07-02
 
 ### Migration
