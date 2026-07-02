@@ -48,6 +48,22 @@
   --input-border-radius: 10px;
   --select-width: 85%;
 }
+
+/* ============================================
+   THEME CARTE — panneaux flottants superposes a la carte
+   (legende, toolbar boutons carte, echelle, bouton plein ecran)
+   ============================================ */
+:root {
+  --map-ui-color-rgb: 9, 148, 105;         /* vert pur (--color-primary) en RGB */
+  --map-ui-opacity: 0.5;                  /* opacite du fond — variable independante */
+  --map-ui-color-active-rgb: 6, 107, 74;   /* vert actif/selectionne en RGB */
+  --map-ui-opacity-active: 0.95;           /* opacite du fond en etat actif/hover */
+  --map-ui-bg: rgba(var(--map-ui-color-rgb), var(--map-ui-opacity));
+  --map-ui-bg-active: rgba(var(--map-ui-color-active-rgb), var(--map-ui-opacity-active));
+  --map-ui-text: #ffffff;                  /* texte/libelles/nombres (ex: "200 km") */
+  --map-ui-icon: #ffffff;                  /* icones des boutons + trait de l'echelle */
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -101,21 +117,21 @@ header {
 }
 
 .logo-parc {
-  height: 64px;
+  height: 48px;
   width: auto;
   margin-left: -20px;
    margin-right: 16px;
 }
 
 .logo-bqt {
-  height: 70px;
+  height: 48px;
   width: auto;
   object-fit: contain;
   margin-right: 16px;
 }
 
 .logo-rf {
-  height: 70px;
+  height: 48px;
   width: auto;
   object-fit: contain;
   margin-right: 6px;
@@ -1121,9 +1137,10 @@ input[type="checkbox"] {
 #basemapPanel {
   pointer-events: auto;
   width: 100%;
-  background: #fafcfa;
+  background: var(--map-ui-bg);
+  border-radius: 12px 12px 0 0;
   box-shadow: 0 -3px 15px rgba(0,0,0,0.08);
-  padding: 12px 20px 16px 20px;
+  padding: 12px 20px 20px 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1141,7 +1158,7 @@ input[type="checkbox"] {
   font-family: var(--font-family);
   font-weight: 700;
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: var(--map-ui-text);
   letter-spacing: 1px;
 }
 
@@ -1170,9 +1187,9 @@ input[type="checkbox"] {
 
 /* Boutons de scroll circulaires */
 .basemap-scroll-btn {
-  background: #ffffff;
-  border: 1px solid #d2ddd8;
-  color: var(--color-primary);
+  background: var(--map-ui-bg);
+  border: none;
+  color: var(--map-ui-icon);
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1189,9 +1206,9 @@ input[type="checkbox"] {
 }
 
 .basemap-scroll-btn:hover {
-  background-color: var(--color-primary-hover);
-  color: #ffffff;
-  border-color: var(--color-primary-hover);
+  background-color: var(--map-ui-bg-active);
+  color: var(--map-ui-icon);
+  border-color: transparent;
 }
 
 .basemap-scroll-btn:disabled {
@@ -1240,7 +1257,7 @@ input[type="checkbox"] {
   font-family: var(--font-family);
   font-size: 12px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--map-ui-text);
   text-align: center;
   white-space: normal;
   line-height: 1.2;
@@ -1255,7 +1272,7 @@ input[type="checkbox"] {
 }
 
 .basemap-card.active span {
-  color: var(--color-primary-hover);
+  color: var(--map-ui-text);
   font-weight: 700;
 }
 
@@ -1299,7 +1316,7 @@ input[type="checkbox"] {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: white;
+  background: var(--map-ui-bg);
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.2);
   overflow: hidden;
@@ -1309,10 +1326,21 @@ input[type="checkbox"] {
   top: 10px;
 }
 
+/* Zoom +/-/recentrer — regroupes en haut a droite, juste sous le bouton plein ecran */
+#toolbarZoom {
+  top: 52px;
+  left: auto;
+  right: 44px;
+}
+
+#mapScreen:has(.sidebar-right.visible) #toolbarZoom {
+  right: 10px;
+}
+
 .toolbar-btn {
   width: 32px;
   height: 32px;
-  background: white;
+  background: var(--map-ui-bg);
   border: none;
   display: flex;
   align-items: center;
@@ -1320,31 +1348,34 @@ input[type="checkbox"] {
   cursor: pointer;
   font-size: 18px;
   font-weight: 400;
-  color: #666;
+  color: var(--map-ui-icon);
   padding: 0;
   border-radius: 0;
   transition: background 0.15s;
 }
 
 .toolbar-btn:hover {
-  background: #f4f4f4;
-  color: #333;
+  background: var(--map-ui-bg-active);
+  color: var(--map-ui-icon);
 }
 
+/* Icones <img> (SVG externes) — CSS filter ne peut pas lire --map-ui-icon directement ;
+   brightness(0) invert(1) force le blanc, en phase avec --map-ui-icon actuel (#ffffff).
+   Si --map-ui-icon change de couleur, ce filtre doit etre retune manuellement. */
 .toolbar-btn img {
   width: 16px;
   height: 16px;
-  opacity: 0.6;
-  filter: invert(30%) sepia(10%) saturate(500%) hue-rotate(110deg);
+  opacity: 0.9;
+  filter: brightness(0) invert(1);
 }
 
 .toolbar-btn.active img {
   opacity: 1;
-  filter: invert(27%) sepia(50%) saturate(500%) hue-rotate(110deg) brightness(0.8);
+  filter: brightness(0) invert(1);
 }
 
 .toolbar-btn.active {
-  background: #eef4f1;
+  background: var(--map-ui-bg-active);
 }
 
 /* Separateur entre boutons */
@@ -1377,12 +1408,13 @@ input[type="checkbox"] {
 }
 
 .legende-panel {
-  background: #d9d9d9;
-  border-radius: 4px 4px 0 0;
+  background: var(--map-ui-bg);
+  border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
   font-family: var(--font-family);
   font-size: 12px;
   pointer-events: auto; /* Le panneau légende reste cliquable */
+  max-width: 420px;
 }
 
 .legende-header {
@@ -1409,24 +1441,33 @@ input[type="checkbox"] {
 
 .legende-contenu {
   padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 
+/* Titres de section masqués — legende compacte horizontale (pastille + libellé uniquement) */
 .legende-section-titre {
-  font-size: 10px;
-  font-weight: 700;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 6px;
+  display: none;
+}
+
+.legende-section {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .legende-item {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin-bottom: 4px;
   font-size: 12px;
-  color: #333;
+  color: var(--map-ui-text);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .legende-pastille {
@@ -1462,11 +1503,16 @@ input[type="checkbox"] {
 .legende-pastille-pnp     { background: #2D6A4F; }
 .legende-pastille-pnrpa   { background: #E07B39; }
 
-/* Légende - liste individus (mode couleur Individu) */
+/* Légende - liste individus (mode couleur Individu) — grille 4 colonnes,
+   2 rangées visibles, le reste defile verticalement (pas avec .legende-contenu) */
 #legendeIndividusList {
-  max-height: 220px;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 4px 14px;
+  max-height: 90px;
   overflow-y: auto;
-  margin-top: 6px;
+  overflow-x: hidden;
+  flex-shrink: 0;
 }
 
 #legendeIndividusList::-webkit-scrollbar {
@@ -1486,13 +1532,15 @@ input[type="checkbox"] {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 0;
+  padding: 2px 4px;
   font-size: 11px;
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .legende-individu-ligne:hover {
-  background: rgba(0,0,0,0.05);
+  background: var(--map-ui-bg-active);
   border-radius: 3px;
 }
 
@@ -1503,6 +1551,9 @@ input[type="checkbox"] {
   border-radius: 50%;
   flex-shrink: 0;
   border: 1px solid rgba(0,0,0,0.15);
+  /* Liseré toujours visible — le contour dynamique (JS, inline style) peut etre blanc
+     et se fondre dans le fond blanc de la legende ; box-shadow n'est pas ecrase par l'inline */
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .legende-individu-label {
@@ -1510,18 +1561,18 @@ input[type="checkbox"] {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 130px;
-  color: #1a3d2f;
+  color: var(--map-ui-text);
 }
 
 /* Légende - flèche direction */
 .legende-fleche {
   font-size: 14px;
-  color: #2D6A4F;
+  color: var(--map-ui-text);
 }
 
 /* Légende - section couleur cachée par défaut */
 .legende-section-couleur { display: none; }
-.legende-section-couleur.visible { display: block; }
+.legende-section-couleur.visible { display: flex; }
 
 .radio-couleur {
   display: inline-flex;
@@ -1609,10 +1660,19 @@ input[type="checkbox"] {
   background: #f4f4f4;
 }
 
+/* Filet de securite — force texte ET traits (bordures/contours) sur TOUS les descendants,
+   quel que soit le nom de classe exact utilise par OpenLayers */
+#scaleTarget,
+#scaleTarget * {
+  color: var(--map-ui-text) !important;
+  border-color: var(--map-ui-icon) !important;
+  outline-color: var(--map-ui-icon) !important;
+}
+
 #scaleTarget {
   display: flex;
   align-items: flex-end;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--map-ui-bg);
   padding: 4px 8px;
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.2);
@@ -1632,7 +1692,7 @@ input[type="checkbox"] {
   font-family: var(--font-family);
   font-size: 11px;
   font-weight: 600;
-  color: #333;
+  color: var(--map-ui-text) !important;
   display: block;
   text-align: left;
   margin-bottom: 2px;
@@ -1644,26 +1704,26 @@ input[type="checkbox"] {
 }
 
 #scaleTarget .ol-scale-singlebar-even {
-  background: #333 !important;
-  border: 1px solid #333 !important;
+  background: var(--map-ui-icon) !important;
+  border: 1px solid var(--map-ui-icon) !important;
   height: 8px;
 }
 
 #scaleTarget .ol-scale-singlebar-odd {
-  background: white !important;
-  border: 1px solid #333 !important;
+  background: rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid var(--map-ui-icon) !important;
   height: 8px;
 }
 
 #scaleTarget .ol-scale-step-marker {
-  background: #333;
+  background: var(--map-ui-icon) !important;
   height: 10px;
 }
 
 #scaleTarget .ol-scale-step-text {
   font-family: var(--font-family);
   font-size: 10px;
-  color: #333;
+  color: var(--map-ui-text) !important;
 }
 
 .ol-fullscreen-custom {
@@ -1683,12 +1743,12 @@ input[type="checkbox"] {
   display: block;
   width: 32px;
   height: 32px;
-  background: white;
+  background: var(--map-ui-bg);
   border: none;
   border-radius: 4px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.2);
   font-size: 16px;
-  color: #666;
+  color: var(--map-ui-icon);
   cursor: pointer;
   line-height: 32px;
   text-align: center;
@@ -1697,11 +1757,12 @@ input[type="checkbox"] {
 }
 
 .ol-fullscreen-custom button:hover {
-  background: #f4f4f4;
+  background: var(--map-ui-bg-active);
 }
 
 #map .ol-attribution {
   right: 44px;
+  display: none; /* masque visuellement — le controle OL reste actif, pas supprime de la carte */
 }
 
 #mapScreen:has(.sidebar-right.visible) #map .ol-attribution {
