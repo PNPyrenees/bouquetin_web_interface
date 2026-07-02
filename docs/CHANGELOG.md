@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [0.49.0] - 2026-07-02
+
+### Migration
+- fetchLocalisationsRPC migree vers f_get_localisation (endpoint, body racine, prefixe var_)
+- Suppression enveloppe filters dans le body - parametres passes directement a la racine
+- Mapping complet des parametres avec prefixe var_ (var_ani_id, var_date_min, var_limit, etc.)
+
+### Optimisations chargement initial
+- Fusion Bloc A et Bloc B en un seul Promise.all - 5 requetes paralleles au lieu de sequentielles
+- fetchAniIdsAvecGeom sortie du chemin critique - differee en arriere-plan apres renderPoints
+- enrichirLocations supprimee du chargement initial - champs deja retournes par la RPC
+- enrichirAnimauxAvecPositions differee apres renderPoints via setTimeout
+- Chargement initial passe de ~3s a ~1s
+
+### Optimisations filtres liste individus
+- Cache _dernierIdsperiode evitant les requetes reseau inutiles quand la periode n'a pas change
+- appliquerFiltreAvecCachePeriode exportee - remplace mettreAJourListeParDate sur les declencheurs attributaires
+- Debounce 300ms sur #searchIndividu - evite un appel reseau a chaque frappe
+- Debounce 250ms sur #selectAnnee - evite plusieurs requetes si selection rapide d'annees
+- Code mort if (id === 'selectAnnee') supprime de la boucle TomSelect
+
+### Corrections filtres temporels
+- Transmission precise des annees selectionnees via var_annees au lieu de reduction en dateMin/dateMax
+- Annees non contiguues (ex: 2019 et 2023) correctement filtrees cote serveur
+- Flatpickr dateFrom/dateTo migre de onChange vers onClose - suppression double declenchement
+- Guard el._flatpickr?.isOpen dans listener input pour eviter conflits saisie clavier/calendrier
+- Warning console si periodes vides malgre dateFrom/dateTo renseignes
+
+### Nettoyage
+- AbortError silencieux sur fetchAniIdsAvecGeom et fetchAniCalendrier en arriere-plan
+
 ## [0.48.0] - 2026-06-29
 
 ### Nettoyage
