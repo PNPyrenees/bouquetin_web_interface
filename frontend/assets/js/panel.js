@@ -540,40 +540,81 @@ function appliquerFiltresColonnes() {
 }
 
 /**
- * Exporte en CSV toutes les localisations des animaux donnes — requete dediee
- * tous champs de v_localisation, independante de la pagination et des filtres colonnes.
+ * Exporte en CSV les localisations des animaux donnes — memes colonnes que le
+ * tableau attributaire (colonnesDisponibles), via f_get_localisation (RPC paginee
+ * par batches de 10 000 positions), coherent avec le reste des filtres carte.
  */
-export async function exporterCSV(token, aniIds, params = {}) {
-  if (!aniIds || aniIds.length === 0) {
-    window._showToast?.('Aucun individu a exporter');
+export async function exporterCSV(token, filters = {}) {
+  const aniIds = filters.ani_id || [];
+  const hasAniIds = Array.isArray(aniIds) && aniIds.length > 0;
+  const isFollowedOnly = !!(filters.ani_is_followed || filters.suivisSeulement);
+
+  if (!hasAniIds && !isFollowedOnly) {
     return;
   }
 
-  window._showToast?.('Export en cours...');
+  const progressEl = document.getElementById('exportProgress');
+  const progressText = document.getElementById('exportProgressText');
+  const arc = document.getElementById('exportArc');
+
+  // Lire le total depuis le compteur de positions déjà affiché dans la table attributaire
+  const totalExpected = parseInt(document.getElementById('positionsCount')?.textContent?.replace(/\s/g, '') || '0') || 0;
+
+  if (arc) arc.setAttribute('stroke-dashoffset', '69.1');
+  if (progressText) {
+    progressText.innerHTML = totalExpected > 0
+      ? `<span>0</span> sur ${totalExpected.toLocaleString('fr-FR')} positions`
+      : '<span>0</span> positions';
+  }
+  if (progressEl) progressEl.style.display = 'flex';
+
+  let totalRecu = 0;
 
   try {
-    const { fetchLocationsExportCSV } = await import('./api.js');
-    const locs = await fetchLocationsExportCSV(token, aniIds, params);
+    const { fetchLocalisationsRPC } = await import('./api.js');
+
+    const rpcFilters = {
+      date_from: filters.date_from || null,
+      date_to: filters.date_to || null,
+      saisonFrom: filters.saisonFrom || null,
+      saisonTo: filters.saisonTo || null,
+      annees: filters.annees && filters.annees.length > 0 ? filters.annees : null,
+      sexe: filters.sexe || null,
+      gestionnaire: filters.gestionnaire || null,
+      population: filters.population || null,
+      programmation: filters.programmation || null
+    };
+
+    if (hasAniIds) {
+      rpcFilters.ani_id = aniIds.map(Number);
+    } else if (isFollowedOnly) {
+      rpcFilters.ani_is_followed = true;
+    }
+
+    if (filters.limit_par_animal) {
+      rpcFilters.limit_par_animal = filters.limit_par_animal;
+    }
+
+    const locs = await fetchLocalisationsRPC(token, rpcFilters, (batch) => {
+      totalRecu += batch.length;
+      const pct = totalExpected > 0 ? (totalRecu / totalExpected) : 0;
+      if (arc) arc.setAttribute('stroke-dashoffset', String(69.1 * (1 - Math.min(pct, 1))));
+      if (progressText) {
+        const recu = totalRecu.toLocaleString('fr-FR');
+        const total = totalExpected > 0 ? ` sur ${totalExpected.toLocaleString('fr-FR')}` : '';
+        progressText.innerHTML = `<span>${recu}</span>${total} positions`;
+      }
+    });
 
     if (locs.length === 0) {
-      window._showToast?.('Aucune donnee a exporter');
       return;
     }
 
-    // Generer le CSV
-    const colonnes = [
-      'loc_id', 'ani_id', 'ani_code', 'ani_nom', 'ani_sexe',
-      'ani_pop_rattach', 'ani_date_relache', 'ani_gestionnaire',
-      'capt_id', 'capt_actif', 'capt_frequence', 'capt_constructeur', 'capt_id_constructeur',
-      'loc_dop', 'fix_status_label', 'loc_nb_satellites', 'loc_outlier', 'loc_anomalie',
-      'loc_altitude_capteur', 'loc_temperature_capteur',
-      'loc_datetime_utc', 'loc_datetime_local', 'loc_date_local',
-      'loc_mois_jour_local', 'loc_commentaire'
-    ];
-
-    const header = colonnes.join(';');
+    // Generer le CSV — memes colonnes que le tableau attributaire (colonnesDisponibles)
+    const colonnesExport = colonnesDisponibles.map(c => c.key);
+    const header = colonnesExport.join(';');
     const lignes = locs.map(loc =>
-      colonnes.map(col => {
+      colonnesExport.map(col => {
         const val = loc[col];
         if (val === null || val === undefined) return '';
         const str = String(val);
@@ -585,7 +626,7 @@ export async function exporterCSV(token, aniIds, params = {}) {
       }).join(';')
     );
 
-    const csvContent = '﻿' + [header, ...lignes].join('\n'); // BOM UTF-8 pour Excel
+    const csvContent = '\ufeff' + [header, ...lignes].join('\n'); // BOM UTF-8 pour Excel
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
 
@@ -595,11 +636,14 @@ export async function exporterCSV(token, aniIds, params = {}) {
     a.download = `bouquetins_localisations_${date}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-
-    window._showToast?.(`${locs.length} localisations exportees`);
   } catch (err) {
     console.error('Erreur export CSV:', err);
-    window._showToast?.('Erreur lors de l export');
+  } finally {
+    if (arc) arc.setAttribute('stroke-dashoffset', '0');
+    setTimeout(() => {
+      if (progressEl) progressEl.style.display = 'none';
+      if (arc) arc.setAttribute('stroke-dashoffset', '69.1');
+    }, 800);
   }
 }
 
