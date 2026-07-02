@@ -60,112 +60,22 @@ export function initPanneau() {
   const sidebarRightBody = document.getElementById('sidebarRightBody');
   if (!sidebarRightBody) return;
 
-  sidebarRightBody.style.display = 'flex';
-  sidebarRightBody.style.flexDirection = 'column';
-  sidebarRightBody.style.padding = '0 0 0 10px';
-  sidebarRightBody.style.height = '100%';
-  sidebarRightBody.style.overflow = 'hidden';
+  // Liste des checkboxes colonnes — seule partie encore generee dynamiquement,
+  // car derivee des tableaux de config colonnesDisponibles/colonnesIndividus.
+  // Le reste du markup (onglets, toolbar, tableau, pagination) est statique dans index.html.
+  document.getElementById('panelColonnesItems').innerHTML = colonnesDisponibles.map(c => `
+    <label class="panel-colonnes-item">
+      <input type="checkbox" value="${c.key}" ${c.defaut ? 'checked' : ''}>
+      ${c.label}
+    </label>
+  `).join('');
 
-  sidebarRightBody.innerHTML = `
-    <div class="panel-tabs">
-      <button class="panel-tab" id="tabIndividus" style="display:none">Individus observés</button>
-      <button class="panel-tab active" id="tabDonnees">Localisations</button>
-    </div>
-    <div class="panel-tab-content" id="panelContentDonnees" style="display:flex">
-      <div class="panel-toolbar">
-        <button id="btnExportCSV" class="panel-btn-filtres" title="Exporter toutes les localisations en CSV">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          Exporter CSV
-        </button>
-        <div style="position:relative; margin-left:auto;">
-          <button class="panel-btn-filtres" id="panelBtnFiltres">
-            <img src="assets/img/filtre_horizontal.png" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"> Filtres colonnes
-          </button>
-          <div class="panel-colonnes-dropdown" id="panelColonnesDropdown" style="display:none">
-            <div class="panel-colonnes-header">
-              <span>Colonnes</span>
-              <button class="panel-colonnes-reset" id="panelColonnesReset">Réinitialiser</button>
-            </div>
-            ${colonnesDisponibles.map(c => `
-              <label class="panel-colonnes-item">
-                <input type="checkbox" value="${c.key}" ${c.defaut ? 'checked' : ''}>
-                ${c.label}
-              </label>
-            `).join('')}
-          </div>
-        </div>
-      </div>
-      <div class="panel-table-wrapper">
-        <table class="panel-table">
-          <thead id="panelTableHead"></thead>
-          <tbody id="panelTableBody"></tbody>
-        </table>
-      </div>
-      <div class="panel-pagination" id="panelPagination">
-        <div class="panel-pagesize-container">
-          <select id="panelPageSizeSelect" class="panel-pagesize-select">
-            <option value="5">5</option>
-            <option value="10">10</option>
-            <option value="15">15</option>
-            <option value="25" selected>25</option>
-            <option value="50">50</option>
-            <option value="all">Tous</option>
-          </select>
-        </div>
-        <div class="panel-pagination-controls" id="panelPaginationControls">
-          <span class="panel-page-info" id="panelPageInfo">Page 1 sur 0</span>
-        </div>
-        <span class="panel-positions-total"><strong>0</strong> positions totales</span>
-      </div>
-    </div>
-    <div class="panel-tab-content" id="panelContentIndividus" style="display:none">
-      <div class="panel-toolbar">
-        <div style="position:relative; margin-left:auto;">
-          <button class="panel-btn-filtres" id="panelBtnFiltresIndividus">
-            <img src="assets/img/filtre_horizontal.png" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"> Filtres colonnes
-          </button>
-          <div class="panel-colonnes-dropdown" id="panelIndividusDropdown" style="display:none">
-            <div class="panel-colonnes-header">
-              <span>Colonnes</span>
-              <button class="panel-colonnes-reset" id="panelIndividusReset">Réinitialiser</button>
-            </div>
-            ${colonnesIndividus.map(c => `
-              <label class="panel-colonnes-item">
-                <input type="checkbox" value="${c.key}" ${c.defaut ? 'checked' : ''}>
-                ${c.label}
-              </label>
-            `).join('')}
-          </div>
-        </div>
-      </div>
-      <div class="panel-table-wrapper">
-        <table class="panel-table panel-table-individus">
-          <thead id="panelIndividusHead"></thead>
-          <tbody id="panelIndividusBody"></tbody>
-        </table>
-      </div>
-      <div class="panel-pagination" id="panelIndividusPagination">
-        <div class="panel-pagesize-container">
-          <select id="panelIndividusPageSizeSelect" class="panel-pagesize-select">
-            <option value="5">5</option>
-            <option value="10">10</option>
-            <option value="15">15</option>
-            <option value="25" selected>25</option>
-            <option value="50">50</option>
-            <option value="all">Tous</option>
-          </select>
-          <span class="panel-individus-total"><strong>0</strong> individus</span>
-        </div>
-        <div class="panel-pagination-controls" id="panelIndividusPaginationControls">
-          <span class="panel-page-info" id="panelIndividusPageInfo">Page 1 sur 0</span>
-        </div>
-      </div>
-    </div>
-  `;
+  document.getElementById('panelIndividusItems').innerHTML = colonnesIndividus.map(c => `
+    <label class="panel-colonnes-item">
+      <input type="checkbox" value="${c.key}" ${c.defaut ? 'checked' : ''}>
+      ${c.label}
+    </label>
+  `).join('');
 
   mettreAJourColonnes();
   initFiltresColonnes();
