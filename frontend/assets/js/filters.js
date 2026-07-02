@@ -253,6 +253,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
   const btnApply = document.getElementById('btnApplyFilters');
   showMapLoading();
   lockSidebar();
+  const progEl = document.getElementById('mapLoadingProgress');
+  if (progEl) progEl.style.display = 'none';
 
   // Collecte des filtres
   const filters = {
@@ -331,9 +333,15 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       }, suivisSeulement);
 
       if (!toutesPositions && n) {
-        // Chemin A — N dernieres positions par animal via RPC
+        // Chemin A — N dernieres positions par animal via RPC (un seul batch attendu)
         rpcFilters.limit_par_animal = n;
-        locations = await fetchLocalisationsRPC(token, rpcFilters);
+        locations = await fetchLocalisationsRPC(token, rpcFilters, () => {
+          const bar = document.getElementById('mapLoadingBar');
+          const pctEl = document.getElementById('mapLoadingPct');
+          if (progEl) progEl.style.display = 'block';
+          if (bar) bar.style.width = '100%';
+          if (pctEl) pctEl.textContent = '100%';
+        });
       } else {
         // Chemin B — Toutes positions, avec modal volume + pagination RPC
         const totalPositions = await fetchCountLocations(token, {
@@ -365,6 +373,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           }
         }
 
+        let _batchTotal = 0;
         locations = await fetchLocalisationsRPC(
           token,
           rpcFilters,
@@ -379,6 +388,16 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
               const current = parseInt(posEl.textContent) || 0;
               posEl.textContent = clearBefore ? batch.length : current + batch.length;
             }
+            // Barre de progression overlay — toujours affichee, sans condition de volume
+            _batchTotal = clearBefore ? batch.length : _batchTotal + batch.length;
+            if (progEl) progEl.style.display = 'block';
+            const pct = totalPositions > 0
+              ? Math.min(100, Math.round((_batchTotal / totalPositions) * 100))
+              : 100;
+            const bar = document.getElementById('mapLoadingBar');
+            const pctEl = document.getElementById('mapLoadingPct');
+            if (bar) bar.style.width = pct + '%';
+            if (pctEl) pctEl.textContent = pct + '%';
           }
         );
       }
@@ -396,7 +415,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const idsSelectionnesManuel = selectedIds.length > 0;
       masquerIndividusSansPositions(locations, idsSelectionnesManuel);
       mettreAJourPanneau(locations);
-      mettreAJourIndividus(getAnimals().filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
+      const idsPresents = new Set(locations.map(l => String(l.ani_id)));
+      mettreAJourIndividus(getAnimals().filter(a => idsPresents.has(String(a.ani_id))));
 
       ouvrirPanneauSiNecessaire();
       const mapScreen = document.getElementById('mapScreen');
@@ -423,6 +443,21 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
         }
       }, 400);
+
+      window._derniersFiltresAppliques = {
+        ani_id: idsAChercher,
+        date_from: dateMin || null,
+        date_to: dateMax || null,
+        saisonFrom: saisonFromApi || null,
+        saisonTo: saisonToApi || null,
+        annees: anneesSelectionnees.length > 0 ? anneesSelectionnees : null,
+        sexe: filters.sexe || null,
+        gestionnaire: filters.gestionnaire || null,
+        population: filters.population || null,
+        programmation: filters.programmation || null,
+        limit_par_animal: toutesPositions ? null : n,
+        suivisSeulement: suivisSeulement
+      };
     } else {
       // Mode Trajectoire — on ne vide pas les points existants
       const periodesT = getPeriodesActives();
@@ -473,9 +508,15 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       }, suivisSeulement);
 
       if (!toutesPositionsTraj && nTraj) {
-        // Chemin C — N dernieres positions par animal via RPC
+        // Chemin C — N dernieres positions par animal via RPC (un seul batch attendu)
         rpcFiltersTraj.limit_par_animal = nTraj;
-        locations = await fetchLocalisationsRPC(token, rpcFiltersTraj);
+        locations = await fetchLocalisationsRPC(token, rpcFiltersTraj, () => {
+          const bar = document.getElementById('mapLoadingBar');
+          const pctEl = document.getElementById('mapLoadingPct');
+          if (progEl) progEl.style.display = 'block';
+          if (bar) bar.style.width = '100%';
+          if (pctEl) pctEl.textContent = '100%';
+        });
       } else {
         // Chemin D — Toutes positions, avec modal volume + pagination RPC
         const totalTrajPositions = await fetchCountLocations(token, {
@@ -515,6 +556,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           }
         }
 
+        let _batchTotal = 0;
         locations = await fetchLocalisationsRPC(
           token,
           rpcFiltersTraj,
@@ -529,6 +571,16 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
               const current = parseInt(posEl.textContent) || 0;
               posEl.textContent = clearBefore ? batch.length : current + batch.length;
             }
+            // Barre de progression overlay — toujours affichee, sans condition de volume
+            _batchTotal = clearBefore ? batch.length : _batchTotal + batch.length;
+            if (progEl) progEl.style.display = 'block';
+            const pct = totalTrajPositions > 0
+              ? Math.min(100, Math.round((_batchTotal / totalTrajPositions) * 100))
+              : 100;
+            const bar = document.getElementById('mapLoadingBar');
+            const pctEl = document.getElementById('mapLoadingPct');
+            if (bar) bar.style.width = pct + '%';
+            if (pctEl) pctEl.textContent = pct + '%';
           }
         );
       }
@@ -545,7 +597,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const idsSelectionnesManuelTraj = selectedIds.length > 0;
       masquerIndividusSansPositions(locations, idsSelectionnesManuelTraj);
       mettreAJourPanneau(locations);
-      mettreAJourIndividus(getAnimals().filter(a => locations.some(l => String(l.ani_id) === String(a.ani_id))));
+      const idsPresentsTraj = new Set(locations.map(l => String(l.ani_id)));
+      mettreAJourIndividus(getAnimals().filter(a => idsPresentsTraj.has(String(a.ani_id))));
       ouvrirPanneauSiNecessaire();
       const mapScreenTraj = document.getElementById('mapScreen');
       if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
@@ -567,6 +620,21 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
         }
       }, 300);
+
+      window._derniersFiltresAppliques = {
+        ani_id: idsAChercher,
+        date_from: dateFromApi || null,
+        date_to: dateToApi || null,
+        saisonFrom: saisonFromApiTraj || null,
+        saisonTo: saisonToApiTraj || null,
+        annees: anneesSelectionneesTraj.length > 0 ? anneesSelectionneesTraj : null,
+        sexe: filters.sexe || null,
+        gestionnaire: filters.gestionnaire || null,
+        population: filters.population || null,
+        programmation: filters.programmation || null,
+        limit_par_animal: toutesPositionsTraj ? null : nTraj,
+        suivisSeulement: suivisSeulement
+      };
     }
 
   } catch (err) {
@@ -574,6 +642,9 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
     alert('Erreur lors du chargement des données');
   } finally {
     hideMapLoading();
+    if (progEl) progEl.style.display = 'none';
+    const bar = document.getElementById('mapLoadingBar');
+    if (bar) bar.style.width = '0%';
     unlockSidebar();
     if (btnApply) {
       btnApply.textContent = 'Appliquer les filtres';

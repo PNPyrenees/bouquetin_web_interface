@@ -30,7 +30,7 @@ export const ROLE_INITIALES = {
   'role_ecriture': 'AD',
 };
 
-export const SEUIL_ALERTE_VOLUME = 15000;
+export const SEUIL_ALERTE_VOLUME = 40000;
 
 export const CLASSES_AGE = {
   F: [
