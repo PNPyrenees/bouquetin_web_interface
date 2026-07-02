@@ -2,7 +2,7 @@ import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fet
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
-import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, getClasseAge, decocherCochesAutomatiques } from './filters.js';
+import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques } from './filters.js';
 
 /**
  * VARIABLES GLOBALES
@@ -380,12 +380,29 @@ async function startApp(token) {
     setCurrentToken(token);
     sessionStorage.setItem('bqt_token', token);
 
-    const [animaux, populations, gestionnaires, programmations] = await Promise.all([
+    const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
+
+    // Sept requêtes en parallèle — fusion des anciens Bloc A (métadonnées) et
+    // Bloc B (positions), qui étaient séquentiels sans dépendance entre eux
+    const [
+      animaux, populations, gestionnaires, programmations, ,
+      locationsAll, locationsSuiviesRaw
+    ] = await Promise.all([
       fetchAnimals(token),
       fetchPopulations(token),
       fetchGestionnaires(token),
       fetchProgrammations(token),
-      chargerProgrammationsGPS(token)
+      chargerProgrammationsGPS(token),
+      // Dernière position par animal suivi — pour activeIds, années, liste individus
+      fetchLocalisationsRPC(currentToken, {
+        ani_is_followed: true,
+        limit_par_animal: 1
+      }),
+      // N dernières positions par animal suivi — pour le rendu carte
+      fetchLocalisationsRPC(currentToken, {
+        ani_is_followed: true,
+        limit_par_animal: n
+      })
     ]);
 
     setAnimals(animaux);
@@ -460,30 +477,14 @@ async function startApp(token) {
       await exporterCSV(currentToken, aniIds, params);
     });
 
-    const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
-
-    // Trois requêtes en parallèle pour le chargement initial
-    const [locationsAll, locationsSuiviesRaw, idsAvecGeom] = await Promise.all([
-      // Dernière position par animal suivi — pour activeIds, années, liste individus
-      fetchLocalisationsRPC(currentToken, {
-        ani_is_followed: true,
-        limit_par_animal: 1
-      }),
-      // N dernières positions par animal suivi — pour le rendu carte
-      fetchLocalisationsRPC(currentToken, {
-        ani_is_followed: true,
-        limit_par_animal: n
-      }),
-      // Identifier tous les animaux qui ont au moins une géométrie — sur tout l historique
-      // (v_localisation), pas seulement leur derniere position (v_animal_last_loc), pour ne pas
-      // exclure un animal inactif dont la derniere position n a pas de geom valide
-      fetchAniIdsAvecGeom(currentToken)
-    ]);
-
     // Calendrier en arrière-plan — ne bloque pas le rendu carte
     fetchAniCalendrier(currentToken).then(calendrier => {
       _aniCalendrier = calendrier;
-    }).catch(err => console.warn('fetchAniCalendrier échoué:', err));
+    }).catch(err => {
+      if (err.name !== 'AbortError') {
+        console.warn('fetchAniCalendrier échoué:', err);
+      }
+    });
 
     // Extraire les années depuis locationsAll (déjà chargé — 1 position par animal suivi)
     // puis enrichir en arrière-plan avec toutes les années via RPC paginée
@@ -538,7 +539,8 @@ async function startApp(token) {
     }).catch(err => console.warn('Enrichissement années échoué:', err));
 
     const locationsEnrichiesAll = enrichirLocations(locationsAll);
-    const locationsSuivies = enrichirLocations(locationsSuiviesRaw);
+    // La RPC f_get_localisation renvoie déjà ani_sexe/ani_gestionnaire/ani_pop_rattach — inutile d'enrichir
+    const locationsSuivies = locationsSuiviesRaw;
 
     // activeIds = tous les ani_id retournés par la RPC ani_is_followed
     // (la RPC filtre déjà cor_date_fin IS NULL côté SQL)
@@ -547,10 +549,37 @@ async function startApp(token) {
     adapterSelectNPourMode('positions');
     mettreAJourBadgeNPositions();
     const count = renderPoints(locationsSuivies);
+
+    // Identifier les animaux avec géométrie en arrière-plan — ne bloque pas le rendu carte
+    fetchAniIdsAvecGeom(currentToken).then(idsAvecGeom => {
+      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+        const checkbox = label.querySelector('input');
+        const aniId = checkbox?.value;
+        if (aniId && !idsAvecGeom.has(String(aniId))) {
+          label.style.display = 'none';
+          label.dataset.sansGeom = 'true';
+        }
+      });
+    }).catch(err => {
+      if (err.name !== 'AbortError') {
+        console.warn('fetchAniIdsAvecGeom échoué:', err);
+      }
+    });
+
     mettreAJourPanneau(locationsSuivies);
     const posEl = document.getElementById('positionsCount');
     if (posEl) posEl.textContent = count;
-    mettreAJourIndividus(enrichirAnimauxAvecPositions(locationsSuivies));
+
+    // Rendu carte immédiat avec données brutes
+    mettreAJourIndividus(animals);
+
+    // Enrichissement différé en arrière-plan — premiere_position/derniere_position
+    // sont des colonnes masquées par défaut dans le panneau individus
+    setTimeout(() => {
+      const animauxEnrichis = enrichirAnimauxAvecPositions(locationsSuivies);
+      mettreAJourIndividus(animauxEnrichis);
+    }, 0);
+
     mettreAJourLegende();
     setLabelDatetime('Date de localisation');
 
@@ -607,12 +636,6 @@ async function startApp(token) {
           });
 
           listeIndividus.appendChild(label);
-
-          // Masquer les animaux sans géométrie
-          if (!idsAvecGeom.has(String(ani.ani_id))) {
-            label.style.display = 'none';
-            label.dataset.sansGeom = 'true';
-          }
         });
 
       listeIndividus.style.maxHeight = '300px';
@@ -629,14 +652,14 @@ async function startApp(token) {
           ajouterBadge('Individus suivis uniquement', () => {
             const cb = document.getElementById('checkSuivis');
             if (cb) cb.checked = false;
-            mettreAJourListeParDate();
+            appliquerFiltreAvecCachePeriode();
           }, 'checkSuivis');
         } else {
           supprimerBadgeById('checkSuivis');
         }
 
         decocherCochesAutomatiques();
-        mettreAJourListeParDate();
+        appliquerFiltreAvecCachePeriode();
         mettreAJourBoutonAppliquer();
       });
     }
@@ -657,18 +680,22 @@ async function startApp(token) {
           dateFormat: 'd/m/Y',
           allowInput: true,
           locale: 'fr',
-          onChange(selectedDates, dateStr) {
-            document.getElementById('dateFrom').value = dateStr;
-            document.getElementById('dateFrom').dispatchEvent(new Event('input', { bubbles: true }));
+          onClose(selectedDates, dateStr) {
+            if (dateStr) {
+              document.getElementById('dateFrom').value = dateStr;
+              document.getElementById('dateFrom').dispatchEvent(new Event('input', { bubbles: true }));
+            }
           }
         });
         flatpickr('#dateTo', {
           dateFormat: 'd/m/Y',
           allowInput: true,
           locale: 'fr',
-          onChange(selectedDates, dateStr) {
-            document.getElementById('dateTo').value = dateStr;
-            document.getElementById('dateTo').dispatchEvent(new Event('input', { bubbles: true }));
+          onClose(selectedDates, dateStr) {
+            if (dateStr) {
+              document.getElementById('dateTo').value = dateStr;
+              document.getElementById('dateTo').dispatchEvent(new Event('input', { bubbles: true }));
+            }
           }
         });
 
@@ -776,9 +803,9 @@ async function startApp(token) {
       });
 
       // Listener selectAnnee
+      let _anneeDebounce = null;
       document.getElementById('selectAnnee')?.addEventListener('change', () => {
         decocherCochesAutomatiques();
-        mettreAJourListeParDate();
         mettreAJourBoutonAppliquer();
         _mettreAJourBadgeSaisonnalite();
         const selectAnneeEl = document.getElementById('selectAnnee');
@@ -790,6 +817,12 @@ async function startApp(token) {
         } else {
           gererExclusiviteTemporel(null);
         }
+
+        // Debounce — éviter plusieurs requêtes si l'utilisateur sélectionne plusieurs années rapidement
+        clearTimeout(_anneeDebounce);
+        _anneeDebounce = setTimeout(() => {
+          mettreAJourListeParDate();
+        }, 250);
       });
 
       // Listeners sur dateFrom et dateTo
@@ -811,6 +844,9 @@ async function startApp(token) {
             mettreAJourBoutonAppliquer();
             return;
           }
+          // Ignorer si flatpickr est en train de traiter la valeur (évite les conflits)
+          if (el._flatpickr?.isOpen) return;
+
           // Ne pas reformater pendant la frappe — Flatpickr gere au blur
           const isComplete = /^\d{2}\/\d{2}\/\d{4}$/.test(el.value);
           if (isComplete) {
@@ -905,7 +941,7 @@ async function startApp(token) {
       checkSuivisInit.checked = true;
       ajouterBadge('Individus en cours de suivi', () => {
         checkSuivisInit.checked = false;
-        mettreAJourListeParDate();
+        appliquerFiltreAvecCachePeriode();
       }, 'checkSuivis');
     }
 
@@ -982,9 +1018,6 @@ async function startApp(token) {
           onChange(value) {
             el.value = value;
             el.dispatchEvent(new Event('change', { bubbles: true }));
-            if (id === 'selectAnnee') {
-              setTimeout(() => mettreAJourListeParDate(), 50);
-            }
           }
         });
       };
@@ -1002,10 +1035,14 @@ async function startApp(token) {
     if (!mapListenersInitialized) {
       mapListenersInitialized = true;
 
+      let _searchDebounce = null;
       searchIndividu?.addEventListener('input', () => {
         decocherCochesAutomatiques();
-        mettreAJourListeParDate();
-        mettreAJourBoutonAppliquer();
+        clearTimeout(_searchDebounce);
+        _searchDebounce = setTimeout(() => {
+          appliquerFiltreAvecCachePeriode();
+          mettreAJourBoutonAppliquer();
+        }, 300);
       });
 
       // Gestion du basculement entre les modes Positions et Trajectoire
@@ -1193,12 +1230,12 @@ function initSidebarBadges(token) {
             el.value = '';
           }
           decocherCochesAutomatiques();
-          mettreAJourListeParDate();
+          appliquerFiltreAvecCachePeriode();
           mettreAJourBoutonAppliquer();
         }, id);
       }
       decocherCochesAutomatiques();
-      mettreAJourListeParDate();
+      appliquerFiltreAvecCachePeriode();
       mettreAJourBoutonAppliquer();
     });
   });
@@ -1211,7 +1248,7 @@ function initSidebarBadges(token) {
     peuplerSelectClasseAge(sexe || 'TOUS');
     // Remettre a zero le filtre classe age si la classe n existe plus
     supprimerBadgeById('selectClasseAge');
-    mettreAJourListeParDate();
+    appliquerFiltreAvecCachePeriode();
     mettreAJourBoutonAppliquer();
   });
 
@@ -1580,7 +1617,7 @@ async function reinitialiserTousLesFiltres() {
     ajouterBadge('Individus en cours de suivi', () => {
       const cb = document.getElementById('checkSuivis');
       if (cb) cb.checked = false;
-      mettreAJourListeParDate();
+      appliquerFiltreAvecCachePeriode();
     }, 'checkSuivis');
 
     // 3. Mode Positions par défaut
