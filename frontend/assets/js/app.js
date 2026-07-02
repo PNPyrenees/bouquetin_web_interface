@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchPopulations, fetchGestionnaires,fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC } from './api.js';
+import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -46,8 +46,9 @@ export function setDernierNTrajectoire(val) { _dernierNTrajectoire = val; }
  * Cette fonction fusionne les positions avec les informations de la table t_animal.
  */
 export function enrichirLocations(locations) {
+  const animalsMap = window._animalsMap || new Map(getAnimals().map(a => [String(a.ani_id), a]));
   return locations.map(loc => {
-    const ani = animals.find(a => String(a.ani_id) === String(loc.ani_id));
+    const ani = animalsMap.get(String(loc.ani_id));
     return {
       ...loc,
       ani_sexe: loc.ani_sexe || ani?.ani_sexe || null,
@@ -382,15 +383,14 @@ async function startApp(token) {
 
     const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
 
-    // Sept requêtes en parallèle — fusion des anciens Bloc A (métadonnées) et
-    // Bloc B (positions), qui étaient séquentiels sans dépendance entre eux
+    // Cinq requêtes en parallèle — fusion des anciens Bloc A (métadonnées) et
+    // Bloc B (positions), qui étaient séquentiels sans dépendance entre eux.
+    // populations/gestionnaires ne sont plus des requêtes dediees — extraites de fetchAnimals()
     const [
-      animaux, populations, gestionnaires, programmations, ,
+      animaux, programmations, ,
       locationsAll, locationsSuiviesRaw
     ] = await Promise.all([
       fetchAnimals(token),
-      fetchPopulations(token),
-      fetchGestionnaires(token),
       fetchProgrammations(token),
       chargerProgrammationsGPS(token),
       // Dernière position par animal suivi — pour activeIds, années, liste individus
@@ -406,6 +406,10 @@ async function startApp(token) {
     ]);
 
     setAnimals(animaux);
+    window._animalsMap = new Map(animaux.map(a => [String(a.ani_id), a]));
+
+    const populations = [...new Set(animaux.map(a => a.ani_pop_rattach).filter(Boolean))].sort();
+    const gestionnaires = [...new Set(animaux.map(a => a.ani_gestionnaire).filter(Boolean))].sort();
 
     const selectPop = document.getElementById('selectPopulation');
     if (selectPop) {
@@ -454,27 +458,13 @@ async function startApp(token) {
     window._showToast = showToast;
     // mettreAJourIndividus(animals);
 
-    // Export CSV — requete dedicee tous champs
+    // Export CSV — colonnes du tableau attributaire, via f_get_localisation (RPC paginee)
+    // Reflete les derniers filtres reellement appliques sur la carte (_derniersFiltresAppliques),
+    // pas l etat courant des champs UI (qui peut differer si l utilisateur n a pas encore reapplique)
     document.getElementById('btnExportCSV')?.addEventListener('click', async () => {
       const { exporterCSV } = await import('./panel.js');
-      // Recuperer les ani_id actuellement affiches sur la carte
-      const aniIds = [...new Set(
-        (window._getGpsFeatures?.() || [])
-          .filter(f => f.get('ani_id'))
-          .map(f => String(f.get('ani_id')))
-      )];
-
-      // Recuperer les params temporels actifs
-      const params = {
-        dateFrom: document.getElementById('dateFrom')?.value
-          ? _parseDateFR(document.getElementById('dateFrom').value)
-          : null,
-        dateTo: document.getElementById('dateTo')?.value
-          ? _parseDateFR(document.getElementById('dateTo').value)
-          : null
-      };
-
-      await exporterCSV(currentToken, aniIds, params);
+      const filtresExport = window._derniersFiltresAppliques || { ani_is_followed: true };
+      await exporterCSV(currentToken, filtresExport);
     });
 
     // Calendrier en arrière-plan — ne bloque pas le rendu carte
@@ -549,6 +539,11 @@ async function startApp(token) {
     adapterSelectNPourMode('positions');
     mettreAJourBadgeNPositions();
     const count = renderPoints(locationsSuivies);
+
+    window._derniersFiltresAppliques = {
+      ani_is_followed: true,
+      limit_par_animal: n
+    };
 
     // Identifier les animaux avec géométrie en arrière-plan — ne bloque pas le rendu carte
     fetchAniIdsAvecGeom(currentToken).then(idsAvecGeom => {
@@ -1141,13 +1136,6 @@ async function startApp(token) {
   }
 }
 
-// Helper — convertit JJ/MM/AAAA en AAAA-MM-JJ pour PostgREST
-function _parseDateFR(dateStr) {
-  if (!dateStr || !/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return null;
-  const [j, m, a] = dateStr.split('/');
-  return `${a}-${m}-${j}`;
-}
-
 function peuplerSelectClasseAge(sexe) {
   const select = document.getElementById('selectClasseAge');
   if (!select) return;
@@ -1735,7 +1723,8 @@ async function reinitialiserTousLesFiltres() {
         clearTrajectoire();
         const count = renderPoints(locationsSuivies, false);
         mettreAJourPanneau(locationsSuivies);
-        mettreAJourIndividus(animals.filter(a => locationsSuivies.some(l => String(l.ani_id) === String(a.ani_id))));
+        const idsPresents = new Set(locationsSuivies.map(l => String(l.ani_id)));
+        mettreAJourIndividus(animals.filter(a => idsPresents.has(String(a.ani_id))));
         const posEl = document.getElementById('positionsCount');
         if (posEl) posEl.textContent = count;
         mettreAJourLegende();
