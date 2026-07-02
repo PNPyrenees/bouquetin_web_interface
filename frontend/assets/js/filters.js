@@ -299,14 +299,23 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           .map(l => l.querySelector('input')?.value)
           .filter(Boolean);
 
-      // Consolidation periode/saison en une seule plage min/max — getPeriodesActives() peut
-      // retourner plusieurs periodes (ex: N annees x 1 periode recurrente)
-      const dateMin = periodes.length > 0
-        ? periodes.reduce((min, p) => p.from && p.from < min ? p.from : min, periodes.find(p => p.from)?.from || '')
+      // Extraire les années sélectionnées précisément (si source annee ou saisonnalite)
+      const anneesSelectionnees = [...new Set(
+        periodes
+          .filter(p => p.annee)
+          .map(p => parseInt(p.annee))
+      )];
+
+      // Bornes de dates absolues (source periode uniquement — dateFrom/dateTo saisis en JJ/MM/AAAA)
+      const periodeDateOnly = periodes.filter(p => p.source === 'periode');
+      const dateMin = periodeDateOnly.length > 0
+        ? periodeDateOnly.reduce((min, p) => p.from && p.from < min ? p.from : min, periodeDateOnly[0].from || '')
         : '';
-      const dateMax = periodes.length > 0
-        ? periodes.reduce((max, p) => p.to && p.to > max ? p.to : max, periodes.find(p => p.to)?.to || '')
+      const dateMax = periodeDateOnly.length > 0
+        ? periodeDateOnly.reduce((max, p) => p.to && p.to > max ? p.to : max, periodeDateOnly[0].to || '')
         : '';
+
+      // Saisonnalité
       const hasSaisonnalite = periodes.some(p => p.source === 'saisonnalite' || p.source === 'saisonnalite_all');
       // Bornes saisonnieres MM-JJ pour filtrage direct via loc_mois_jour_local (RPC)
       const saisonFromApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
@@ -317,7 +326,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         date_from: dateMin || null,
         date_to: dateMax || null,
         saisonFrom: saisonFromApi,
-        saisonTo: saisonToApi
+        saisonTo: saisonToApi,
+        annees: anneesSelectionnees.length > 0 ? anneesSelectionnees : null
       }, suivisSeulement);
 
       if (!toutesPositions && n) {
@@ -416,16 +426,22 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
     } else {
       // Mode Trajectoire — on ne vide pas les points existants
       const periodesT = getPeriodesActives();
-      let dateFromApi = null;
-      let dateToApi = null;
-      if (periodesT.length > 0) {
-        const p = periodesT.length === 1 ? periodesT[0] : {
-          from: periodesT.reduce((min, p) => p.from < min ? p.from : min, periodesT[0].from),
-          to: periodesT.reduce((max, p) => p.to > max ? p.to : max, periodesT[0].to)
-        };
-        dateFromApi = p.from;
-        dateToApi = p.to;
-      }
+
+      // Extraire les années sélectionnées précisément (si source annee ou saisonnalite)
+      const anneesSelectionneesTraj = [...new Set(
+        periodesT
+          .filter(p => p.annee)
+          .map(p => parseInt(p.annee))
+      )];
+
+      // Bornes de dates absolues (source periode uniquement — dateFrom/dateTo saisis en JJ/MM/AAAA)
+      const periodeDateOnlyTraj = periodesT.filter(p => p.source === 'periode');
+      const dateFromApi = periodeDateOnlyTraj.length > 0
+        ? periodeDateOnlyTraj.reduce((min, p) => p.from && p.from < min ? p.from : min, periodeDateOnlyTraj[0].from || '')
+        : null;
+      const dateToApi = periodeDateOnlyTraj.length > 0
+        ? periodeDateOnlyTraj.reduce((max, p) => p.to && p.to > max ? p.to : max, periodeDateOnlyTraj[0].to || '')
+        : null;
 
       // idsAChercher : individus cochés, sinon individus visibles après filtres (comme en mode Positions)
       const idsAChercher = selectedIds.length > 0 ? selectedIds :
@@ -449,10 +465,11 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
 
       const rpcFiltersTraj = construireFiltersRPC(token, idsAChercher, {
         ...filters,
-        date_from: dateFromApi,
-        date_to: dateToApi,
+        date_from: dateFromApi || null,
+        date_to: dateToApi || null,
         saisonFrom: saisonFromApiTraj,
-        saisonTo: saisonToApiTraj
+        saisonTo: saisonToApiTraj,
+        annees: anneesSelectionneesTraj.length > 0 ? anneesSelectionneesTraj : null
       }, suivisSeulement);
 
       if (!toutesPositionsTraj && nTraj) {
@@ -640,6 +657,8 @@ export function filtrerListeIndividus() {
 }
 
 let _derniereRequeteId = 0;
+let _derniereCleperiode = null;
+let _dernierIdsperiode = null;
 
 /**
  * Met à jour la liste des individus selon les dates sélectionnées
@@ -656,7 +675,19 @@ export async function mettreAJourListeParDate() {
   const requeteId = ++_derniereRequeteId;
   const periodes = getPeriodesActives();
 
+  // Invalider le cache si la période a changé
+  const cleperiode = JSON.stringify(periodes);
+  if (cleperiode !== _derniereCleperiode) {
+    _dernierIdsperiode = null;
+  }
+
   if (periodes.length === 0) {
+    // Guard — si les champs sont renseignés mais périodes est vide, log pour diagnostic
+    const df = document.getElementById('dateFrom')?.value;
+    const dt = document.getElementById('dateTo')?.value;
+    if (df || dt) {
+      console.warn('[mettreAJourListeParDate] Périodes vides malgré dateFrom/dateTo :', df, dt);
+    }
     if (requeteId !== _derniereRequeteId) return;
     filtrerListeIndividus();
     return;
@@ -695,6 +726,19 @@ export async function mettreAJourListeParDate() {
 
   // Periode simple, annee precise, ou saison + annee precise — le calendrier (mois_jour seul,
   // sans annee) ne suffit pas a verifier la precision exacte, on interroge l API comme avant
+
+  // Si la période n'a pas changé et qu'on a déjà un résultat — réutiliser sans requête réseau
+  if (cleperiode === _derniereCleperiode && _dernierIdsperiode !== null) {
+    if (requeteId !== _derniereRequeteId) return;
+    _appliquerFiltreListeAvecIds(_dernierIdsperiode);
+    return;
+  }
+
+  // Affichage immédiat pendant le chargement — évite la liste figée
+  document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+    if (label.dataset.sansGeom !== 'true') label.style.opacity = '0.4';
+  });
+
   try {
     const idsUnion = new Set();
 
@@ -720,7 +764,15 @@ export async function mettreAJourListeParDate() {
 
     if (requeteId !== _derniereRequeteId) return;
 
+    // Mettre en cache le résultat
+    _derniereCleperiode = cleperiode;
+    _dernierIdsperiode = new Set(idsUnion);
+
     _appliquerFiltreListeAvecIds(idsUnion);
+
+    document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+      label.style.opacity = '';
+    });
   } catch (err) {
     console.error('[mettreAJourListeParDate] Erreur:', err);
   }
@@ -760,6 +812,18 @@ function _appliquerFiltreListeAvecIds(idsAvecDonnees) {
       supprimerBadgeById(`ani-${aniId}`);
     }
   });
+}
+
+/**
+ * Réapplique le dernier résultat de période en cache si disponible, sans requête réseau —
+ * sinon retombe sur le filtrage attributaire pur (aucune période active).
+ */
+export function appliquerFiltreAvecCachePeriode() {
+  if (_dernierIdsperiode !== null) {
+    _appliquerFiltreListeAvecIds(_dernierIdsperiode);
+  } else {
+    filtrerListeIndividus();
+  }
 }
 
 // Supprimé: fonctions individuelles devenues obsolètes car centralisées dans filtrerListeIndividus
