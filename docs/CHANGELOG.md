@@ -31,6 +31,10 @@
 ### Nettoyage
 - AbortError silencieux sur fetchAniIdsAvecGeom et fetchAniCalendrier en arriere-plan
 
+### Refactoring panneau
+- HTML du panneau (onglets, tableaux, pagination Localisations et Individus) deplace de panel.js vers index.html
+- Suppression du innerHTML dynamique dans panel.js - structure statique dans le HTML
+
 ## [0.48.0] - 2026-06-29
 
 ### Nettoyage
