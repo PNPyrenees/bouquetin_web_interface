@@ -168,8 +168,9 @@
 
 .sidebar-right-body {
     flex: 1;
-    overflow-y: auto;
-    padding: var(--sidebar-padding);
+    height: 100%;
+    overflow: hidden;
+    padding: 0 0 0 10px;
     display: flex;
     flex-direction: column;
 }
