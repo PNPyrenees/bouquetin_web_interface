@@ -26,54 +26,6 @@ export async function login(username, password) {
 }
 
 /**
- * Récupère tous les champs de v_localisation pour l'export CSV — sans limit,
- * indépendant de la pagination et des filtres colonnes du tableau.
- * @param {string} token - Jeton JWT pour l'autorisation
- * @param {Array<string>} aniIds - Identifiants des animaux à exporter
- * @param {Object} params - Filtres temporels optionnels (dateFrom, dateTo au format AAAA-MM-JJ)
- */
-export async function fetchLocationsExportCSV(token, aniIds, params = {}) {
-  if (!aniIds || aniIds.length === 0) return [];
-
-  const CHAMPS_EXPORT = [
-    'loc_id', 'ani_id', 'ani_code', 'ani_nom', 'ani_sexe',
-    'ani_pop_rattach', 'ani_date_relache', 'ani_gestionnaire',
-    'capt_id', 'capt_actif', 'capt_frequence', 'capt_constructeur', 'capt_id_constructeur',
-    'loc_dop', 'fix_status_label', 'loc_nb_satellites', 'loc_outlier', 'loc_anomalie',
-    'loc_altitude_capteur', 'loc_temperature_capteur',
-    'loc_datetime_utc', 'loc_datetime_local', 'loc_date_local',
-    'loc_mois_jour_local', 'loc_commentaire'
-    // geom exclu volontairement — pas utile dans un CSV tabulaire
-  ].join(',');
-
-  const batchSize = 50;
-  const results = [];
-
-  for (let i = 0; i < aniIds.length; i += batchSize) {
-    const batch = aniIds.slice(i, i + batchSize);
-    const idsParam = `ani_id=in.(${batch.join(',')})`;
-
-    let url = `${API_URL}/v_localisation?${idsParam}&select=${CHAMPS_EXPORT}&loc_anomalie=not.is.true&loc_outlier=is.null&order=ani_nom.asc,loc_datetime_local.desc`;
-
-    // Appliquer les filtres temporels si presents
-    if (params.dateFrom) url += `&loc_datetime_local=gte.${params.dateFrom}`;
-    if (params.dateTo) url += `&loc_datetime_local=lte.${params.dateTo}`;
-
-    const res = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept-Profile': 'bouquetin'
-      }
-    });
-    if (!res.ok) throw new Error(`Export CSV fetch error: ${res.status}`);
-    const data = await res.json();
-    results.push(...data);
-  }
-
-  return results;
-}
-
-/**
  * Récupère la liste complète des animaux et leurs métadonnées.
  */
 export async function fetchAnimals(token) {
