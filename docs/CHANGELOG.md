@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [0.50.0] - 2026-07-02
+
+### Optimisations chargement et performances JS
+- Populations et gestionnaires extraits depuis fetchAnimals() - fetchPopulations()/fetchGestionnaires() retirees des imports et appels app.js (fonctions toujours definies dans api.js, non appelees)
+- enrichirLocations() O(n×m) remplacee par Map O(1) via window._animalsMap
+- .filter()+.some() O(n×m) remplaces par Set dans mettreAJourIndividus
+- window._animalsMap construit une fois au chargement initial et reutilise
+
+### Export CSV
+- Migration export CSV vers f_get_localisation - plus de requete sur v_localisation
+- Colonnes exportees limitees aux 9 colonnes du tableau attributaire uniquement
+- Pagination par batches de 10 000 positions via fetchLocalisationsRPC()
+- Suppression de fetchLocationsExportCSV() et CHAMPS_EXPORT - dead code retire
+- Export base sur window._derniersFiltresAppliques - correspond toujours aux donnees carte
+- Filtre limit_par_animal transmis a l'export - respect du mode N dernieres positions
+- Filtre saison, annees, gestionnaire, population, programmation transmis a l'export
+- Signature exporterCSV(token, filters) - aniIds lu depuis filters.ani_id en interne
+
+### Indicateur de progression
+- Barre de progression avec pourcentage dans l'overlay de chargement (chemins A, B, C, D)
+- Affichage systematique sans condition de volume
+- Indicateur circulaire export CSV a cote du bouton avec compteur de positions
+- Seuil alerte volume releve de 15 000 a 40 000 positions
+
+### Corrections filtres
+- _derniersFiltresAppliques mis a jour dans les chemins Positions ET Trajectoire
+- Chemin Trajectoire utilise les noms de variables corrects
+
 ## [0.49.0] - 2026-07-02
 
 ### Migration
