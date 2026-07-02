@@ -1079,6 +1079,15 @@ input[type="checkbox"] {
   filter: invert(40%) sepia(60%) saturate(400%) hue-rotate(110deg);
 }
 
+#mapLoadingBar {
+  background: var(--color-primary);
+}
+
+#mapLoadingPct {
+  font-size: 14px;
+  color: #2D6A4F;
+}
+
 @keyframes spin {
   0% {
     transform: rotate(0deg);

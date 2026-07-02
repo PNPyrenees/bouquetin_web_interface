@@ -208,6 +208,29 @@
   flex-shrink: 0;
 }
 
+#exportCircle {
+  transform: rotate(-90deg);
+}
+
+.export-circle-bg {
+  stroke: var(--color-border);
+}
+
+.export-circle-arc {
+  stroke: var(--color-primary);
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+#exportProgressText {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+#exportProgressText span {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
 
 
 .panel-btn-filtres {
