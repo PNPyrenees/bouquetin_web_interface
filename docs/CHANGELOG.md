@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.50.1] - 2026-07-03
+
+### Corrections
+- Zoom automatique corrige pour un individu unique — utilise getGpsSource().getExtent() au lieu de locations[0].geom
+- Cas point unique (extent degenere) gere via animate() avec ZOOM_FILTER_SINGLE
+- Styles CSS inline deplacés de index.html vers main.css, map.css et panel.css
+
 ## [0.50.0] - 2026-07-02
 
 ### Optimisations chargement et performances JS
