@@ -150,6 +150,23 @@ export async function fetchProgrammations(token) {
   return res.json();
 }
 
+/**
+ * Récupère les ani_id ayant au moins une translocation (t_capture_relache.translocation = true).
+ * Utilisé pour le filtre Translocation côté frontend.
+ */
+export async function fetchTranslocationIds(token) {
+  const res = await fetch(`${API_URL}/t_capture_relache?select=ani_id,translocation&translocation=eq.true`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=none'
+    }
+  });
+  if (!res.ok) throw new Error(`fetchTranslocationIds error: ${res.status}`);
+  const data = await res.json();
+  return new Set(data.map(r => r.ani_id));
+}
+
 export async function fetchPopulations(token) {
   const res = await fetch(
     `${API_URL}/t_animal?select=ani_pop_rattach&ani_pop_rattach=not.is.null&order=ani_pop_rattach.asc`,
