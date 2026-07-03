@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC } from './api.js';
+import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -388,7 +388,7 @@ async function startApp(token) {
     // populations/gestionnaires ne sont plus des requêtes dediees — extraites de fetchAnimals()
     const [
       animaux, programmations, ,
-      locationsAll, locationsSuiviesRaw
+      locationsAll, locationsSuiviesRaw, idsTranslocations
     ] = await Promise.all([
       fetchAnimals(token),
       fetchProgrammations(token),
@@ -402,10 +402,14 @@ async function startApp(token) {
       fetchLocalisationsRPC(currentToken, {
         ani_is_followed: true,
         limit_par_animal: n
-      })
+      }),
+      fetchTranslocationIds(token)
     ]);
 
     setAnimals(animaux);
+    animaux.forEach(a => {
+      a.was_translocated = idsTranslocations.has(a.ani_id);
+    });
     window._animalsMap = new Map(animaux.map(a => [String(a.ani_id), a]));
 
     const populations = [...new Set(animaux.map(a => a.ani_pop_rattach).filter(Boolean))].sort();
@@ -596,6 +600,7 @@ async function startApp(token) {
           label.dataset.sexe = ani.ani_sexe || '';
           label.dataset.gestionnaire = ani.ani_gestionnaire || '';
           label.dataset.population = ani.ani_pop_rattach || '';
+          label.dataset.translocation = ani.was_translocated ? 'true' : 'false';
           label.dataset.masqueParDate = 'false';
 
           const dernierePos = locationsEnrichiesAll.find(l => String(l.ani_id) === String(ani.ani_id));
@@ -1203,7 +1208,7 @@ function initSidebarBadges(token) {
   }
 
   // Selects
-  ['selectSexe', 'selectGestionnaire', 'selectClasseAge', 'selectPopulation', 'selectProgrammation'].forEach(id => {
+  ['selectSexe', 'selectGestionnaire', 'selectClasseAge', 'selectPopulation', 'selectProgrammation', 'selectTranslocation'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
     el.addEventListener('change', () => {
