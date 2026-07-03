@@ -431,15 +431,14 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
 
       setTimeout(() => {
         const extent = getGpsSource().getExtent();
-        if (selectedIds.length === 1 && locations.length > 0) {
-          const loc = locations[0];
-          const geom = typeof loc.geom === 'string' ? JSON.parse(loc.geom) : loc.geom;
-          if (geom?.coordinates) {
-            const wgs84 = proj4('EPSG:2154', 'EPSG:4326', geom.coordinates);
-            const coord = ol.proj.fromLonLat(wgs84);
-            getMap().getView().animate({ center: coord, zoom: ZOOM_FILTER_SINGLE, duration: 400 });
-          }
-        } else if (locations.length > 1 && extent && !ol.extent.isEmpty(extent)) {
+        if (!extent || ol.extent.isEmpty(extent)) return;
+
+        const [minX, minY, maxX, maxY] = extent;
+        const isPoint = minX === maxX && minY === maxY;
+
+        if (isPoint) {
+          getMap().getView().animate({ center: [minX, minY], zoom: ZOOM_FILTER_SINGLE, duration: 400 });
+        } else {
           getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
         }
       }, 400);
