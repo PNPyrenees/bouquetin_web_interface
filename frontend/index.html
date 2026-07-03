@@ -46,7 +46,7 @@
           <img src="assets/img/rapport.png" alt="" class="nav-icon">
           statistiques
         </a>
-        <a href="#" id="btnAjouter" class="nav-link nav-link-add" style="display: none;">+ Ajouter</a>
+        <a href="#" id="btnAjouter" class="nav-link nav-link-add">+ Ajouter</a>
       </nav>
       <div class="header-top-right">
         <div class="session-dropdown" id="userChip" style="display:none">
@@ -242,15 +242,15 @@
       <span class="toggle-icon">‹</span>
     </button>
   </aside>
-  <div id="mapScreen" style="display:block">
+  <div id="mapScreen">
     <div id="mapLoading" style="display:none">
       <div class="map-loading-spinner"></div>
       <span>Chargement des données...</span>
-      <div id="mapLoadingProgress" style="display:none;width:200px;margin-top:10px">
-        <div style="position:relative;height:4px;border-radius:2px;background:rgba(255,255,255,0.25);overflow:hidden">
-          <div id="mapLoadingBar" style="height:100%;width:0%;border-radius:2px;transition:width 0.3s ease"></div>
+      <div id="mapLoadingProgress" style="display:none">
+        <div class="map-loading-track">
+          <div id="mapLoadingBar" style="width:0%"></div>
         </div>
-        <div id="mapLoadingPct" style="text-align:center;margin-top:6px"></div>
+        <div id="mapLoadingPct"></div>
       </div>
     </div>
     <div id="map">
@@ -374,7 +374,7 @@
               </svg>
               Exporter CSV
             </button>
-            <div id="exportProgress" style="display:none;align-items:center;gap:10px">
+            <div id="exportProgress" style="display:none">
               <svg width="28" height="28" viewBox="0 0 28 28" id="exportCircle">
                 <circle cx="14" cy="14" r="11" fill="none" stroke-width="2.5" class="export-circle-bg"/>
                 <circle id="exportArc" cx="14" cy="14" r="11" fill="none" stroke-width="2.5"
@@ -382,9 +382,9 @@
               </svg>
               <span id="exportProgressText"></span>
             </div>
-            <div style="position:relative; margin-left:auto;">
+            <div class="panel-filtre-wrapper">
               <button class="panel-btn-filtres" id="panelBtnFiltres">
-                <img src="assets/img/filtre_horizontal.png" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"> Filtres colonnes
+                <img src="assets/img/filtre_horizontal.png" alt="" class="panel-btn-filtres-icon"> Filtres colonnes
               </button>
               <div class="panel-colonnes-dropdown" id="panelColonnesDropdown" style="display:none">
                 <div class="panel-colonnes-header">
@@ -420,9 +420,9 @@
         </div>
         <div class="panel-tab-content" id="panelContentIndividus" style="display:none">
           <div class="panel-toolbar">
-            <div style="position:relative; margin-left:auto;">
+            <div class="panel-filtre-wrapper">
               <button class="panel-btn-filtres" id="panelBtnFiltresIndividus">
-                <img src="assets/img/filtre_horizontal.png" alt="" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"> Filtres colonnes
+                <img src="assets/img/filtre_horizontal.png" alt="" class="panel-btn-filtres-icon"> Filtres colonnes
               </button>
               <div class="panel-colonnes-dropdown" id="panelIndividusDropdown" style="display:none">
                 <div class="panel-colonnes-header">
@@ -460,7 +460,7 @@
     </div>
   </aside>
   <script type="module" src="assets/js/app.js"></script>
-  <span id="positionsCount" style="display:none">0</span>
+  <span id="positionsCount">0</span>
 
   <div id="loginScreen">
     <div class="login-left">
@@ -492,7 +492,7 @@
       </div>
     </div>
   </div>
-  <div id="modalVolume" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center;">
+  <div id="modalVolume" style="display:none">
     <div class="modal-volume-card">
       <h3 class="modal-volume-titre">Volume de données important</h3>
       <p class="modal-volume-texte">Votre requête retourne <strong id="modalVolumeCount"></strong> positions.</p>
