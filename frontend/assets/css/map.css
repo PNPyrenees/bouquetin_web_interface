@@ -26,3 +26,31 @@
   color: #333;
   font-size: 11px;
 }
+
+/* ========================================
+   OVERLAY DE CHARGEMENT CARTE
+   ======================================== */
+
+#mapLoadingProgress {
+  width: 200px;
+  margin-top: 10px;
+}
+
+.map-loading-track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+
+#mapLoadingBar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+#mapLoadingPct {
+  text-align: center;
+  margin-top: 6px;
+}
