@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [0.50.2] - 2026-07-03
+
+### Filtre translocation
+- fetchTranslocationIds() ajoutee dans api.js — requete legere sur t_capture_relache au demarrage
+- Animaux enrichis avec was_translocated au chargement initial dans startApp()
+- filtrerListeIndividus() et _appliquerFiltreListeAvecIds() filtrent par translocation cote client
+- Listener selectTranslocation ajoute au tableau des selects attributaires dans app.js
+- was_translocated transmis a construireFiltersRPC() en boolean et dans _derniersFiltresAppliques
+- Filtre cumulatif avec tous les autres filtres existants
+
 ## [0.50.1] - 2026-07-03
 
 ### Corrections
