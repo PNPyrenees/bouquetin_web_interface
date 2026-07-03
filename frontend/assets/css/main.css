@@ -192,6 +192,7 @@ header {
 .nav-link-add {
   color: #2D9469;
   font-weight: 700;
+  display: none;
 }
 
 .header-top-right {
@@ -307,6 +308,18 @@ header {
 .filter-select option {
   background-color: #2D6A4F;
   color: white;
+}
+
+#modalVolume {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-volume-card {
@@ -1002,6 +1015,7 @@ input[type="checkbox"] {
 }
 
 #mapScreen {
+  display: block;
   position: fixed;
   top: 60px;
   left: var(--sidebar-width);
@@ -1832,6 +1846,10 @@ input[type="checkbox"] {
 
 #btnApplyFilters.section-locked {
   opacity: 0.6;
+}
+
+#positionsCount {
+  display: none;
 }
 
 #toast {
