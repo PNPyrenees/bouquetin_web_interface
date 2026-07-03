@@ -235,6 +235,13 @@ function construireFiltersRPC(token, idsAnimaux, filters, suivisSeulement) {
   if (filters.population)    rpcFilters.population    = filters.population;
   if (filters.programmation) rpcFilters.programmation = filters.programmation;
 
+  // Translocation
+  if (filters.wasTranslocated === 'transloque') {
+    rpcFilters.was_translocated = true;
+  } else if (filters.wasTranslocated === 'non_transloque') {
+    rpcFilters.was_translocated = false;
+  }
+
   // Qualité
   rpcFilters.include_outliers = filters.include_outliers || false;
 
@@ -270,7 +277,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
     gestionnaire: document.getElementById('selectGestionnaire')?.value || '',
     population: document.getElementById('selectPopulation')?.value || '',
     include_outliers: document.getElementById('checkAberrantes')?.checked || false,
-    programmation: document.getElementById('selectProgrammation')?.value || ''
+    programmation: document.getElementById('selectProgrammation')?.value || '',
+    wasTranslocated: document.getElementById('selectTranslocation')?.value || ''
   };
 
   if (btnApply) {
@@ -454,6 +462,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         gestionnaire: filters.gestionnaire || null,
         population: filters.population || null,
         programmation: filters.programmation || null,
+        was_translocated: filters.wasTranslocated ?? null,
         limit_par_animal: toutesPositions ? null : n,
         suivisSeulement: suivisSeulement
       };
@@ -631,6 +640,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         gestionnaire: filters.gestionnaire || null,
         population: filters.population || null,
         programmation: filters.programmation || null,
+        was_translocated: filters.wasTranslocated ?? null,
         limit_par_animal: toutesPositionsTraj ? null : nTraj,
         suivisSeulement: suivisSeulement
       };
@@ -684,6 +694,7 @@ export function filtrerListeIndividus() {
   const classe = document.getElementById('selectClasseAge')?.value;
   const suivisSeulement = document.getElementById('checkSuivis')?.checked || false;
   const programmation = document.getElementById('selectProgrammation')?.value;
+  const wasTranslocated = document.getElementById('selectTranslocation')?.value;
 
   const searchVal = document.getElementById('searchIndividu')?.value?.toLowerCase()?.trim() || '';
 
@@ -701,6 +712,7 @@ export function filtrerListeIndividus() {
     const aniGestionnaire = label.dataset.gestionnaire || '';
     const aniPopulation = label.dataset.population || '';
     const aniClasse = label.dataset.classe || '';
+    const aniTranslocation = label.dataset.translocation || '';
 
     const matchSexe = !sexe || aniSexe === sexe;
     const matchGestionnaire = !gestionnaire || aniGestionnaire === gestionnaire;
@@ -709,8 +721,11 @@ export function filtrerListeIndividus() {
     const matchSuivis = !suivisSeulement || getActiveIds().has(Number(aniId));
     const matchProgrammation = !programmation ||
       String(getProgrammationsMap().get(String(aniId))) === programmation;
+    const matchTranslocation = !wasTranslocated ||
+      (wasTranslocated === 'transloque' && aniTranslocation === 'true') ||
+      (wasTranslocated === 'non_transloque' && aniTranslocation === 'false');
 
-    const visible = (matchSexe && matchGestionnaire && matchPopulation && matchClasse && matchSuivis && matchProgrammation);
+    const visible = (matchSexe && matchGestionnaire && matchPopulation && matchClasse && matchSuivis && matchProgrammation && matchTranslocation);
     label.dataset.masqueParDate = visible ? 'false' : 'true';
 
     const matchSearch = !searchVal || label.textContent.toLowerCase().includes(searchVal);
@@ -859,6 +874,7 @@ function _appliquerFiltreListeAvecIds(idsAvecDonnees) {
     const population = document.getElementById('selectPopulation')?.value;
     const classe = document.getElementById('selectClasseAge')?.value;
     const programmation = document.getElementById('selectProgrammation')?.value;
+    const wasTranslocated = document.getElementById('selectTranslocation')?.value;
 
     const matchPeriode = idsAvecDonnees.has(String(checkbox.value));
     const matchSexe = !sexe || label.dataset.sexe === sexe;
@@ -868,8 +884,11 @@ function _appliquerFiltreListeAvecIds(idsAvecDonnees) {
     const matchSuivis = !document.getElementById('checkSuivis')?.checked || getActiveIds().has(Number(checkbox.value));
     const matchProgrammation = !programmation ||
       String(getProgrammationsMap().get(String(checkbox.value))) === programmation;
+    const matchTranslocation = !wasTranslocated ||
+      (wasTranslocated === 'transloque' && label.dataset.translocation === 'true') ||
+      (wasTranslocated === 'non_transloque' && label.dataset.translocation === 'false');
 
-    const visible = matchPeriode && matchSexe && matchGestionnaire && matchPopulation && matchClasse && matchSuivis && matchProgrammation;
+    const visible = matchPeriode && matchSexe && matchGestionnaire && matchPopulation && matchClasse && matchSuivis && matchProgrammation && matchTranslocation;
     label.dataset.masqueParDate = visible ? 'false' : 'true';
     const afficheFinal = visible && (!searchVal || label.textContent.toLowerCase().includes(searchVal));
     label.style.display = afficheFinal ? 'flex' : 'none';
