@@ -12,7 +12,8 @@ import {
   mettreAJourSelectN, mettreAJourBoutonAppliquer,
   setDernierNPositions, setDernierNTrajectoire,
   mettreAJourBadgeNPositions,
-  getAniCalendrier
+  getAniCalendrier,
+  getFiltreGeom
 } from './app.js';
 
 // Convertit le format flatpickr JJ/MM en MM-JJ attendu par loc_mois_jour_local (PostgREST)
@@ -242,6 +243,12 @@ function construireFiltersRPC(token, idsAnimaux, filters, suivisSeulement) {
     rpcFilters.was_translocated = false;
   }
 
+  // Filtre spatial (polygone dessiné)
+  if (filters.geom) {
+    rpcFilters.geom = filters.geom;
+    rpcFilters.geom_src = filters.geom_src || 4326;
+  }
+
   // Qualité
   rpcFilters.include_outliers = filters.include_outliers || false;
 
@@ -278,7 +285,9 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
     population: document.getElementById('selectPopulation')?.value || '',
     include_outliers: document.getElementById('checkAberrantes')?.checked || false,
     programmation: document.getElementById('selectProgrammation')?.value || '',
-    wasTranslocated: document.getElementById('selectTranslocation')?.value || ''
+    wasTranslocated: document.getElementById('selectTranslocation')?.value || '',
+    geom: getFiltreGeom() ? JSON.stringify(getFiltreGeom()) : null,
+    geom_src: getFiltreGeom() ? 4326 : null
   };
 
   if (btnApply) {
@@ -463,6 +472,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         population: filters.population || null,
         programmation: filters.programmation || null,
         was_translocated: filters.wasTranslocated ?? null,
+        geom: filters.geom || null,
+        geom_src: filters.geom_src || null,
         limit_par_animal: toutesPositions ? null : n,
         suivisSeulement: suivisSeulement
       };
@@ -641,6 +652,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         population: filters.population || null,
         programmation: filters.programmation || null,
         was_translocated: filters.wasTranslocated ?? null,
+        geom: filters.geom || null,
+        geom_src: filters.geom_src || null,
         limit_par_animal: toutesPositionsTraj ? null : nTraj,
         suivisSeulement: suivisSeulement
       };
