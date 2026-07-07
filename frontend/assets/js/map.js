@@ -653,7 +653,7 @@ const _drawLayer = new ol.layer.Vector({
 
 let _drawInteraction = null;
 
-export function activerDessinSpatial(onPolygonDrawn) {
+export function activerDessinSpatial(onPolygonDrawn, geometryType = 'Polygon') {
   if (!map) return;
 
   if (!map.getLayers().getArray().includes(_drawLayer)) {
@@ -666,9 +666,12 @@ export function activerDessinSpatial(onPolygonDrawn) {
 
   _drawSource.clear();
 
+  // Pour le rectangle, utiliser createBox avec type Circle
+  const isBox = geometryType === 'Box';
   _drawInteraction = new ol.interaction.Draw({
     source: _drawSource,
-    type: 'Polygon',
+    type: isBox ? 'Circle' : 'Polygon',
+    geometryFunction: isBox ? ol.interaction.Draw.createBox() : undefined,
     stopClick: true,
     condition: (e) => ol.events.condition.noModifierKeys(e) && ol.events.condition.primaryAction(e)
   });
@@ -678,14 +681,15 @@ export function activerDessinSpatial(onPolygonDrawn) {
     map.removeInteraction(_drawInteraction);
     _drawInteraction = null;
 
-    // Exporter le GeoJSON du polygone dessiné en EPSG:4326
-    const writer = new ol.format.GeoJSON();
-    const geojson = writer.writeFeatureObject(e.feature, {
-      dataProjection: 'EPSG:4326',
-      featureProjection: map.getView().getProjection()
-    });
+    // Export WKT en EPSG:4326 — format attendu par f_get_localisation
+    const writer = new ol.format.WKT();
+    const geomClone = e.feature.getGeometry().clone().transform(
+      map.getView().getProjection(),
+      'EPSG:4326'
+    );
+    const wkt = writer.writeGeometry(geomClone);
 
-    if (onPolygonDrawn) onPolygonDrawn(geojson.geometry);
+    if (onPolygonDrawn) onPolygonDrawn(wkt);
   });
 
   map.addInteraction(_drawInteraction);
