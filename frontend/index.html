@@ -266,9 +266,21 @@
         <button id="btnTrajectoire" class="toolbar-btn toolbar-mode" title="Trajectoire">
           <img src="assets/img/route-solid-full.svg" width="16" height="16" alt="Trajectoire">
         </button>
-        <button id="btnFiltreSpatial" class="toolbar-btn" title="Filtre spatial">
-          <img src="assets/img/draw-polygon-solid-full.svg" width="16" height="16" alt="Filtre spatial">
-        </button>
+        <div class="toolbar-btn-wrapper">
+          <button id="btnDessin" class="toolbar-btn" title="Filtre spatial">
+            <img src="assets/img/stylo.png" width="16" height="16" alt="Dessin">
+          </button>
+          <div id="panneauDessin" class="panneau-dessin" style="display:none">
+            <button id="btnDessinPolygone" class="panneau-dessin-btn" title="Polygone">
+              <img src="assets/img/draw-polygon-solid-full.svg" width="16" height="16" alt="Polygone">
+            </button>
+            <button id="btnDessinRectangle" class="panneau-dessin-btn" title="Rectangle">
+              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+                <path d="M3 5h18v14H3V5zm2 2v10h14V7H5z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
         <button id="btnFondsCarte" class="toolbar-btn" title="Fonds de carte">
           <img src="assets/img/layer-group-solid-full.svg" width="16" height="16" alt="Fonds de carte">
         </button>
