@@ -286,7 +286,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
     include_outliers: document.getElementById('checkAberrantes')?.checked || false,
     programmation: document.getElementById('selectProgrammation')?.value || '',
     wasTranslocated: document.getElementById('selectTranslocation')?.value || '',
-    geom: getFiltreGeom() ? JSON.stringify(getFiltreGeom()) : null,
+    geom: getFiltreGeom() || null,
     geom_src: getFiltreGeom() ? 4326 : null
   };
 
