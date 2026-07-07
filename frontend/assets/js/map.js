@@ -634,3 +634,71 @@ export function zoomToPoint(loc) {
   const coord = geom.getCoordinates();
   map.getView().animate({ center: coord, duration: 400 });
 }
+
+// --- Filtre spatial par dessin de polygone ---
+
+const _drawSource = new ol.source.Vector();
+const _drawLayer = new ol.layer.Vector({
+  source: _drawSource,
+  style: new ol.style.Style({
+    fill: new ol.style.Fill({ color: 'rgba(255, 255, 255, 0.3)' }),
+    stroke: new ol.style.Stroke({
+      color: 'rgba(0, 153, 255, 1)',
+      width: 3,
+      lineDash: [6, 4]
+    })
+  }),
+  zIndex: 10
+});
+
+let _drawInteraction = null;
+
+export function activerDessinSpatial(onPolygonDrawn) {
+  if (!map) return;
+
+  if (!map.getLayers().getArray().includes(_drawLayer)) {
+    map.addLayer(_drawLayer);
+  }
+
+  if (_drawInteraction) {
+    map.removeInteraction(_drawInteraction);
+  }
+
+  _drawSource.clear();
+
+  _drawInteraction = new ol.interaction.Draw({
+    source: _drawSource,
+    type: 'Polygon',
+    stopClick: true,
+    condition: (e) => ol.events.condition.noModifierKeys(e) && ol.events.condition.primaryAction(e)
+  });
+
+  _drawInteraction.on('drawend', (e) => {
+    // Désactiver l'interaction après le dessin
+    map.removeInteraction(_drawInteraction);
+    _drawInteraction = null;
+
+    // Exporter le GeoJSON du polygone dessiné en EPSG:4326
+    const writer = new ol.format.GeoJSON();
+    const geojson = writer.writeFeatureObject(e.feature, {
+      dataProjection: 'EPSG:4326',
+      featureProjection: map.getView().getProjection()
+    });
+
+    if (onPolygonDrawn) onPolygonDrawn(geojson.geometry);
+  });
+
+  map.addInteraction(_drawInteraction);
+}
+
+export function desactiverDessinSpatial() {
+  if (!map) return;
+  if (_drawInteraction) {
+    map.removeInteraction(_drawInteraction);
+    _drawInteraction = null;
+  }
+}
+
+export function effacerDessinSpatial() {
+  _drawSource.clear();
+}
