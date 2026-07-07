@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques } from './filters.js';
 
@@ -27,6 +27,7 @@ let _dernierNPositions = '5';
 let _dernierNTrajectoire = '25';
 let _nEstToutes = false;
 let _nModeManuel = false;
+let _filtreGeom = null;
 
 export function getAnimals() { return animals; }
 export function getActiveIds() { return activeIds; }
@@ -39,6 +40,8 @@ export function setActiveIds(val) { activeIds = val; }
 export function setCurrentToken(val) { currentToken = val; }
 export function setDernierNPositions(val) { _dernierNPositions = val; }
 export function setDernierNTrajectoire(val) { _dernierNTrajectoire = val; }
+export function getFiltreGeom() { return _filtreGeom; }
+export function setFiltreGeom(val) { _filtreGeom = val; }
 
 /**
  * ENRICHISSEMENT DES DONNÉES
@@ -1481,7 +1484,29 @@ function initToolbarCarte() {
   });
 
   document.getElementById('btnFiltreSpatial')?.addEventListener('click', () => {
-    showToast('Filtre spatial/fonctionnalité à venir');
+    const btn = document.getElementById('btnFiltreSpatial');
+
+    if (_filtreGeom) {
+      // Désactiver le filtre spatial existant
+      _filtreGeom = null;
+      effacerDessinSpatial();
+      btn.classList.remove('active');
+      supprimerBadgeById('filtre-spatial');
+      mettreAJourBoutonAppliquer();
+      return;
+    }
+
+    // Activer le mode dessin
+    btn.classList.add('active');
+    activerDessinSpatial((geom) => {
+      _filtreGeom = geom;
+      ajouterBadge('Zone dessinée', () => {
+        _filtreGeom = null;
+        effacerDessinSpatial();
+        mettreAJourBoutonAppliquer();
+      }, 'filtre-spatial');
+      mettreAJourBoutonAppliquer();
+    });
   });
 }
 
@@ -1612,6 +1637,12 @@ async function reinitialiserTousLesFiltres() {
       if (cb) cb.checked = false;
       appliquerFiltreAvecCachePeriode();
     }, 'checkSuivis');
+
+    // Filtre spatial — reinitialisation
+    _filtreGeom = null;
+    effacerDessinSpatial();
+    document.getElementById('btnFiltreSpatial')?.classList.remove('active');
+    supprimerBadgeById('filtre-spatial');
 
     // 3. Mode Positions par défaut
     const btnPos = document.getElementById('btnPositions');
