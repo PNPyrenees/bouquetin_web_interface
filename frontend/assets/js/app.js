@@ -28,6 +28,7 @@ let _dernierNTrajectoire = '25';
 let _nEstToutes = false;
 let _nModeManuel = false;
 let _filtreGeom = null;
+let _dessinEnCours = false;
 
 export function getAnimals() { return animals; }
 export function getActiveIds() { return activeIds; }
@@ -1434,6 +1435,29 @@ function initBasemapSelector() {
   });
 }
 
+/**
+ * Démarre le dessin d'une zone (polygone ou rectangle) et ferme le panneau de choix.
+ */
+function demarrerDessinSpatial(geometryType) {
+  const btn = document.getElementById('btnDessin');
+  const panneau = document.getElementById('panneauDessin');
+  if (panneau) panneau.style.display = 'none';
+  btn?.classList.add('active');
+  _dessinEnCours = true;
+
+  activerDessinSpatial((geom) => {
+    _dessinEnCours = false;
+    _filtreGeom = geom;
+    ajouterBadge('Zone dessinée', () => {
+      _filtreGeom = null;
+      effacerDessinSpatial();
+      btn?.classList.remove('active');
+      mettreAJourBoutonAppliquer();
+    }, 'filtre-spatial');
+    mettreAJourBoutonAppliquer();
+  }, geometryType);
+}
+
 function initToolbarCarte() {
   if (toolbarCarteInitialized) return;
   toolbarCarteInitialized = true;
@@ -1483,30 +1507,51 @@ function initToolbarCarte() {
     }
   });
 
-  document.getElementById('btnFiltreSpatial')?.addEventListener('click', () => {
-    const btn = document.getElementById('btnFiltreSpatial');
+  document.getElementById('btnDessin')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const btn = document.getElementById('btnDessin');
+    const panneau = document.getElementById('panneauDessin');
 
-    if (_filtreGeom) {
-      // Désactiver le filtre spatial existant
+    if (_filtreGeom || _dessinEnCours) {
+      // Un filtre spatial est déjà actif (ou en cours de dessin) — le désactiver directement
       _filtreGeom = null;
+      _dessinEnCours = false;
       effacerDessinSpatial();
+      desactiverDessinSpatial();
       btn.classList.remove('active');
+      if (panneau) panneau.style.display = 'none';
       supprimerBadgeById('filtre-spatial');
       mettreAJourBoutonAppliquer();
       return;
     }
 
-    // Activer le mode dessin
-    btn.classList.add('active');
-    activerDessinSpatial((geom) => {
-      _filtreGeom = geom;
-      ajouterBadge('Zone dessinée', () => {
-        _filtreGeom = null;
-        effacerDessinSpatial();
-        mettreAJourBoutonAppliquer();
-      }, 'filtre-spatial');
-      mettreAJourBoutonAppliquer();
-    });
+    // Toggle le panneau de choix Polygone/Rectangle
+    const estOuvert = panneau && panneau.style.display !== 'none';
+    if (panneau) panneau.style.display = estOuvert ? 'none' : 'flex';
+    btn.classList.toggle('active', !estOuvert);
+  });
+
+  document.getElementById('btnDessinPolygone')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    demarrerDessinSpatial('Polygon');
+  });
+
+  document.getElementById('btnDessinRectangle')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    demarrerDessinSpatial('Box');
+  });
+
+  // Clic ailleurs sur la carte — ferme le panneau de choix s'il est ouvert
+  document.addEventListener('click', (e) => {
+    const panneau = document.getElementById('panneauDessin');
+    const btn = document.getElementById('btnDessin');
+    if (!panneau || panneau.style.display === 'none') return;
+    if (panneau.contains(e.target) || btn?.contains(e.target)) return;
+
+    panneau.style.display = 'none';
+    if (!_filtreGeom && !_dessinEnCours) {
+      btn?.classList.remove('active');
+    }
   });
 }
 
@@ -1640,8 +1685,12 @@ async function reinitialiserTousLesFiltres() {
 
     // Filtre spatial — reinitialisation
     _filtreGeom = null;
+    _dessinEnCours = false;
     effacerDessinSpatial();
-    document.getElementById('btnFiltreSpatial')?.classList.remove('active');
+    desactiverDessinSpatial();
+    document.getElementById('btnDessin')?.classList.remove('active');
+    const panneauDessinReinit = document.getElementById('panneauDessin');
+    if (panneauDessinReinit) panneauDessinReinit.style.display = 'none';
     supprimerBadgeById('filtre-spatial');
 
     // 3. Mode Positions par défaut
