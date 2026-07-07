@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.51.1] - 2026-07-07
+
+### Filtre spatial finalise
+- Format geom corrige : export WKT via ol.format.WKT au lieu de GeoJSON — f_get_localisation attend du WKT
+- Suppression du double encodage JSON.stringify sur geom dans filters.js
+- Ajout dessin rectangle via ol.interaction.Draw.createBox
+- Fusion des boutons polygone et rectangle en un seul bouton stylo avec panneau de choix
+- Panneau de dessin : clic stylo ouvre le choix Polygone/Rectangle, clic ailleurs ferme
+- Un seul filtre spatial actif a la fois — badge Zone dessinee commun
+- Reinitialisation du filtre spatial adaptee aux nouveaux boutons
+
 ## [0.51.0] - 2026-07-04
 
 ### Filtre spatial (en cours)
