@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.51.0] - 2026-07-04
+
+### Filtre spatial (en cours)
+- Couche de dessin vectorielle et interaction Draw polygone dans map.js
+- activerDessinSpatial(), desactiverDessinSpatial(), effacerDessinSpatial() exportees
+- Bouton btnFiltreSpatial fonctionnel — toggle dessin/effacement avec badge Zone dessinee
+- geom/geom_src collectes dans applyFilters et transmis via construireFiltersRPC
+- geom/geom_src inclus dans _derniersFiltresAppliques (Positions et Trajectoire)
+- Reinitialisation du filtre spatial dans reinitialiserTousLesFiltres
+- Connu : erreur 500 cote serveur sur le format geom — format attendu par f_get_localisation a clarifier avec Ludovic
+
 ## [0.50.2] - 2026-07-03
 
 ### Filtre translocation
