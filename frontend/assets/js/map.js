@@ -1,6 +1,7 @@
 import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG } from './config.js';
 let map;
 let gpsSource;
+let gpsLayer;
 let trajectoireSource;
 let popupOverlay;
 let basemaps = [];
@@ -56,6 +57,10 @@ const CONTOURS = [
   { strokeR: 0,   strokeG: 200, strokeB: 255, strokeA: 1, strokeWidth: 2 }, // Cyan
 ];
 
+// Suffixes d attributs precalcules par renderPoints() pour chaque mode de coloration —
+// permet a changerModeCouleur() de rebasculer le style WebGL sans reconstruire les features
+const MODES_COULEUR_SUFFIXES = { individu: 'Individu', sexe: 'Sexe', gestionnaire: 'Gestionnaire' };
+
 function getCouleurParIndex(index) {
   return GLASBEY_32[index % GLASBEY_32.length];
 }
@@ -108,7 +113,7 @@ function getGradientColor(ratio) {
 /**
  * Retourne la couleur d'un point selon le mode de coloration.
  */
-function getCouleur(loc, mode) {
+export function getCouleur(loc, mode) {
   switch (mode) {
     case 'individu':
     default:
@@ -143,13 +148,14 @@ export function initMap(targetId, popupId) {
   gpsSource = new ol.source.Vector();
   trajectoireSource = new ol.source.Vector();
 
-  // Création de la couche des points GPS
-  const gpsLayer = new ol.layer.WebGLPoints({
+  // Création de la couche des points GPS — style initial mode Individu (coherent avec
+  // le radio coche par defaut dans index.html) ; voir changerModeCouleur() pour la bascule
+  gpsLayer = new ol.layer.WebGLPoints({
     source: gpsSource,
     style: {
       'circle-radius': ['get', 'radius'],
-      'circle-fill-color': ['color', ['get', 'fillR'], ['get', 'fillG'], ['get', 'fillB'], ['get', 'fillA']],
-      'circle-stroke-color': ['color', ['get', 'strokeR'], ['get', 'strokeG'], ['get', 'strokeB'], ['get', 'strokeA']],
+      'circle-fill-color': ['color', ['get', 'fillIndividuR'], ['get', 'fillIndividuG'], ['get', 'fillIndividuB'], ['get', 'fillA']],
+      'circle-stroke-color': ['color', ['get', 'strokeIndividuR'], ['get', 'strokeIndividuG'], ['get', 'strokeIndividuB'], ['get', 'strokeA']],
       'circle-stroke-width': ['get', 'strokeWidth']
     }
   });
@@ -288,14 +294,20 @@ export function initMap(targetId, popupId) {
   return map;
 }
 
+// Memoise — la palette ne compte qu une poignee de couleurs distinctes, mais renderPoints()
+// appelle desormais cssToRgba() pour les 3 modes de coloration sur chaque point
+const _rgbaCache = new Map();
 function cssToRgba(css) {
+  if (_rgbaCache.has(css)) return _rgbaCache.get(css);
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 1;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.fillStyle = css;
   ctx.fillRect(0, 0, 1, 1);
   const d = ctx.getImageData(0, 0, 1, 1).data;
-  return [d[0], d[1], d[2], d[3] / 255];
+  const rgba = [d[0], d[1], d[2], d[3] / 255];
+  _rgbaCache.set(css, rgba);
+  return rgba;
 }
 
 /**
@@ -333,65 +345,98 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
       derniereParIndividu[loc.ani_id]?.date === (loc.loc_datetime_local || loc.loc_date_local);
     const estPremier = modeTrajectoire &&
       premiereParIndividu[loc.ani_id]?.date === (loc.loc_datetime_local || loc.loc_date_local);
+    const estDepart = modeTrajectoire && estPremier && !estDernier;
 
-    const couleur = getCouleur(loc, modeCouleur);
-    const [cR, cG, cB, cA] = cssToRgba(couleur);
+    const idx = indicesIndividus.get(loc.ani_id) ?? 0;
+    const contour = getContourParIndex(idx);
 
-    let radius, fillR, fillG, fillB, fillA, strokeR, strokeG, strokeB, strokeA, strokeWidth;
-
-    if (modeTrajectoire && estPremier && !estDernier) {
+    let radius, strokeWidth;
+    if (estDepart) {
       radius = 6;
-      fillR = 255; fillG = 255; fillB = 255; fillA = 1;
-      strokeR = cR; strokeG = cG; strokeB = cB; strokeA = cA;
       strokeWidth = 2.5;
     } else if (modeTrajectoire && estDernier) {
       // Meme contour par index que les autres points — coherent avec la legende
-      const idxDernier = indicesIndividus.get(loc.ani_id) ?? 0;
-      const contourDernier = getContourParIndex(idxDernier);
       radius = 8;
-      fillR = cR; fillG = cG; fillB = cB; fillA = cA;
-      strokeR = contourDernier.strokeR;
-      strokeG = contourDernier.strokeG;
-      strokeB = contourDernier.strokeB;
-      strokeA = contourDernier.strokeA;
-      strokeWidth = contourDernier.strokeWidth;
+      strokeWidth = contour.strokeWidth;
     } else if (modeTrajectoire) {
       // Contour variable selon l index de l individu — coherent avec la legende et le mode Positions
-      const idxTraj = indicesIndividus.get(loc.ani_id) ?? 0;
-      const contourTraj = getContourParIndex(idxTraj);
       radius = 4;
-      fillR = cR; fillG = cG; fillB = cB; fillA = cA;
-      strokeR = contourTraj.strokeR;
-      strokeG = contourTraj.strokeG;
-      strokeB = contourTraj.strokeB;
-      strokeA = contourTraj.strokeA;
       strokeWidth = 1;
     } else {
       // Mode Positions — contour variable selon l index de l individu
-      const idx = indicesIndividus.get(loc.ani_id) ?? 0;
-      const contour = getContourParIndex(idx);
       radius = 6;
-      fillR = cR; fillG = cG; fillB = cB; fillA = cA;
-      strokeR = contour.strokeR;
-      strokeG = contour.strokeG;
-      strokeB = contour.strokeB;
-      strokeA = contour.strokeA;
       strokeWidth = contour.strokeWidth;
     }
 
-    const feature = new ol.Feature({
+    // Couleurs precalculees pour les 3 modes de symbologie — permet a changerModeCouleur()
+    // de rebasculer le style de la couche WebGL sans reconstruire les features
+    const featureAttrs = {
       geometry: new ol.geom.Point(coord),
       ...loc,
       radius,
-      fillR, fillG, fillB, fillA,
-      strokeR, strokeG, strokeB, strokeA,
-      strokeWidth
+      strokeWidth,
+      fillA: 1,
+      strokeA: 1
+    };
+
+    Object.entries(MODES_COULEUR_SUFFIXES).forEach(([mode, suffixe]) => {
+      const [cR, cG, cB] = cssToRgba(getCouleur(loc, mode));
+      if (estDepart) {
+        featureAttrs[`fill${suffixe}R`] = 255;
+        featureAttrs[`fill${suffixe}G`] = 255;
+        featureAttrs[`fill${suffixe}B`] = 255;
+        featureAttrs[`stroke${suffixe}R`] = cR;
+        featureAttrs[`stroke${suffixe}G`] = cG;
+        featureAttrs[`stroke${suffixe}B`] = cB;
+      } else {
+        featureAttrs[`fill${suffixe}R`] = cR;
+        featureAttrs[`fill${suffixe}G`] = cG;
+        featureAttrs[`fill${suffixe}B`] = cB;
+        featureAttrs[`stroke${suffixe}R`] = contour.strokeR;
+        featureAttrs[`stroke${suffixe}G`] = contour.strokeG;
+        featureAttrs[`stroke${suffixe}B`] = contour.strokeB;
+      }
     });
 
+    const feature = new ol.Feature(featureAttrs);
     gpsSource.addFeature(feature);
   });
 
+  changerModeCouleur(modeCouleur);
+
   return gpsSource.getFeatures().length;
+}
+
+/**
+ * Bascule la couche de points GPS sur un autre mode de coloration (individu/sexe/gestionnaire)
+ * sans reconstruire les features — les 3 jeux de couleurs sont precalcules par renderPoints().
+ */
+export function changerModeCouleur(modeCouleur) {
+  if (!gpsLayer) return;
+  const suffixe = MODES_COULEUR_SUFFIXES[modeCouleur] || 'Individu';
+  const style = {
+    'circle-radius': ['get', 'radius'],
+    'circle-fill-color': ['color', ['get', `fill${suffixe}R`], ['get', `fill${suffixe}G`], ['get', `fill${suffixe}B`], ['get', 'fillA']],
+    'circle-stroke-color': ['color', ['get', `stroke${suffixe}R`], ['get', `stroke${suffixe}G`], ['get', `stroke${suffixe}B`], ['get', 'strokeA']],
+    'circle-stroke-width': ['get', 'strokeWidth']
+  };
+
+  if (typeof gpsLayer.setStyle === 'function') {
+    gpsLayer.setStyle(style);
+    return;
+  }
+
+  // Repli — setStyle indisponible sur cette version d OpenLayers : on recree uniquement
+  // la couche WebGL en reutilisant gpsSource telle quelle, sans re-parser les features
+  const layers = map.getLayers();
+  const index = layers.getArray().indexOf(gpsLayer);
+  const nouvelleCouche = new ol.layer.WebGLPoints({ source: gpsSource, style });
+  if (index >= 0) {
+    layers.setAt(index, nouvelleCouche);
+  } else {
+    map.addLayer(nouvelleCouche);
+  }
+  gpsLayer = nouvelleCouche;
 }
 
 /**
@@ -405,14 +450,14 @@ function showPopup(feature, coordinate, popupEl) {
     ? p.loc_datetime_local.replace('T', ' ').slice(0, 16)
     : p.loc_date_local
       ? p.loc_date_local.replace('T', ' ').slice(0, 16)
-      : '—';
+      : 'N/A';
 
   popupEl.innerHTML = '';
   const content = document.createElement('div');
   content.className = 'popup-content';
 
   const strong = document.createElement('strong');
-  strong.textContent = p.ani_nom || '—';
+  strong.textContent = p.ani_nom || 'N/A';
   content.appendChild(strong);
 
   const info = document.createElement('div');
