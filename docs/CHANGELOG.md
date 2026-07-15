@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [0.60.1] - 2026-07-15
+
+### Corrections
+- Docstring obsolete de fetchLocalisationsRPC corrigee - mentionnait encore get_localisation_with_json_filter au lieu de f_get_localisation
+
 ## [0.60.0] - 2026-07-15
 
 ### Nouvelle page Individus
