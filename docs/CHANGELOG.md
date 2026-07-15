@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## [0.60.0] - 2026-07-15
+
+### Nouvelle page Individus
+- Nouvelle page pages/individuals.html avec liste des animaux et fiche detaillee
+- Liste : recherche, filtres par colonne (nom, code, sexe, annee, population, gestionnaire, statut), tri
+- Fiche individu en onglets : Synthese, Captures & Relaches, Documents
+- Onglet Synthese : identite, marquage, capteur GPS, carte des dernieres localisations avec filtres (nombre de positions, dates), graphiques Distance parcourue par mois et Altitude moyenne par saison (ApexCharts)
+- Onglet Captures & Relaches : historique des evenements avec badge Transloque/Non transloque, carte des sites de capture et relache
+- Illustration de profil avec marquage colore dynamiquement selon les donnees de l'animal (collier, oreilles)
+
+### Coherence des donnees
+- Statut Suivi actif/Non suivi/Mort unifie entre page Carte et page Individus (meme logique : collier actif ET au moins une position GPS)
+- Colonne Code corrigee dans la liste (ani_code au lieu de ani_id)
+- Champs manquants ajoutes a l'affichage : ani_commentaire, capt_frequence, translocation
+- Normalisation des couleurs de marquage (casse, valeurs composites) avec avertissement si couleur non reconnue
+- Verification de coherence translocation=false (zone, lieu-dit, geometrie) avec tolerance ajustee pour eviter les faux positifs
+- Verification du SRID des geometries capture/relache (GeoJSON et EWKB)
+- Garde-fou contre les coordonnees aberrantes en base (filtrage avant affichage sur la carte des sites)
+- Sous-titres de periode sur les graphiques pour eviter la confusion entre fenetres temporelles differentes
+- Correction de la contamination de cache entre le filtre de la carte de localisations et le graphique Distance
+
+### Carte - optimisation du mode de coloration
+- Points GPS : 3 jeux de couleurs (individu/sexe/gestionnaire) precalcules des le rendu initial (renderPoints) - changerModeCouleur() bascule le style de la couche WebGL sans reconstruire les features
+- cssToRgba() memoise - evite de re-rasteriser une couleur CSS deja convertie
+- Legende (mode Sexe/Gestionnaire) alimentee dynamiquement par getCouleur() au lieu de classes CSS statiques
+- Suppression de la restriction imposant une periode selectionnee avant de pouvoir cocher "Inclure les outliers"
+- Uniformisation de l'affichage des valeurs manquantes ('N/A' au lieu de '—'/'-') dans le popup carte et le panneau attributaire
+
+### Connu - a signaler
+- 287 enregistrements sur 367 dans t_capture_relache ont une capture_date NULL et des coordonnees capture_site_geom corrompues (valeurs en notation scientifique aberrante) - probable defaut d'import historique, filtre cote frontend en attendant une correction en base
+
 ## [0.51.1] - 2026-07-07
 
 ### Filtre spatial finalise
