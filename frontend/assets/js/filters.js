@@ -317,6 +317,11 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
           .map(l => l.querySelector('input')?.value)
           .filter(Boolean);
+      // Ids transmis a la RPC uniquement — a la difference de idsAChercher (utilise pour le
+      // zoom et _derniersFiltresAppliques.ani_id, cf. export CSV dans panel.js), on n'envoie
+      // pas explicitement la totalite des individus visibles quand rien n'est coche : dans ce
+      // cas construireFiltersRPC() retombe sur ani_is_followed (ou aucun filtre animal).
+      const idsPourRPC = selectedIds.length > 0 ? selectedIds : [];
 
       // Extraire les années sélectionnées précisément (si source annee ou saisonnalite)
       const anneesSelectionnees = [...new Set(
@@ -340,7 +345,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const saisonFromApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
       const saisonToApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
 
-      const rpcFilters = construireFiltersRPC(token, idsAChercher, {
+      const rpcFilters = construireFiltersRPC(token, idsPourRPC, {
         ...filters,
         date_from: dateMin || null,
         date_to: dateMax || null,
@@ -361,14 +366,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         });
       } else {
         // Chemin B — Toutes positions, avec modal volume + pagination RPC
-        const totalPositions = await fetchCountLocations(token, {
-          ani_id: rpcFilters.ani_id,
-          date_from: rpcFilters.date_from,
-          date_to: rpcFilters.date_to,
-          saisonFrom: rpcFilters.saisonFrom,
-          saisonTo: rpcFilters.saisonTo,
-          include_outliers: rpcFilters.include_outliers
-        });
+        const totalPositions = await fetchCountLocations(token, rpcFilters);
 
         let confirmed = true;
         if (totalPositions > SEUIL_ALERTE_VOLUME) {
@@ -504,6 +502,8 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
           .map(l => l.querySelector('input')?.value)
           .filter(Boolean);
       window._idsAChercherTraj = idsAChercher;
+      // Ids transmis a la RPC uniquement — cf. commentaire equivalent en mode Positions.
+      const idsPourRPC = selectedIds.length > 0 ? selectedIds : [];
 
       const inputNTraj = document.getElementById('inputNDernieres');
       const nModeToutesCheck = document.getElementById('nModeToutes');
@@ -517,7 +517,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const saisonFromApiTraj = hasSaisonnaliteTraj ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
       const saisonToApiTraj = hasSaisonnaliteTraj ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
 
-      const rpcFiltersTraj = construireFiltersRPC(token, idsAChercher, {
+      const rpcFiltersTraj = construireFiltersRPC(token, idsPourRPC, {
         ...filters,
         date_from: dateFromApi || null,
         date_to: dateToApi || null,
@@ -538,14 +538,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
         });
       } else {
         // Chemin D — Toutes positions, avec modal volume + pagination RPC
-        const totalTrajPositions = await fetchCountLocations(token, {
-          ani_id: rpcFiltersTraj.ani_id,
-          date_from: rpcFiltersTraj.date_from,
-          date_to: rpcFiltersTraj.date_to,
-          saisonFrom: rpcFiltersTraj.saisonFrom,
-          saisonTo: rpcFiltersTraj.saisonTo,
-          include_outliers: rpcFiltersTraj.include_outliers
-        });
+        const totalTrajPositions = await fetchCountLocations(token, rpcFiltersTraj);
 
         let confirmedTraj = true;
 
