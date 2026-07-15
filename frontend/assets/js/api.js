@@ -336,7 +336,7 @@ export async function fetchCaptureRelacheParAnimal(token, aniId) {
 }
 
 /**
- * Appelle la fonction SQL get_localisation_with_json_filter via PostgREST RPC.
+ * Appelle la fonction SQL f_get_localisation via PostgREST RPC.
  * Gère la pagination par batches avec rendu progressif via onBatch.
  *
  * @param {string} token - Jeton JWT
