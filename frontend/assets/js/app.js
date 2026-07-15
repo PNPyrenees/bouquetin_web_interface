@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques } from './filters.js';
 
@@ -1191,16 +1191,6 @@ function initSidebarBadges(token) {
   if (checkOutliers) {
     checkOutliers.addEventListener('change', () => {
       if (checkOutliers.checked) {
-        const dateFrom = document.getElementById('dateFrom').value;
-        const dateTo = document.getElementById('dateTo').value;
-
-        // Bloquer si pas de période sélectionnée
-        if (!dateFrom || !dateTo) {
-          showToast('Veuillez sélectionner une période');
-          checkOutliers.checked = false; // Décocher automatiquement
-          return;
-        }
-
         ajouterBadge('Inclure les outliers', () => {
           checkOutliers.checked = false;
         }, 'checkAberrantes');
@@ -1263,15 +1253,16 @@ function initSidebarBadges(token) {
   document.querySelectorAll('input[name="modeCouleur"]').forEach(radio => {
     radio.addEventListener('change', () => {
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-      const features = window._getGpsFeatures?.() || [];
-      if (features.length > 0) {
+      // Bascule de style sur la couche WebGL existante — les 3 jeux de couleurs sont
+      // deja precalcules par renderPoints(), pas besoin de reconstruire les features
+      changerModeCouleur(modeCouleur);
+      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
+      if (isTrajectoire) {
+        const features = window._getGpsFeatures?.() || [];
         const locations = features
           .filter(f => f.get('ani_id'))
           .map(f => f.getProperties());
-        const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-        clearMapPoints();
-        renderPoints(locations, true, isTrajectoire, modeCouleur);
-        if (isTrajectoire) renderTrajectoire(locations, modeCouleur);
+        renderTrajectoire(locations, modeCouleur);
       }
       mettreAJourLegende();
     });
@@ -2035,9 +2026,19 @@ export function mettreAJourLegende(modeForce = null) {
     const label1 = document.getElementById('legendeCouleurLabel1');
     const pastille2 = document.getElementById('legendeCouleurPastille2');
     const label2 = document.getElementById('legendeCouleurLabel2');
-    if (pastille1) pastille1.className = 'legende-pastille legende-pastille-male';
+    // Couleurs issues de getCouleur() (map.js) — meme source que le rendu carte.
+    // Contour neutre fixe : pas de contour par individu au niveau d une categorie.
+    if (pastille1) {
+      pastille1.className = 'legende-pastille';
+      pastille1.style.background = getCouleur({ ani_sexe: 'M' }, 'sexe');
+      pastille1.style.border = '2px solid #cccccc';
+    }
     if (label1) label1.textContent = 'Mâle';
-    if (pastille2) pastille2.className = 'legende-pastille legende-pastille-femelle';
+    if (pastille2) {
+      pastille2.className = 'legende-pastille';
+      pastille2.style.background = getCouleur({ ani_sexe: 'F' }, 'sexe');
+      pastille2.style.border = '2px solid #cccccc';
+    }
     if (label2) label2.textContent = 'Femelle';
 
   } else if (modeCouleur === 'gestionnaire') {
@@ -2048,9 +2049,17 @@ export function mettreAJourLegende(modeForce = null) {
     const label1 = document.getElementById('legendeCouleurLabel1');
     const pastille2 = document.getElementById('legendeCouleurPastille2');
     const label2 = document.getElementById('legendeCouleurLabel2');
-    if (pastille1) pastille1.className = 'legende-pastille legende-pastille-pnp';
+    if (pastille1) {
+      pastille1.className = 'legende-pastille';
+      pastille1.style.background = getCouleur({ ani_gestionnaire: 'PNP' }, 'gestionnaire');
+      pastille1.style.border = '2px solid #cccccc';
+    }
     if (label1) label1.textContent = 'PNP';
-    if (pastille2) pastille2.className = 'legende-pastille legende-pastille-pnrpa';
+    if (pastille2) {
+      pastille2.className = 'legende-pastille';
+      pastille2.style.background = getCouleur({ ani_gestionnaire: 'PNRPA' }, 'gestionnaire');
+      pastille2.style.border = '2px solid #cccccc';
+    }
     if (label2) label2.textContent = 'PNRPA';
   }
 }
