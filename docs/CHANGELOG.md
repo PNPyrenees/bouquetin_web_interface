@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.61.0] - 2026-07-15
+
+### Corrections suite retours Ludovic
+- Denombrement (fetchCountLocations) migre de v_localisation vers f_get_localisation avec select=count - prend maintenant en compte le filtre spatial
+- var_limit force a 1000000 dans le comptage - f_get_localisation applique son LIMIT avant COUNT, le defaut (10000) plafonnait le total affiche
+- construireBodyRPC factorisee et partagee entre fetchLocalisationsRPC et fetchCountLocations - une seule logique de traduction filters vers parametres var_*
+- ani_id n'est plus transmis a la RPC quand aucun individu n'est coche manuellement - nouvelle variable idsPourRPC dediee, idsAChercher inchangee pour export CSV et zoom automatique
+
 ## [0.60.1] - 2026-07-15
 
 ### Corrections
