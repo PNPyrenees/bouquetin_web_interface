@@ -31,7 +31,7 @@ export async function login(username, password) {
 export async function fetchAnimals(token) {
   // On sélectionne uniquement les colonnes nécessaires pour alléger la réponse
   const res = await fetch(
-    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_annee_naissance,ani_date_relache,ani_sexe,ani_gestionnaire,ani_pop_rattach&order=ani_nom`,
+    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_code,ani_annee_naissance,ani_date_relache,ani_date_mort,ani_sexe,ani_gestionnaire,ani_pop_rattach&order=ani_nom`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -151,6 +151,25 @@ export async function fetchProgrammations(token) {
 }
 
 /**
+ * Récupère les ani_id "suivis" au sens de la page Carte : collier actif
+ * (cor_date_fin IS NULL) ET au moins une position GPS transmise — dérivé du
+ * résultat de f_get_localisation (var_ani_is_followed=true, var_limit_par_animal=1),
+ * pas d'une requête directe sur cor_animal_capteur. Construction identique à
+ * activeIds (app.js:543-545), pour que la page Individus retombe exactement sur
+ * la même source de vérité que la page Carte. Un animal avec collier actif mais
+ * 0 position (ex. capteur récemment posé ou en panne) n'apparaît PAS dans ce
+ * Set — il reste 'non_suivi' côté page Individus, cohérent avec son absence de
+ * la liste des individus suivis sur la page Carte.
+ */
+export async function fetchAnimauxSuivis(token) {
+  const locations = await fetchLocalisationsRPC(token, {
+    ani_is_followed: true,
+    limit_par_animal: 1
+  });
+  return new Set(locations.map(l => l.ani_id));
+}
+
+/**
  * Récupère les ani_id ayant au moins une translocation (t_capture_relache.translocation = true).
  * Utilisé pour le filtre Translocation côté frontend.
  */
@@ -263,6 +282,60 @@ export async function fetchAniIdsAvecGeom(token) {
 }
 
 /**
+ * Détail complet d'un animal (t_animal) — champs identité + marquage pour la fiche individu.
+ */
+export async function fetchAnimalDetail(token, aniId) {
+  const res = await fetch(
+    `${API_URL}/t_animal?ani_id=eq.${aniId}&select=ani_id,ani_nom,ani_code,ani_sexe,ani_annee_naissance,ani_date_mort,ani_gestionnaire,ani_pop_rattach,ani_marquage_oreille_droite,ani_marquage_oreille_gauche,ani_marquage_couleur_collier,ani_marquage_code_collier,ani_marquage_bande_laterale_collier,ani_commentaire`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchAnimalDetail error: ${res.status}`);
+  const data = await res.json();
+  return data[0] || null;
+}
+
+/**
+ * Capteur(s) associé(s) à l'animal, avec programmation — utilise l'embedding PostgREST
+ * (t_capteur, bib_programmation), non teste ailleurs dans ce fichier : necessite des FK
+ * entre cor_animal_capteur et ces deux tables cote schema.
+ */
+export async function fetchCapteurParAnimal(token, aniId) {
+  const res = await fetch(
+    `${API_URL}/cor_animal_capteur?ani_id=eq.${aniId}&select=cor_id,cor_date_debut,cor_date_fin,capt_id,prog_id,t_capteur(capt_id,capt_id_constructeur,capt_type,capt_frequence,capt_actif),bib_programmation(prog_libelle,prog_frequence,prog_duree_acquisition)&order=cor_date_debut.desc`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchCapteurParAnimal error: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Historique captures/relâchés d'un animal.
+ */
+export async function fetchCaptureRelacheParAnimal(token, aniId) {
+  const res = await fetch(
+    `${API_URL}/t_capture_relache?ani_id=eq.${aniId}&select=capture_relache_id,capture_date,capture_zone,capture_lieu_dit,capture_site_geom,relache_date,relache_zone,relache_lieu_dit,relache_site_geom,capture_methode,capture_objectif,translocation,capture_relache_commentaire&order=capture_date.desc`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchCaptureRelacheParAnimal error: ${res.status}`);
+  return res.json();
+}
+
+/**
  * Appelle la fonction SQL get_localisation_with_json_filter via PostgREST RPC.
  * Gère la pagination par batches avec rendu progressif via onBatch.
  *
@@ -338,4 +411,28 @@ export async function fetchLocalisationsRPC(token, filters = {}, onBatch = null)
   }
 
   return totalLocations;
+}
+
+/**
+ * Localisations d'un seul animal via f_get_localisation — pour la mini-carte de la fiche individu.
+ * Meme RPC que fetchLocalisationsRPC, sans pagination (usage borne a un animal).
+ */
+export async function fetchLocalisationsAnimal(token, aniId, options = {}) {
+  const body = { var_ani_id: [Number(aniId)] };
+  if (options.limitParAnimal) body.var_limit_par_animal = options.limitParAnimal;
+  if (options.dateMin) body.var_date_min = options.dateMin;
+  if (options.dateMax) body.var_date_max = options.dateMax;
+  body.var_limit = 10000;
+
+  const res = await fetch(`${API_URL}/rpc/f_get_localisation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Content-Profile': 'bouquetin'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`fetchLocalisationsAnimal error: ${res.status}`);
+  return res.json();
 }
