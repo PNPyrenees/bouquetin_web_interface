@@ -10,7 +10,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Bebas+Neue&display=swap"
     rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.9.0/ol.css">
+  <script src="https://cdn.jsdelivr.net/npm/ol@v10.9.0/dist/ol.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <link rel="stylesheet" href="../assets/css/main.css">
+  <link rel="stylesheet" href="../assets/css/individuals.css">
 </head>
 
 <body>
@@ -18,7 +23,9 @@
     <div class="header-top">
       <div class="header-top-left">
         <img src="../assets/img/logo-parc.svg" alt="Logo Parc National des Pyrénées" class="logo-parc">
+        <img src="../assets/img/Logo_-_République_française.svg" alt="République Française" class="logo-rf">
         <img src="../assets/img/bqt_header.png" alt="Bouquetin" class="logo-bqt">
+
         <h1 class="header-title">Suivi des bouquetins ibériques</h1>
       </div>
       <nav class="header-nav" id="mainNav">
@@ -34,19 +41,234 @@
           <img src="../assets/img/rapport.png" alt="" class="nav-icon">
           statistiques
         </a>
-        <a href="#" id="btnAjouter" class="nav-link nav-link-add" style="display: none;">+ Ajouter</a>
+        <a href="#" id="btnAjouter" class="nav-link nav-link-add">+ Ajouter</a>
       </nav>
       <div class="header-top-right">
-        <div class="user-chip" id="userChip" style="display: none;">
-          CONNEXION
+        <div class="session-dropdown" id="userChip" style="display:none">
+          <button class="session-trigger" id="sessionTrigger">
+            <span class="session-avatar" id="sessionAvatar">--</span>
+            <img id="sessionChevron" class="session-chevron" src="../assets/img/chevron-bas.png" alt="">
+          </button>
+          <div class="session-menu" id="sessionMenu" style="display:none">
+            <div class="session-menu-header">Session</div>
+            <div class="session-menu-role" id="sessionRole"></div>
+            <hr class="session-menu-divider">
+            <button class="session-menu-item" id="btnDeconnexion">Se déconnecter</button>
+          </div>
         </div>
       </div>
     </div>
   </header>
-  <main style="padding: 40px; font-family: var(--font-family); color: var(--color-text);">
-    <h1 style="color: var(--color-primary); margin-bottom: 16px;">Hello</h1>
-    <p style="color: var(--color-text-muted);">World.</p>
+
+  <main id="indivScreen">
+
+    <!-- VUE LISTE -->
+    <div id="vueListe">
+      <div class="indiv-liste">
+        <div class="indiv-row indiv-liste-entete">
+          <div class="indiv-col">
+            <span class="indiv-col-label">Nom</span>
+            <input type="text" id="filtreColNom" class="indiv-col-filtre" placeholder="Rechercher...">
+          </div>
+          <div class="indiv-col">
+            <span class="indiv-col-label">Code</span>
+            <input type="text" id="filtreColCode" class="indiv-col-filtre" placeholder="Rechercher...">
+          </div>
+          <div class="indiv-col">
+            <span class="indiv-col-label">Sexe</span>
+            <select id="filtreColSexe" class="indiv-col-filtre">
+              <option value="">Tous</option>
+              <option value="M">M</option>
+              <option value="F">F</option>
+            </select>
+          </div>
+          <div class="indiv-col">
+            <span class="indiv-col-label">Année naissance</span>
+            <input type="text" id="filtreColAnnee" class="indiv-col-filtre" placeholder="Rechercher...">
+          </div>
+          <div class="indiv-col">
+            <span class="indiv-col-label">Population</span>
+            <select id="filtreColPopulation" class="indiv-col-filtre">
+              <option value="">Tous</option>
+            </select>
+          </div>
+          <div class="indiv-col">
+            <span class="indiv-col-label">Gestionnaire</span>
+            <select id="filtreColGestionnaire" class="indiv-col-filtre">
+              <option value="">Tous</option>
+            </select>
+          </div>
+          <div class="indiv-col">
+            <span class="indiv-col-label">Statut</span>
+            <select id="filtreColStatut" class="indiv-col-filtre">
+              <option value="">Tous</option>
+              <option value="actif">Suivi actif</option>
+              <option value="non_suivi">Non suivi</option>
+              <option value="mort">Mort</option>
+            </select>
+          </div>
+        </div>
+        <div id="indivTableBody">
+          <!-- Peuplée en JS par peuplerTableauListe() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- VUE FICHE -->
+    <div id="vueFiche" style="display:none">
+      <button id="btnRetourListe" class="indiv-btn-retour">
+        <img src="../assets/img/circle-left-regular-full.svg" alt="" class="btn-retour-icon">
+        <span>Retour à la liste</span>
+      </button>
+
+      <div class="fiche-carte fiche-carte-entete">
+        <div class="fiche-entete-corps">
+          <div class="fiche-illustration-bloc">
+            <div class="fiche-illustration">
+              <img src="../assets/img/bqt_profil_normal.jpg" alt="" class="fiche-illustration-photo">
+              <svg class="fiche-illustration-collier" viewBox="0 0 193.23 103.56" xmlns="http://www.w3.org/2000/svg"><path id="pathColorCollier" d="M3.55,21.41c-1.09-.1-2.64,5-3.26,9.48-.47,3.34-.16,5.43-.18,9.48-.06,12.98-.15,11.27-.09,13.76.13,5.31.26,10.19,1.39,16.51.7,3.9,1.05,5.84,1.83,7.64,1.93,4.41,5.58,7.92,13.76,12.23,13.71,7.22,26.37,9.27,27.52,9.48,29.52,5.31,52.87,3.28,58.39,2.75,12.25-1.18,21.01-3.08,29.35-4.89,12.68-2.75,26.16-6.53,39.75-13.45,0,0,9.4-4.79,16.2-13.15,4.1-5.04,4.5-8.07,4.59-9.22.1-1.45-.1-2.55,0-6.37.07-2.71.24-5.2.28-5.2.09,0-.26,10.07-.26,10.07-.02,0,.16-5.7.27-13.47.14-9.54.2-14.31.04-17.7-.61-12.58-2.59-18.73-3.7-21.71-1.61-4.34-3.51-7.81-3.97-7.64-.54.19,2.22,4.97,1.22,10.7-1.21,6.95-6.78,11.74-9.48,14.06-1.42,1.23-4.11,3.06-9.48,6.73-2.69,1.84-4.05,2.75-5.17,3.42-4.97,2.95-9.32,4.02-13.78,5.14-18.93,4.77-15.75,4.55-21.1,5.5-9.93,1.77-17.57,3.26-20.48,3.67-13.42,1.87-23.54,2.25-32.41,2.55-25.63.87-37.62-1.2-40.99-1.82-2.82-.52-5.87-1.31-5.89-1.21-.1.41,48.26,13.24,48.41,12.71.11-.38-23.62-9.01-38.8-10.86-5.67-.69-8.3-1.34-13.48-2.9-4.46-1.33-6.69-1.99-9.17-3.67-4.51-3.05-6.83-7.02-7.64-8.56-3.86-7.3-2.43-13.95-3.67-14.06Z"/></svg>
+              <svg class="fiche-illustration-oreille fiche-illustration-oreille-gauche" viewBox="0 0 57.32 80.86" xmlns="http://www.w3.org/2000/svg"><path id="pathColorOreilleGauche" d="M43.19,19.05c1.08,5.6,3.83,10.2,7.36,14.57,2.56,3.16,5.88,5.3,6.23,9.72-.41,6.08,3.29,29.3-4.43,30.23,0,0-46.77,7.29-46.77,7.29-3.79.04-5.12-2.1-5.36-5.6-.72-10.34.57-21.5,0-31.92.22-4.49,4.56-6.7,7.22-9.71,7.88-7.28,6.39-18.75,10.61-27.53,4.84-7.07,19.1-8.9,21.38-.63"/></svg>
+              <svg class="fiche-illustration-oreille fiche-illustration-oreille-droite" viewBox="0 0 57.32 80.86" xmlns="http://www.w3.org/2000/svg"><path id="pathColorOreilleDroite" d="M43.19,19.05c1.08,5.6,3.83,10.2,7.36,14.57,2.56,3.16,5.88,5.3,6.23,9.72-.41,6.08,3.29,29.3-4.43,30.23,0,0-46.77,7.29-46.77,7.29-3.79.04-5.12-2.1-5.36-5.6-.72-10.34.57-21.5,0-31.92.22-4.49,4.56-6.7,7.22-9.71,7.88-7.28,6.39-18.75,10.61-27.53,4.84-7.07,19.1-8.9,21.38-.63"/></svg>
+              <img src="../assets/img/capteur.png" alt="" class="fiche-illustration-capteur">
+              <div class="fiche-illustration-statut" id="ficheIllustrationStatut"></div>
+            </div>
+          </div>
+          <div class="fiche-entete-infos">
+            <div class="fiche-entete-nom-row">
+              <h2 id="ficheNom">N/A</h2>
+            </div>
+            <div class="fiche-entete-champs" id="carteIdentitePrincipale"></div>
+            <hr class="fiche-entete-separateur">
+            <div class="fiche-entete-champs" id="carteIdentiteDates"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fiche-grid-2col">
+        <div class="fiche-col">
+          <div class="fiche-carte" id="carteMarquage">
+            <div class="fiche-carte-titre">Marquage</div>
+            <div class="fiche-carte-corps"></div>
+          </div>
+          <div class="fiche-carte" id="carteInformationsGPS">
+            <div class="fiche-carte-titre">Capteur GPS</div>
+            <div class="fiche-carte-corps"></div>
+          </div>
+          <div class="fiche-carte" id="carteCapturesRelaches">
+            <div class="fiche-carte-titre">Captures &amp; Relâchés</div>
+            <div class="fiche-carte-corps">
+              <div class="capture-relache-section">
+                <div class="capture-relache-soustitre">Captures</div>
+                <div class="capture-relache-liste" id="captureListe">
+                  <!-- Peuplée en JS par remplirListeCaptures() -->
+                </div>
+              </div>
+              <div class="capture-relache-section">
+                <div class="capture-relache-soustitre">Relâchés</div>
+                <div class="capture-relache-liste" id="relacheListe">
+                  <!-- Peuplée en JS par remplirListeRelaches() -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="fiche-col fiche-col-carte">
+          <div class="fiche-carte" id="carteDernieresLocalisations">
+            <div class="fiche-carte-titre">Dernières localisations</div>
+            <div class="fiche-carte-corps">
+              <div class="fiche-carte-controles">
+                <label>
+                  Nombre de dernières positions
+                  <input type="number" id="ficheInputN" min="1" value="25">
+                </label>
+                <label>
+                  Du
+                  <input type="text" id="ficheDateFrom" placeholder="JJ/MM/AAAA" autocomplete="off">
+                </label>
+                <label>
+                  Au
+                  <input type="text" id="ficheDateTo" placeholder="JJ/MM/AAAA" autocomplete="off">
+                </label>
+                <button id="btnActualiserFiche" class="btn-apply">Actualiser</button>
+              </div>
+              <div id="ficheMapLocalisations" class="fiche-map"></div>
+            </div>
+          </div>
+          <div class="fiche-carte" id="carteSites">
+            <div class="fiche-carte-titre">Sites de capture &amp; relâché</div>
+            <div class="fiche-carte-corps">
+              <div class="capture-map-conteneur">
+                <div id="ficheMapSites" class="fiche-map capture-map"></div>
+                <div class="legende-panel capture-map-legende">
+                  <div class="legende-contenu">
+                    <div class="legende-item">
+                      <div class="legende-pastille legende-pastille-capture"></div>
+                      <span>Site de capture</span>
+                    </div>
+                    <div class="legende-item">
+                      <div class="legende-pastille legende-pastille-default"></div>
+                      <span>Site de relâché</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="fiche-grid-graphiques">
+        <div class="fiche-carte">
+          <div class="fiche-carte-titre">Distance parcourue par mois</div>
+          <div class="fiche-carte-periode" id="periodeDistanceMois"></div>
+          <div class="fiche-carte-corps">
+            <div class="fiche-graphique-bloc" id="chartDistanceMois"></div>
+          </div>
+        </div>
+        <div class="fiche-carte">
+          <div class="fiche-carte-titre">Altitude moyenne par saison</div>
+          <div class="fiche-carte-periode">Historique complet</div>
+          <div class="fiche-carte-corps">
+            <div class="fiche-graphique-bloc" id="chartAltitudeSaison"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </main>
+
+  <script type="module" src="../assets/js/individuals.js"></script>
+
+  <div id="loginScreen">
+    <div class="login-left">
+      <img src="../assets/img/pnp.jpg" alt="Bouquetin ibérique" class="login-bg-img">
+      <div class="login-photo-credit">
+        © Jean-Paul Crampe
+      </div>
+    </div>
+    <div class="login-right">
+      <div class="login-logos">
+        <img src="../assets/img/logo-parc.svg" alt="Parc National des Pyrénées" class="login-logo-pnp">
+        <img src="../assets/img/Logo_-_République_française.svg" alt="République Française" class="login-logo-rf">
+      </div>
+      <div class="login-card">
+        <h2>Suivi des Bouquetins Ibériques</h2>
+        <p>Parc National des Pyrénées</p>
+        <form id="loginForm">
+          <div class="login-field">
+            <label for="username">Identifiant</label>
+            <input id="username" type="text" autocomplete="username">
+          </div>
+          <div class="login-field">
+            <label for="password">Mot de passe</label>
+            <input id="password" type="password" autocomplete="current-password">
+          </div>
+          <div id="loginError"></div>
+          <button type="submit">Se connecter</button>
+        </form>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>
