@@ -406,7 +406,7 @@ function rendrePage() {
 }
 
 function formaterDateLocalisation(valeur) {
-  if (!valeur) return '—';
+  if (!valeur) return 'N/A';
   const date = new Date(valeur);
   if (isNaN(date)) return valeur;
   const j = String(date.getDate()).padStart(2, '0');
@@ -422,7 +422,7 @@ function formaterValeur(key, valeur, loc = {}) {
     if (key === 'loc_datetime_local' && loc.loc_date_local) {
       valeur = loc.loc_date_local;
     } else {
-      return '-';
+      return 'N/A';
     }
   }
 
@@ -430,7 +430,7 @@ function formaterValeur(key, valeur, loc = {}) {
     case 'loc_datetime_local':
       return formaterDateLocalisation(valeur);
     case 'loc_anomalie':
-      return valeur === true ? '<span style="color:#e74c3c;font-weight:700">Oui</span>' : '—';
+      return valeur === true ? '<span style="color:#e74c3c;font-weight:700">Oui</span>' : 'N/A';
     case 'ani_sexe':
       return valeur === 'M' ? 'Mâle' : valeur === 'F' ? 'Femelle' : valeur;
     case 'loc_altitude_capteur':
@@ -845,16 +845,16 @@ function rendrePageIndividus() {
 }
 
 function formaterValeurIndividu(key, valeur) {
-  if (valeur === null || valeur === undefined) return '-';
+  if (valeur === null || valeur === undefined) return 'N/A';
   switch (key) {
     case 'ani_sexe':
       return valeur === 'M' ? 'Mâle' : valeur === 'F' ? 'Femelle' : valeur;
     case 'ani_date_relache':
     case 'ani_date_mort':
-      return valeur ? valeur.slice(0, 10) : '-';
+      return valeur ? valeur.slice(0, 10) : 'N/A';
     case 'premiere_position':
     case 'derniere_position':
-      return valeur ? valeur.replace('T', ' ').slice(0, 16) : '-';
+      return valeur ? valeur.replace('T', ' ').slice(0, 16) : 'N/A';
     default:
       return valeur;
   }
