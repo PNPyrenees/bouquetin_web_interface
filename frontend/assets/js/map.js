@@ -9,8 +9,17 @@ let isAnimating = false;
 
 const couleursIndividus = new Map();
 const indicesIndividus = new Map();
-let _dateMin = null;
-let _dateMax = null;
+
+// Drapeau de perte de contexte WebGL — positionne a true par le handler
+// webglcontextlost, repasse a false sur webglcontextrestored.
+// Les listeners pointermove et singleclick le testent avant tout appel
+// a hasFeatureAtPixel / forEachFeatureAtPixel pour ne pas appeler des
+// methodes WebGL sur un contexte invalide (evite le crash en cascade).
+let _webglContextLost = false;
+
+// Mode de coloration actif — conserve entre deux appels pour que
+// changerModeCouleur() sache quels attributs sont deja en place sur les features.
+let _modeCouleurActif = 'individu';
 
 // Palette Glasbey 32 — conçue pour maximiser la distance perceptuelle
 // Source : Glasbey et al. (2007), utilisée en bioinformatique et cartographie SIG
@@ -57,8 +66,8 @@ const CONTOURS = [
   { strokeR: 0,   strokeG: 200, strokeB: 255, strokeA: 1, strokeWidth: 2 }, // Cyan
 ];
 
-// Suffixes d attributs precalcules par renderPoints() pour chaque mode de coloration —
-// permet a changerModeCouleur() de rebasculer le style WebGL sans reconstruire les features
+// Suffixe normalise par mode — utilise par renderPoints() (mode actif uniquement)
+// et changerModeCouleur() (injection des nouvelles couleurs a la volee).
 const MODES_COULEUR_SUFFIXES = { individu: 'Individu', sexe: 'Sexe', gestionnaire: 'Gestionnaire' };
 
 function getCouleurParIndex(index) {
@@ -81,13 +90,6 @@ function preparerCouleurs(locations) {
     couleursIndividus.set(id, getCouleurParIndex(i));
     indicesIndividus.set(id, i);
   });
-
-
-  const dates = locations
-    .map(l => new Date(l.loc_datetime_local || l.loc_date_local))
-    .filter(d => !isNaN(d));
-  _dateMin = dates.length > 0 ? dates.reduce((a, b) => a < b ? a : b) : null;
-  _dateMax = dates.length > 0 ? dates.reduce((a, b) => a > b ? a : b) : null;
 }
 
 /**
@@ -149,13 +151,15 @@ export function initMap(targetId, popupId) {
   trajectoireSource = new ol.source.Vector();
 
   // Création de la couche des points GPS — style initial mode Individu (coherent avec
-  // le radio coche par defaut dans index.html) ; voir changerModeCouleur() pour la bascule
+  // le radio coche par defaut dans index.html) ; voir changerModeCouleur() pour la bascule.
+  // Reduction a 6 attributs GPU par feature (fillR/G/B, strokeR/G/B) au lieu de 18 —
+  // le mode actif est le seul calcule et stocke sur les features.
   gpsLayer = new ol.layer.WebGLPoints({
     source: gpsSource,
     style: {
       'circle-radius': ['get', 'radius'],
-      'circle-fill-color': ['color', ['get', 'fillIndividuR'], ['get', 'fillIndividuG'], ['get', 'fillIndividuB'], ['get', 'fillA']],
-      'circle-stroke-color': ['color', ['get', 'strokeIndividuR'], ['get', 'strokeIndividuG'], ['get', 'strokeIndividuB'], ['get', 'strokeA']],
+      'circle-fill-color': ['color', ['get', 'fillR'], ['get', 'fillG'], ['get', 'fillB'], ['get', 'fillA']],
+      'circle-stroke-color': ['color', ['get', 'strokeR'], ['get', 'strokeG'], ['get', 'strokeB'], ['get', 'strokeA']],
       'circle-stroke-width': ['get', 'strokeWidth']
     }
   });
@@ -227,26 +231,75 @@ export function initMap(targetId, popupId) {
     ])
   });
 
-  // Changement du curseur au survol d'un point
-  map.on('pointermove', evt => {
-    map.getViewport().style.cursor = map.hasFeatureAtPixel(evt.pixel) ? 'pointer' : '';
+  // Handler webglcontextlost / webglcontextrestored — installe apres le premier
+  // rendu d OpenLayers (evenement postrender, once:true), moment ou le canvas WebGL
+  // est garanti existant. Un setTimeout(0) ne suffisait pas car OL cree le canvas
+  // de facon asynchrone pendant son propre cycle de rendu.
+  map.once('postrender', () => {
+    const canvas = map.getViewport().querySelector('canvas');
+    if (canvas) {
+      canvas.addEventListener('webglcontextlost', evt => {
+        evt.preventDefault(); // indique a OL qu on gere l evenement
+        _webglContextLost = true;
+        console.warn('WebGL context lost — les interactions carte sont suspendues.');
+        const msg = 'Volume de données trop important pour le GPU — la carte est ' +
+          'temporairement indisponible. Réduisez les filtres ou rechargez la page.';
+        if (window._showToast) {
+          window._showToast(msg);
+        } else {
+          console.error(msg);
+        }
+      });
+      canvas.addEventListener('webglcontextrestored', () => {
+        _webglContextLost = false;
+        console.info('WebGL context restored — les interactions carte sont restaurées.');
+        if (window._showToast) {
+          window._showToast('Contexte GPU restauré — la carte est de nouveau disponible.');
+        }
+      });
+    } else {
+      console.warn('initMap : canvas WebGL introuvable après postrender — le handler webglcontextlost ne peut pas être installé.');
+    }
   });
 
-  // Gestion du clic pour afficher le popup
+  // Changement du curseur au survol d'un point.
+  // Guard _webglContextLost : si le contexte GPU est perdu, hasFeatureAtPixel()
+  // appelle en interne forEachFeatureAtCoordinate -> RenderTarget.readPixel et
+  // plante sur this.helper undefined (PointsLayer.js:304). On coupe court ici.
+  map.on('pointermove', evt => {
+    if (_webglContextLost) return;
+    try {
+      map.getViewport().style.cursor = map.hasFeatureAtPixel(evt.pixel) ? 'pointer' : '';
+    } catch (err) {
+      // Le contexte peut etre perdu entre le guard et l appel reel (race condition)
+      // — on absorbe silencieusement pour eviter la cascade de TypeError.
+      console.warn('hasFeatureAtPixel echoue (contexte WebGL invalide ?) :', err.message);
+    }
+  });
+
+  // Gestion du clic pour afficher le popup.
+  // Meme guard que pointermove : forEachFeatureAtPixel appelle la meme chaine
+  // WebGL interne et planterait sur un contexte perdu.
   map.on('singleclick', evt => {
+    if (_webglContextLost) return;
     let hit = false;
     let aniId = null;
     let locDatetime = null;
-    // Utiliser layerFilter pour cibler directement la couche GPS
-    map.forEachFeatureAtPixel(evt.pixel, feature => {
-      if (hit) return;
-      hit = true;
-      aniId = String(feature.get('ani_id'));
-      locDatetime = feature.get('loc_datetime_local') || feature.get('loc_date_local');
-      showPopup(feature, evt.coordinate, popupEl);
-    }, {
-      layerFilter: layer => layer === gpsLayer
-    });
+    try {
+      // Utiliser layerFilter pour cibler directement la couche GPS
+      map.forEachFeatureAtPixel(evt.pixel, feature => {
+        if (hit) return;
+        hit = true;
+        aniId = String(feature.get('ani_id'));
+        locDatetime = feature.get('loc_datetime_local') || feature.get('loc_date_local');
+        showPopup(feature, evt.coordinate, popupEl);
+      }, {
+        layerFilter: layer => layer === gpsLayer
+      });
+    } catch (err) {
+      console.warn('forEachFeatureAtPixel echoue (contexte WebGL invalide ?) :', err.message);
+      return;
+    }
     if (!hit) popupEl.style.display = 'none';
 
     document.querySelectorAll('.panel-table-row.selected-carte').forEach(tr => {
@@ -377,8 +430,11 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
       strokeWidth = contour.strokeWidth;
     }
 
-    // Couleurs precalculees pour les 3 modes de symbologie — permet a changerModeCouleur()
-    // de rebasculer le style de la couche WebGL sans reconstruire les features
+    // 6 attributs GPU uniquement (mode actif) — reduit la charge memoire GPU
+    // par rapport a l ancienne approche (18 attributs pour les 3 modes precalcules).
+    // changerModeCouleur() re-parcourt les features pour injecter les nouvelles
+    // couleurs a la volee au changement de mode (cout CPU negligeable vs gain GPU).
+    const [cR, cG, cB] = cssToRgba(getCouleur(loc, modeCouleur));
     const featureAttrs = {
       geometry: new ol.geom.Point(coord),
       ...loc,
@@ -388,64 +444,89 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
       strokeA: 1
     };
 
-    Object.entries(MODES_COULEUR_SUFFIXES).forEach(([mode, suffixe]) => {
-      const [cR, cG, cB] = cssToRgba(getCouleur(loc, mode));
-      if (estDepart) {
-        featureAttrs[`fill${suffixe}R`] = 255;
-        featureAttrs[`fill${suffixe}G`] = 255;
-        featureAttrs[`fill${suffixe}B`] = 255;
-        featureAttrs[`stroke${suffixe}R`] = cR;
-        featureAttrs[`stroke${suffixe}G`] = cG;
-        featureAttrs[`stroke${suffixe}B`] = cB;
-      } else {
-        featureAttrs[`fill${suffixe}R`] = cR;
-        featureAttrs[`fill${suffixe}G`] = cG;
-        featureAttrs[`fill${suffixe}B`] = cB;
-        featureAttrs[`stroke${suffixe}R`] = contour.strokeR;
-        featureAttrs[`stroke${suffixe}G`] = contour.strokeG;
-        featureAttrs[`stroke${suffixe}B`] = contour.strokeB;
-      }
-    });
+    if (estDepart) {
+      featureAttrs.fillR = 255;
+      featureAttrs.fillG = 255;
+      featureAttrs.fillB = 255;
+      featureAttrs.strokeR = cR;
+      featureAttrs.strokeG = cG;
+      featureAttrs.strokeB = cB;
+    } else {
+      featureAttrs.fillR = cR;
+      featureAttrs.fillG = cG;
+      featureAttrs.fillB = cB;
+      featureAttrs.strokeR = contour.strokeR;
+      featureAttrs.strokeG = contour.strokeG;
+      featureAttrs.strokeB = contour.strokeB;
+    }
 
     const feature = new ol.Feature(featureAttrs);
     gpsSource.addFeature(feature);
   });
 
-  changerModeCouleur(modeCouleur);
+  _modeCouleurActif = modeCouleur;
+  // Pas d appel a changerModeCouleur() ici — les features viennent d etre crees
+  // avec les bons attributs fillR/G/B, le style de gpsLayer pointe deja sur ces
+  // attributs generiques (cf. initMap). Un setStyle redondant forcerait un re-rendu
+  // inutile apres le addFeature massif.
 
   return gpsSource.getFeatures().length;
 }
 
 /**
- * Bascule la couche de points GPS sur un autre mode de coloration (individu/sexe/gestionnaire)
- * sans reconstruire les features — les 3 jeux de couleurs sont precalcules par renderPoints().
+ * Bascule la couche de points GPS sur un autre mode de coloration (individu/sexe/gestionnaire).
+ * Recalcule et injecte les couleurs a la volee sur chaque feature existante — les features
+ * ne stockent plus que 6 attributs GPU (fillR/G/B + strokeR/G/B pour le mode actif),
+ * contre 18 dans l ancienne approche (3 modes precalcules simultanement).
  */
 export function changerModeCouleur(modeCouleur) {
-  if (!gpsLayer) return;
-  const suffixe = MODES_COULEUR_SUFFIXES[modeCouleur] || 'Individu';
-  const style = {
-    'circle-radius': ['get', 'radius'],
-    'circle-fill-color': ['color', ['get', `fill${suffixe}R`], ['get', `fill${suffixe}G`], ['get', `fill${suffixe}B`], ['get', 'fillA']],
-    'circle-stroke-color': ['color', ['get', `stroke${suffixe}R`], ['get', `stroke${suffixe}G`], ['get', `stroke${suffixe}B`], ['get', 'strokeA']],
-    'circle-stroke-width': ['get', 'strokeWidth']
-  };
+  if (!gpsLayer || !gpsSource) return;
 
-  if (typeof gpsLayer.setStyle === 'function') {
-    gpsLayer.setStyle(style);
-    return;
-  }
+  // Re-injection des couleurs sur chaque feature existante.
+  // preparerCouleurs() a ete appele par renderPoints() avant nous — couleursIndividus
+  // et indicesIndividus sont a jour. On relit les metadonnees de chaque feature
+  // plutot que de conserver une reference au loc d origine (features deja en gpsSource).
+  const features = gpsSource.getFeatures();
+  features.forEach(f => {
+    const loc = {
+      ani_id: f.get('ani_id'),
+      ani_sexe: f.get('ani_sexe'),
+      ani_gestionnaire: f.get('ani_gestionnaire')
+    };
+    const [cR, cG, cB] = cssToRgba(getCouleur(loc, modeCouleur));
+    const idx = indicesIndividus.get(loc.ani_id) ?? 0;
+    const contour = getContourParIndex(idx);
 
-  // Repli — setStyle indisponible sur cette version d OpenLayers : on recree uniquement
-  // la couche WebGL en reutilisant gpsSource telle quelle, sans re-parser les features
-  const layers = map.getLayers();
-  const index = layers.getArray().indexOf(gpsLayer);
-  const nouvelleCouche = new ol.layer.WebGLPoints({ source: gpsSource, style });
-  if (index >= 0) {
-    layers.setAt(index, nouvelleCouche);
-  } else {
-    map.addLayer(nouvelleCouche);
-  }
-  gpsLayer = nouvelleCouche;
+    // Point de depart (trajectoire) : fond blanc, contour colore — identifie par strokeA != fillA
+    // heuristique : on detecte le "depart" par le fait que fillR/G/B valent 255/255/255
+    // ET strokeR/G/B ne valent pas 255/255/255 (contour colore, pas blanc).
+    // On ne peut pas relire estDepart directement (non stocke sur la feature) — mais
+    // renderPoints() a stocke fillA=1 pour tous, donc on detecte via les valeurs RGB.
+    const estDepart = f.get('fillR') === 255 && f.get('fillG') === 255 && f.get('fillB') === 255 &&
+      !(f.get('strokeR') === 255 && f.get('strokeG') === 255 && f.get('strokeB') === 255);
+
+    if (estDepart) {
+      f.set('fillR', 255);
+      f.set('fillG', 255);
+      f.set('fillB', 255);
+      f.set('strokeR', cR);
+      f.set('strokeG', cG);
+      f.set('strokeB', cB);
+    } else {
+      f.set('fillR', cR);
+      f.set('fillG', cG);
+      f.set('fillB', cB);
+      f.set('strokeR', contour.strokeR);
+      f.set('strokeG', contour.strokeG);
+      f.set('strokeB', contour.strokeB);
+    }
+  });
+
+  _modeCouleurActif = modeCouleur;
+
+  // Le style WebGL pointe toujours sur fillR/G/B et strokeR/G/B (generiques) —
+  // les f.set() ci-dessus declenchent automatiquement le re-rendu OL via changed().
+  // Pas besoin de setStyle() ni de recreer la couche.
 }
 
 /**
