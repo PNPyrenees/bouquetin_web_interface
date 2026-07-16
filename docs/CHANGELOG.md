@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [0.63.0] - 2026-07-16
+
+### Interface page Individus
+- Logo du parc (logo_tramnoir.png) ajoute en filigrane discret derriere la liste des individus
+
 ## [0.62.0] - 2026-07-15
 
 ### Corrections suite retours Ludovic
