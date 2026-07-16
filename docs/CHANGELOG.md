@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [0.65.0] - 2026-07-16
+
+### Interface générale
+- Favicon PNP_logo_minuature ajoutee sur toutes les pages (fond blanc pour la visibilite dans l'onglet navigateur)
+- Opacite de survol ajustee sur la page Individus pour ne pas masquer le logo en filigrane
+
 ## [0.64.0] - 2026-07-16
 
 ### Performance et robustesse carte WebGL
