@@ -78,7 +78,7 @@
 }
 
 .indiv-row:not(.indiv-liste-entete):hover {
-  background: #f5f5f5;
+  background: rgba(245, 245, 245, 0.75);
 }
 
 .indiv-liste-entete {
