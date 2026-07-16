@@ -259,7 +259,13 @@ function _mettreAJourBadgeSaisonnalite() {
       const st = document.getElementById('saisonTo');
       if (sf) { sf.value = ''; sf._flatpickr?.clear(); }
       if (st) { st.value = ''; st._flatpickr?.clear(); }
-      document.querySelectorAll('input[name="saisonRadio"]').forEach(r => r.checked = false);
+      const selectSaisonReset = document.getElementById('selectSaison');
+      if (selectSaisonReset?.tomselect) {
+        selectSaisonReset.tomselect.clear(true);
+        selectSaisonReset.tomselect.setValue('', true);
+      } else if (selectSaisonReset) {
+        selectSaisonReset.value = '';
+      }
       gererExclusiviteTemporel(null);
       mettreAJourListeParDate();
       mettreAJourBoutonAppliquer();
@@ -726,31 +732,43 @@ async function startApp(token) {
         });
       }
 
-      // Listeners radios saison
-      document.querySelectorAll('input[name="saisonRadio"]').forEach(radio => {
-        radio.addEventListener('change', () => {
-          if (!radio.checked) return;
-          const saison = radio.value;
-          const config = SAISONS_CONFIG[saison];
-          if (!config) return;
+      // Listener select saison — remplace les anciens boutons radio (name="saisonRadio").
+      // Une option "Aucune" (value="") en 1ere position permet nativement de revenir a
+      // "aucune saison", ce que des radios ne permettent pas par simple clic.
+      document.getElementById('selectSaison')?.addEventListener('change', (e) => {
+        const saison = e.target.value;
+        const saisonFrom = document.getElementById('saisonFrom');
+        const saisonTo = document.getElementById('saisonTo');
 
-          const saisonFrom = document.getElementById('saisonFrom');
-          const saisonTo = document.getElementById('saisonTo');
-          if (saisonFrom) {
-            saisonFrom.value = config.from;
-            saisonFrom._flatpickr?.setDate(config.from, false, 'd/m');
-          }
-          if (saisonTo) {
-            saisonTo.value = config.to;
-            saisonTo._flatpickr?.setDate(config.to, false, 'd/m');
-          }
-
-          gererExclusiviteTemporel('saisonnalite');
+        if (!saison) {
+          // "Aucune" — vide les champs Du/Au au lieu de les remplir, leve l'exclusivite
+          if (saisonFrom) { saisonFrom.value = ''; saisonFrom._flatpickr?.clear(); }
+          if (saisonTo) { saisonTo.value = ''; saisonTo._flatpickr?.clear(); }
+          gererExclusiviteTemporel(null);
           mettreAJourListeParDate();
           mettreAJourBoutonAppliquer();
           decocherCochesAutomatiques();
           _mettreAJourBadgeSaisonnalite();
-        });
+          return;
+        }
+
+        const config = SAISONS_CONFIG[saison];
+        if (!config) return;
+
+        if (saisonFrom) {
+          saisonFrom.value = config.from;
+          saisonFrom._flatpickr?.setDate(config.from, false, 'd/m');
+        }
+        if (saisonTo) {
+          saisonTo.value = config.to;
+          saisonTo._flatpickr?.setDate(config.to, false, 'd/m');
+        }
+
+        gererExclusiviteTemporel('saisonnalite');
+        mettreAJourListeParDate();
+        mettreAJourBoutonAppliquer();
+        decocherCochesAutomatiques();
+        _mettreAJourBadgeSaisonnalite();
       });
 
       // Listeners saisonFrom / saisonTo
@@ -778,7 +796,13 @@ async function startApp(token) {
           }
           const isComplete = /^\d{2}\/\d{2}$/.test(el.value);
           if (isComplete) {
-            document.querySelectorAll('input[name="saisonRadio"]').forEach(r => r.checked = false);
+            const selectSaisonManuel = document.getElementById('selectSaison');
+            if (selectSaisonManuel?.tomselect) {
+              selectSaisonManuel.tomselect.clear(true);
+              selectSaisonManuel.tomselect.setValue('', true);
+            } else if (selectSaisonManuel) {
+              selectSaisonManuel.value = '';
+            }
             mettreAJourListeParDate();
             mettreAJourBoutonAppliquer();
             decocherCochesAutomatiques();
@@ -1004,7 +1028,7 @@ async function startApp(token) {
       }
     }
 
-    ['selectPopulation', 'selectSexe', 'selectClasseAge', 'selectGestionnaire', 'selectTranslocation', 'selectProgrammation'].forEach(id => {
+    ['selectPopulation', 'selectSexe', 'selectClasseAge', 'selectGestionnaire', 'selectTranslocation', 'selectProgrammation', 'selectSaison'].forEach(id => {
       const el = document.getElementById(id);
       if (!el) return;
 
@@ -1774,7 +1798,13 @@ async function reinitialiserTousLesFiltres() {
     if (dt) { dt.value = ''; dt._flatpickr?.clear(); }
     if (sf) { sf.value = ''; sf._flatpickr?.clear(); }
     if (st) { st.value = ''; st._flatpickr?.clear(); }
-    document.querySelectorAll('input[name="saisonRadio"]').forEach(r => r.checked = false);
+    const selectSaisonReinit = document.getElementById('selectSaison');
+    if (selectSaisonReinit?.tomselect) {
+      selectSaisonReinit.tomselect.clear(true);
+      selectSaisonReinit.tomselect.setValue('', true);
+    } else if (selectSaisonReinit) {
+      selectSaisonReinit.value = '';
+    }
     supprimerBadgeById('periode-from');
     supprimerBadgeById('periode-to');
     supprimerBadgeById('saisonnalite');
