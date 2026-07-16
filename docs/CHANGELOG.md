@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [0.64.0] - 2026-07-16
+
+### Performance et robustesse carte WebGL
+- Reduction de 18 a 6 attributs GPU par feature (mode couleur actif uniquement au lieu des 3 modes precalcules) - charge GPU divisee par 3
+- changerModeCouleur() reecrite pour reinjecter les couleurs a la volee au changement de mode, sans recreer la couche
+- Gestion de la perte de contexte WebGL (webglcontextlost/webglcontextrestored) avec message utilisateur au lieu d'un crash silencieux
+- Guards ajoutes sur pointermove et singleclick pour eviter les erreurs en cascade apres perte de contexte
+- Correction ReferenceError sur variable _dateMin non declaree, introduite par un refactoring precedent - bloquait l'affichage initial des points
+- Initialisation du handler WebGL basee sur l'evenement postrender au lieu d'un setTimeout fixe - fiabilise la detection du canvas
+
 ## [0.63.0] - 2026-07-16
 
 ### Interface page Individus
