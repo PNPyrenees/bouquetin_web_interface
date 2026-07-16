@@ -1613,14 +1613,8 @@ input[type="checkbox"] {
   gap: 6px;
   padding: 2px 4px;
   font-size: 11px;
-  cursor: pointer;
   flex-shrink: 0;
   white-space: nowrap;
-}
-
-.legende-individu-ligne:hover {
-  background: var(--map-ui-bg-active);
-  border-radius: 3px;
 }
 
 .legende-individu-pastille {
@@ -2231,13 +2225,6 @@ select:has(+ .ts-wrapper) {
 
 .temporel-divider {
   display: none;
-}
-
-.saison-radios {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px 12px;
-  margin-top: 4px;
 }
 
 /* Disposition côte à côte pour les paires de dates (Période / Saisonnalité) */
