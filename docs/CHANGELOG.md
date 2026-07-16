@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [0.62.0] - 2026-07-15
+
+### Corrections suite retours Ludovic
+- Boutons radio saison remplaces par select avec option Aucune - permet de deselectionner sans recharger la page
+- Select saison initialise via TomSelect - rendu identique aux autres selects de la sidebar
+- Retrait de l'effet hover trompeur sur la legende (curseur pointeur et changement de couleur au survol) - aucune interaction n'existait derriere
+- Garde-fou contre les positions GPS avec coordonnees geographiquement aberrantes - empeche le recentrage automatique de la carte vers un point hors zone plausible
+- coordonneesPlausibles() centralisee dans config.js - partagee entre map.js et individuals.js
+- config.example.js (template versionne) aligne sur config.js - evite une erreur au chargement pour quiconque cree son config.js a partir du template
+
 ## [0.61.0] - 2026-07-15
 
 ### Corrections suite retours Ludovic
