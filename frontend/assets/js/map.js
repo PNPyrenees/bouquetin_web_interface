@@ -1,4 +1,4 @@
-import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG } from './config.js';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG, coordonneesPlausibles } from './config.js';
 let map;
 let gpsSource;
 let gpsLayer;
@@ -338,6 +338,15 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
   locations.forEach(loc => {
     if (!loc.geom?.coordinates) return;
 
+    // Garde-fou donnees corrompues (ex: notation scientifique aberrante en base, cf.
+    // meme validation dans individuals.js/config.js) — point ignore silencieusement
+    // (console.warn de diagnostic) plutot qu'ajoute a gpsSource, pour ne pas fausser
+    // le recentrage automatique (getExtent()) ni le rendu WebGL.
+    if (!coordonneesPlausibles(loc.geom.coordinates)) {
+      console.warn('Position GPS avec coordonnees hors plage plausible, ignoree :', loc.geom.coordinates, loc);
+      return;
+    }
+
     const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
     const coord = ol.proj.fromLonLat(wgs84);
 
@@ -499,6 +508,10 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
   const parIndividu = {};
   locations.forEach(loc => {
     if (!loc.geom?.coordinates) return;
+    if (!coordonneesPlausibles(loc.geom.coordinates)) {
+      console.warn('Position GPS avec coordonnees hors plage plausible, ignoree (trajectoire) :', loc.geom.coordinates, loc);
+      return;
+    }
     if (!parIndividu[loc.ani_id]) parIndividu[loc.ani_id] = [];
 
     const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
