@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchAnimauxSuivis, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal } from './api.js';
-import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, SAISONS_CONFIG } from './config.js';
+import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, SAISONS_CONFIG, coordonneesPlausibles } from './config.js';
 
 let currentToken = null;
 let currentAniId = null;
@@ -616,24 +616,11 @@ function creerCoucheFond() {
 // (branche EWKB hex, conservee par securite si le format change un jour cote serveur).
 const SRID_ATTENDU = 2154;
 
-// Bornes approximatives de la France metropolitaine + Espagne en Lambert-93 (EPSG:2154)
-// — garde-fou cote frontend contre des donnees corrompues en base (287/367 lignes de
-// t_capture_relache ont un capture_site_geom en notation scientifique aberrante, ex:
-// 1e+237, confirme le 2026-07-15 ; probleme de donnees signale separement, cf. audit
-// page Individus). Y_MIN volontairement bas (marge sous la frontiere espagnole, ou
-// certaines populations suivies par le PNP sont situees) plutot que cale strictement
-// sur la France metropolitaine.
-const LAMBERT93_X_MIN = 0;
-const LAMBERT93_X_MAX = 1300000;
-const LAMBERT93_Y_MIN = 5800000;
-const LAMBERT93_Y_MAX = 7200000;
-
-function coordonneesPlausibles(coords) {
-  if (!Array.isArray(coords) || coords.length !== 2) return false;
-  const [x, y] = coords;
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
-  return x >= LAMBERT93_X_MIN && x <= LAMBERT93_X_MAX && y >= LAMBERT93_Y_MIN && y <= LAMBERT93_Y_MAX;
-}
+// coordonneesPlausibles() (bornes Lambert-93, garde-fou coordonnees corrompues) est
+// desormais centralisee dans config.js — partagee avec map.js (page Carte), meme
+// probleme de donnees rencontre des deux cotes (287/367 lignes de t_capture_relache et
+// des positions v_localisation en notation scientifique aberrante, ex: 1e+237, confirme
+// le 2026-07-15).
 
 /**
  * Parse une geometrie Point PostGIS renvoyee par PostgREST pour une colonne lue via
