@@ -119,6 +119,17 @@ select.indiv-col-filtre {
   color: var(--color-text);
 }
 
+/* Les <select class="indiv-col-filtre"> sont remplaces par TomSelect (cf.
+   individuals.js, initTomSelectFiltresColonnes) — masque des le CSS, meme
+   principe que select.sidebar-select plus haut, pour eviter le flash du
+   select natif brut le temps que le fetch (Promise.all dans initPage) resolve
+   et que TomSelect injecte son wrapper. La regle ".ts-wrapper ~ select"
+   (plus bas) prend le relais une fois le wrapper present, mais ne couvre pas
+   la fenetre avant l'init JS — d'ou ce masquage inconditionnel en complement. */
+select.indiv-col-filtre {
+  display: none;
+}
+
 /* TomSelect remplace le rendu de ces selects (cf. individuals.js,
    initTomSelectFiltresColonnes) — le select natif est masque par la regle
    generique ".ts-wrapper ~ select" (main.css) des que le widget est injecte.
