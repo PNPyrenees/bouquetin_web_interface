@@ -103,15 +103,56 @@
   color: var(--color-text-muted);
 }
 
-.indiv-col-filtre {
+/* Scope aux <input>/<select> reels — sinon ce style s'applique aussi au
+   .ts-wrapper (meme classe indiv-col-filtre recopiee par TomSelect), qui
+   affiche alors sa propre bordure en plus de celle du .ts-control interne
+   (effet "double case"). */
+input.indiv-col-filtre,
+select.indiv-col-filtre {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 0;
   font-family: var(--font-family);
   font-size: 12px;
   background: #ffffff;
   color: var(--color-text);
+}
+
+/* TomSelect remplace le rendu de ces selects (cf. individuals.js,
+   initTomSelectFiltresColonnes) — le select natif est masque par la regle
+   generique ".ts-wrapper ~ select" (main.css) des que le widget est injecte.
+   Le wrapper recupere la classe indiv-col-filtre du select d'origine, donc on
+   restyle .ts-control/.ts-dropdown pour retrouver le meme gabarit que les
+   champs texte voisins (radius/ombre deja a 0 via la regle #indivScreen plus bas). */
+#indivScreen .ts-wrapper.indiv-col-filtre {
+  width: 100%;
+}
+
+#indivScreen .ts-wrapper.indiv-col-filtre .ts-control {
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  font-family: var(--font-family);
+  font-size: 12px;
+  background: #ffffff;
+  color: var(--color-text);
+  min-height: 0;
+  flex-wrap: nowrap;
+}
+
+/* La lib impose min-width:7rem au champ de recherche interne et un flex qui
+   passe a la ligne des que ca ne tient plus — dans une colonne de filtre
+   etroite ca fait grossir la case des le focus. On le laisse retrecir sans
+   jamais passer sous l'item affiche. */
+#indivScreen .ts-wrapper.indiv-col-filtre .ts-control > input {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+#indivScreen .ts-wrapper.indiv-col-filtre .ts-dropdown {
+  border: 1px solid var(--color-border);
+  font-family: var(--font-family);
+  font-size: 12px;
 }
 
 .indiv-cell {
@@ -781,4 +822,68 @@
     gap: 8px;
     text-align: left;
   }
+}
+
+/* ==========================================================================
+   INDIVIDUALS & FICHE OVERRIDES (Sober, flat, no rounded corners, no traits/borders)
+   ========================================================================= */
+
+/* Remove rounded corners and shadows from all inputs, selects, textareas, and buttons in indivScreen */
+#indivScreen input,
+#indivScreen select,
+#indivScreen textarea,
+#indivScreen button,
+#indivScreen .ts-wrapper,
+#indivScreen .ts-control,
+#indivScreen .ts-dropdown {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Remove rounded corners and shadows from everything in the individual profile (fiche) */
+#vueFiche,
+#vueFiche * {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Remove row borders in list view to avoid "too many lines/traits" and table look */
+.indiv-row:not(.indiv-liste-entete) {
+  border-bottom: none !important;
+}
+
+
+/* Make list table header flat and sober */
+.indiv-liste-entete {
+  background: transparent !important;
+  border-bottom: none !important;
+}
+
+/* Legend dots and the status icon on the fiche photo must stay round —
+   the blanket #vueFiche * border-radius:0 above would otherwise square them */
+#vueFiche .legende-pastille,
+#vueFiche .legende-pastille-creux,
+#vueFiche .fiche-illustration-statut {
+  border-radius: 50% !important;
+}
+
+/* Remove borders on fiche card containers, illustration, and maps for a clean layout */
+#vueFiche .fiche-carte,
+#vueFiche .capture-event-carte,
+#vueFiche .fiche-map,
+#vueFiche .fiche-illustration {
+  border: none !important;
+}
+
+/* Remove border line inside translocation/event cards and give header a very light bg */
+#vueFiche .capture-event-entete {
+  border-bottom: none !important;
+  background: rgba(0, 0, 0, 0.02) !important;
+}
+
+/* Squeeze inputs inside fiche card controls to have simple flat border */
+#vueFiche .fiche-carte-controles input {
+  border: 1px solid #ccc !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
