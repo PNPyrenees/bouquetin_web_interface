@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [0.66.0] - 2026-07-17
+
+### Ajustements design
+- Ameliorations visuelles sur la page Individus et l'interface generale
+
 ## [0.65.0] - 2026-07-16
 
 ### Interface générale
