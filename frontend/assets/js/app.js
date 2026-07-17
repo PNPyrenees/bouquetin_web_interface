@@ -1014,8 +1014,7 @@ async function startApp(token) {
             hideSelected: false,
             render: {
               option(data, escape) {
-                const isSelected = Object.values(selectAnneeEl.tomselect?.items || {}).map(item => typeof item === 'string' ? item : item?.value).includes(data.value);
-                return `<div class="${isSelected ? 'ts-option-selected' : ''}">${escape(data.text)}</div>`;
+                return `<div>${escape(data.text)}</div>`;
               }
             },
             onChange() {
@@ -1745,6 +1744,7 @@ async function reinitialiserTousLesFiltres() {
     if (selectAnneeReinit) {
       if (selectAnneeReinit.tomselect) {
         selectAnneeReinit.tomselect.clear(true);
+        selectAnneeReinit.tomselect.refreshOptions(false);
       } else {
         selectAnneeReinit.value = '';
       }
