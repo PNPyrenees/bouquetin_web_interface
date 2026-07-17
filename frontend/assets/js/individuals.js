@@ -262,6 +262,22 @@ function appliquerFiltresListe() {
   document.getElementById(id)?.addEventListener('change', appliquerFiltresListe);
 });
 
+// TomSelect — remplace le rendu natif de ces 4 selects, dont le popup ouvert
+// (coins arrondis + ombre sur Chrome/Windows) ignore border-radius/box-shadow en CSS.
+function initTomSelectFiltresColonnes() {
+  ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.tomselect) return;
+    new TomSelect(el, {
+      create: false,
+      allowEmptyOption: true,
+      onChange() {
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+  });
+}
+
 function peuplerTableauListe() {
   const corps = document.getElementById('indivTableBody');
   if (!corps) return;
@@ -309,6 +325,7 @@ function peuplerTableauListe() {
   });
 
   peuplerFiltresDynamiques();
+  initTomSelectFiltresColonnes();
   appliquerFiltresListe();
 }
 
