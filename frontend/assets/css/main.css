@@ -2020,29 +2020,6 @@ select:has(+ .ts-wrapper) {
   cursor: default;
 }
 
-.ts-dropdown .ts-option-selected {
-  color: #9ab5ac;
-  font-style: italic;
-}
-
-.ts-dropdown .ts-option-selected::after {
-  content: ' ✓';
-  color: #2D6A4F;
-  font-weight: 700;
-}
-
-#selectAnnee-ts-wrapper .ts-dropdown .option.selected {
-  background: transparent !important;
-  color: #9ab5ac !important;
-  font-style: italic;
-}
-#selectAnnee-ts-wrapper .ts-dropdown .option.selected::after {
-  content: ' ✓';
-  color: #2D6A4F;
-  font-weight: 700;
-  font-style: normal;
-}
-
 .input-group2 label {
   display: block;
   font-size: 10px;
