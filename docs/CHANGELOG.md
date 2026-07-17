@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.67.0] - 2026-07-17
+
+### Corrections selecteurs TomSelect
+- Coche verte retiree sur le selecteur Annee - style desormais identique aux autres selects (grisage simple)
+- Reinitialisation du selecteur Annee corrigee - refreshOptions appele apres clear pour eviter le grisage residuel
+- Flash du select natif brut au chargement initial corrige sur le filtre Statut (page Individus) - masquage CSS immediat en attendant l'initialisation TomSelect
+
 ## [0.66.0] - 2026-07-17
 
 ### Ajustements design
