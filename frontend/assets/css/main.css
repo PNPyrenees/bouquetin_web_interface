@@ -2255,3 +2255,25 @@ select:has(+ .ts-wrapper) {
 .panel-table-row {
   cursor: pointer;
 }
+
+/* ==========================================================================
+   GLOBAL SELECT & TOMSELECT OVERRIDES (Sober, flat design without rounded corners or shadows)
+   ========================================================================== */
+
+/* Remove rounded corners and shadows from all native selects and TomSelect elements */
+select,
+.ts-wrapper,
+.ts-control,
+.ts-dropdown,
+.ts-wrapper .ts-control,
+.ts-wrapper.sidebar-select .ts-control,
+.ts-wrapper.sidebar-select .ts-dropdown {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Remove hover/focus/active shadows from TomSelect elements */
+.ts-wrapper.focus .ts-control,
+.ts-wrapper.sidebar-select.focus .ts-control {
+  box-shadow: none !important;
+}
