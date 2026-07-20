@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchAnimauxSuivis, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal } from './api.js';
-import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, SAISONS_CONFIG, coordonneesPlausibles } from './config.js';
+import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, SAISONS_CONFIG } from './config.js';
 
 let currentToken = null;
 let currentAniId = null;
@@ -633,12 +633,6 @@ function creerCoucheFond() {
 // (branche EWKB hex, conservee par securite si le format change un jour cote serveur).
 const SRID_ATTENDU = 2154;
 
-// coordonneesPlausibles() (bornes Lambert-93, garde-fou coordonnees corrompues) est
-// desormais centralisee dans config.js — partagee avec map.js (page Carte), meme
-// probleme de donnees rencontre des deux cotes (287/367 lignes de t_capture_relache et
-// des positions v_localisation en notation scientifique aberrante, ex: 1e+237, confirme
-// le 2026-07-15).
-
 /**
  * Parse une geometrie Point PostGIS renvoyee par PostgREST pour une colonne lue via
  * un SELECT de table brute (capture_site_geom/relache_site_geom). Gere deux formats :
@@ -648,10 +642,6 @@ const SRID_ATTENDU = 2154;
  * - EWKB hex (chaine) — comportement par defaut de PostgREST pour une colonne geometry
  *   non castee, jamais observe en pratique sur ces deux colonnes a ce jour, mais gere par
  *   securite si le format change cote serveur (cf. parseEwkbHexPoint).
- * Les deux branches valident les coordonnees extraites via coordonneesPlausibles() avant
- * de les retourner — une geometrie hors plage (donnee corrompue en base) est traitee
- * exactement comme une geometrie absente (retour null), filtree ensuite par
- * .filter(Boolean) dans renderPointsSites().
  */
 function parseGeomPostGIS(geom) {
   if (!geom) return null;
@@ -664,20 +654,11 @@ function parseGeomPostGIS(geom) {
         geom
       );
     }
-    if (!coordonneesPlausibles(geom.coordinates)) {
-      console.warn('Coordonnées hors plage plausible, géométrie ignorée :', geom.coordinates);
-      return null;
-    }
     return geom.coordinates;
   }
 
   if (typeof geom === 'string') {
-    const coords = parseEwkbHexPoint(geom);
-    if (coords && !coordonneesPlausibles(coords)) {
-      console.warn('Coordonnées hors plage plausible, géométrie ignorée :', coords);
-      return null;
-    }
-    return coords;
+    return parseEwkbHexPoint(geom);
   }
 
   console.warn('Format de géométrie PostGIS non reconnu:', geom);
