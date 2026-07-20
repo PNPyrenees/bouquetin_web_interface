@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.68.0] - 2026-07-20
+
+### Corrections suite retours Ludovic (session 2)
+- Retrait du garde-fou coordonneesPlausibles - les points GPS aberrants restent visibles, c'est aux experts de juger de leur validite, pas a l'application de les filtrer
+- Libelle "Aucune" renomme en "Toutes les saisons" sur le selecteur Saison
+- Contour blanc force sur les couleurs sombres de la palette individus (Bleu, Bleu nuit, Vert fonce, Noir-marron, Bordeaux, Rouge fonce, Bleu marine) - meilleure visibilite sur fond satellite avec ombrage
+
 ## [0.67.0] - 2026-07-17
 
 ### Corrections selecteurs TomSelect
