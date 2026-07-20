@@ -9,24 +9,6 @@ export const LAMBERT93 =
   '+x_0=700000 +y_0=6600000 +ellps=GRS80 ' +
   '+towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
 
-// Bornes approximatives de la France metropolitaine + Espagne en Lambert-93 (EPSG:2154)
-// — garde-fou partage (page Carte et page Individus) contre des donnees corrompues en
-// base (coordonnees en notation scientifique aberrante, ex: 1e+237, confirme le
-// 2026-07-15 sur t_capture_relache et v_localisation). Y_MIN volontairement bas (marge
-// sous la frontiere espagnole, ou certaines populations suivies par le PNP sont situees)
-// plutot que cale strictement sur la France metropolitaine.
-export const LAMBERT93_X_MIN = 0;
-export const LAMBERT93_X_MAX = 1300000;
-export const LAMBERT93_Y_MIN = 5800000;
-export const LAMBERT93_Y_MAX = 7200000;
-
-export function coordonneesPlausibles(coords) {
-  if (!Array.isArray(coords) || coords.length !== 2) return false;
-  const [x, y] = coords;
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
-  return x >= LAMBERT93_X_MIN && x <= LAMBERT93_X_MAX && y >= LAMBERT93_Y_MIN && y <= LAMBERT93_Y_MAX;
-}
-
 // Niveaux de zoom
 export const ZOOM_POINT_SINGLE = 14;
 export const ZOOM_FILTER_SINGLE = 13;
