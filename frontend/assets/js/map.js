@@ -1,4 +1,4 @@
-import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG, coordonneesPlausibles } from './config.js';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG } from './config.js';
 let map;
 let gpsSource;
 let gpsLayer;
@@ -74,7 +74,25 @@ function getCouleurParIndex(index) {
   return GLASBEY_32[index % GLASBEY_32.length];
 }
 
+// Override — couleurs de remplissage de GLASBEY_32 assez sombres (luminance percue
+// ITU-R BT.601 <= 58, seuil fixe par #00478E) pour que le contour cyclique (Blanc/Noir/
+// Jaune/Cyan, cf. CONTOURS) tombe parfois sur Noir et rende le point quasi invisible sur
+// fond satellite avec ombrage de montagne — signale par Ludovic sur #00478E (bleu marine).
+// Contour force en Blanc (coherent avec le contour par defaut du 1er cycle), quel que
+// soit le rang d'apparition de l'individu, pour ces couleurs uniquement.
+const CONTOUR_OVERRIDE_PAR_COULEUR = {
+  '#0000FF': CONTOURS[0], // Bleu
+  '#000033': CONTOURS[0], // Bleu nuit
+  '#005300': CONTOURS[0], // Vert fonce
+  '#201A01': CONTOURS[0], // Noir-marron
+  '#720055': CONTOURS[0], // Bordeaux
+  '#A10300': CONTOURS[0], // Rouge fonce
+  '#00478E': CONTOURS[0], // Bleu marine
+};
+
 export function getContourParIndex(index) {
+  const couleur = GLASBEY_32[index % GLASBEY_32.length];
+  if (CONTOUR_OVERRIDE_PAR_COULEUR[couleur]) return CONTOUR_OVERRIDE_PAR_COULEUR[couleur];
   // Changer de contour tous les 32 individus (une palette complete)
   return CONTOURS[Math.floor(index / GLASBEY_32.length) % CONTOURS.length];
 }
@@ -391,15 +409,6 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
   locations.forEach(loc => {
     if (!loc.geom?.coordinates) return;
 
-    // Garde-fou donnees corrompues (ex: notation scientifique aberrante en base, cf.
-    // meme validation dans individuals.js/config.js) — point ignore silencieusement
-    // (console.warn de diagnostic) plutot qu'ajoute a gpsSource, pour ne pas fausser
-    // le recentrage automatique (getExtent()) ni le rendu WebGL.
-    if (!coordonneesPlausibles(loc.geom.coordinates)) {
-      console.warn('Position GPS avec coordonnees hors plage plausible, ignoree :', loc.geom.coordinates, loc);
-      return;
-    }
-
     const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
     const coord = ol.proj.fromLonLat(wgs84);
 
@@ -589,10 +598,6 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
   const parIndividu = {};
   locations.forEach(loc => {
     if (!loc.geom?.coordinates) return;
-    if (!coordonneesPlausibles(loc.geom.coordinates)) {
-      console.warn('Position GPS avec coordonnees hors plage plausible, ignoree (trajectoire) :', loc.geom.coordinates, loc);
-      return;
-    }
     if (!parIndividu[loc.ani_id]) parIndividu[loc.ani_id] = [];
 
     const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
