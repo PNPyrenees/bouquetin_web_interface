@@ -1,7 +1,7 @@
 import { fetchAnimalIdsParPeriode, fetchCountLocations, fetchLocalisationsRPC } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
-import { mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, mettreAJourIndividus } from './panel.js';
-import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, SAISONS_CONFIG, CLASSES_AGE } from './config.js';
+import { mettreAJourPanneau, setLabelDatetime, mettreAJourIndividus } from './panel.js';
+import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, SAISONS_CONFIG, CLASSES_AGE, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
 import {
   getAnimals, getActiveIds, getCurrentToken, getProgrammationsMap,
   enrichirLocations, enrichirAnimauxAvecPositions,
@@ -10,10 +10,12 @@ import {
   showToast, mettreAJourLegende,
   ajouterBadge, supprimerBadgeById, mettreAJourFiltresActifs,
   mettreAJourSelectN, mettreAJourBoutonAppliquer,
+  getDernierNPositions, getDernierNTrajectoire,
   setDernierNPositions, setDernierNTrajectoire,
   mettreAJourBadgeNPositions,
   getAniCalendrier,
-  getFiltreGeom
+  getFiltreGeom,
+  deriverNDernieresPositionsParAnimal
 } from './app.js';
 
 // Convertit le format flatpickr JJ/MM en MM-JJ attendu par loc_mois_jour_local (PostgREST)
@@ -24,6 +26,187 @@ function formatSaisonPourAPI(dateJJMM) {
 }
 
 const BATCH_SIZE = 10000;
+
+// Cache de positions decouple du rendu (gpsSource peut n'afficher qu'un sous-ensemble du
+// cache, cf. sur-chargement preventif ci-dessous) — source de verite pour la reutilisation
+// client entre modes Positions/Trajectoire, y compris "Toutes les positions". Mis a jour a
+// chaque chargement reseau reussi dans applyFilters() (les deux branches).
+let _cachePositions = [];
+
+// Instantane du dernier chargement reussi (Positions ou Trajectoire) — { portee, limitParAnimal }.
+// limitParAnimal: nombre de positions/animal reellement presentes dans _cachePositions, ou
+// null si _cachePositions contient TOUTES les positions correspondant a la portee (mode
+// "Toutes les positions"). Cf. peutReutiliser()/deriverPourBesoin().
+let _dernierChargement = null;
+
+/**
+ * Assemble l'objet de portee de filtres compare pour decider d'une reutilisation client —
+ * meme perimetre que window._derniersFiltresAppliques, plus include_outliers (absent de ce
+ * dernier) : une bascule de "Inclure les outliers" entre deux chargements doit invalider
+ * la reutilisation, sinon des positions filtrees par erreur resteraient affichees.
+ */
+function construirePorteeComparaison(idsAChercher, dateFrom, dateTo, saisonFrom, saisonTo, annees, filters, suivisSeulement) {
+  return {
+    ani_id: idsAChercher,
+    date_from: dateFrom || null,
+    date_to: dateTo || null,
+    saisonFrom: saisonFrom || null,
+    saisonTo: saisonTo || null,
+    annees: annees.length > 0 ? annees : null,
+    sexe: filters.sexe || null,
+    gestionnaire: filters.gestionnaire || null,
+    population: filters.population || null,
+    programmation: filters.programmation || null,
+    was_translocated: filters.wasTranslocated ?? null,
+    geom: filters.geom || null,
+    geom_src: filters.geom_src || null,
+    include_outliers: filters.include_outliers || false,
+    suivisSeulement
+  };
+}
+
+/**
+ * Enregistre le chargement initial de startApp() (mode Positions, n positions/animal,
+ * ani_is_followed=true, aucun autre filtre) dans le meme cache que applyFilters(). Sans
+ * cela, startApp() — qui fait son propre fetch reseau hors de applyFilters() — ne peuple
+ * jamais _cachePositions, et le premier basculement vers Trajectoire repart toujours en
+ * reseau meme si les N sont identiques. A appeler apres resolution de fetchAniCalendrier()
+ * (donc apres le flaggage sansGeom sur #listeIndividus) pour que idsAChercher calcule
+ * exactement la meme liste qu'un futur appel a applyFilters() — sinon la comparaison de
+ * portee echoue et le cache n'est jamais reutilise (pas d'erreur, juste sans le gain).
+ */
+export function enregistrerChargementInitial(locations, n) {
+  const idsAChercher = Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
+    .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
+    .map(l => l.querySelector('input')?.value)
+    .filter(Boolean);
+
+  const suivisSeulement = document.getElementById('checkSuivis')?.checked || false;
+
+  const portee = construirePorteeComparaison(
+    idsAChercher, null, null, null, null, [],
+    { sexe: '', gestionnaire: '', population: '', programmation: '', wasTranslocated: '', geom: null, geom_src: null, include_outliers: false },
+    suivisSeulement
+  );
+
+  _cachePositions = locations;
+  _dernierChargement = { portee, limitParAnimal: n };
+}
+
+/**
+ * Determine si le chargement demande (besoinLimitParAnimal positions/animal, ou null pour
+ * "Toutes") peut etre derive de _cachePositions plutot que de relancer une requete reseau.
+ * Condition generale (pas restreinte a un sens Positions<->Trajectoire particulier) : le
+ * dernier chargement reussi doit porter sur exactement la meme portee de filtres, et son
+ * volume doit couvrir le besoin — un cache "Toutes" (limitParAnimal null) couvre n'importe
+ * quel besoin ; un cache limite ne couvre un besoin "Toutes" sous aucune condition (on ne
+ * sait pas s'il manque des positions au-dela de ce qui a ete charge).
+ */
+function peutReutiliser(porteeActuelle, besoinLimitParAnimal) {
+  if (!_dernierChargement) return false;
+  if (JSON.stringify(_dernierChargement.portee) !== JSON.stringify(porteeActuelle)) return false;
+  if (_dernierChargement.limitParAnimal === null) return true;
+  if (besoinLimitParAnimal === null) return false;
+  return _dernierChargement.limitParAnimal >= besoinLimitParAnimal;
+}
+
+/**
+ * Extrait de _cachePositions exactement ce qu'il faut afficher pour le besoin courant.
+ */
+function deriverPourBesoin(besoinLimitParAnimal) {
+  if (besoinLimitParAnimal === null) return _cachePositions;
+  return deriverNDernieresPositionsParAnimal(_cachePositions, besoinLimitParAnimal);
+}
+
+/**
+ * Le N reellement valide par l'utilisateur (champ partage, cf. getDernierNTrajectoire())
+ * couvre-t-il le minimum de positions par animal necessaire pour tracer une trajectoire
+ * (un segment necessite >= 2 points) ? Sert a griser #btnTrajectoire (app.js) quand ce
+ * n'est pas le cas, plutot que de le laisser afficher une trajectoire tronquee a un seul
+ * point.
+ *
+ * Teste le N partage plutot que _dernierChargement.limitParAnimal : ce dernier reflete le
+ * volume reellement rapatrie du reseau, qui peut etre PLUS GRAND que ce que l'utilisateur
+ * a demande a cause du sur-chargement preventif (calculerNEffectifPositions/Trajectoire,
+ * qui pre-charge aussi le N de l'autre mode) — un cache a limitParAnimal=5 alors que
+ * l'utilisateur vient de valider N=1 rendait ce test faussement positif (bug confirme le
+ * 22/07 : bouton Trajectoire pas grise avec N=1, trajectoire affichee a 1 point).
+ */
+export function peutAfficherTrajectoire() {
+  if (!_dernierChargement) return false;
+  const nPartage = getDernierNTrajectoire();
+  if (nPartage === 'toutes') return true;
+  if ((parseInt(nPartage) || 0) < N_POSITIONS_MIN_TRAJECTOIRE) return false;
+  // Garde-fou secondaire — le cache doit aussi couvrir ce besoin (toujours vrai en
+  // pratique, le sur-chargement ne peut que charger plus que le N partage, jamais moins)
+  return _dernierChargement.limitParAnimal === null || _dernierChargement.limitParAnimal >= N_POSITIONS_MIN_TRAJECTOIRE;
+}
+
+/**
+ * Bascule pure Positions <-> Trajectoire, sans jamais lire le DOM des filtres ni faire
+ * d'appel reseau — re-rend uniquement le sous-ensemble derive de _cachePositions
+ * (dernieres donnees reellement validees par un applyFilters() reussi, cf.
+ * #btnApplyFilters, seul point d'entree pour un vrai chargement filtre). Rejoue le
+ * post-traitement d'affichage necessaire (legende, libelle date, panneau, liste
+ * individus) mais jamais le zoom automatique ni window._derniersFiltresAppliques —
+ * ceux-ci restent le reflet exclusif du dernier chargement reellement applique.
+ * Retourne false (sans rien modifier) si aucun chargement valide n'existe encore, si le
+ * mode Trajectoire est demande avec moins de N_POSITIONS_MIN_TRAJECTOIRE positions/animal
+ * (garde-fou independant de l'etat — grise ou non — de #btnTrajectoire, cf.
+ * peutAfficherTrajectoire() en amont pour le cas nominal), ou si besoinLimitParAnimal
+ * depasse ce que le cache couvre.
+ */
+export function rebasculerModeAffichage(mode, besoinLimitParAnimal) {
+  if (!_dernierChargement) return false;
+  if (mode === 'trajectoire' && besoinLimitParAnimal !== null && besoinLimitParAnimal < N_POSITIONS_MIN_TRAJECTOIRE) return false;
+  if (!peutReutiliser(_dernierChargement.portee, besoinLimitParAnimal)) return false;
+
+  const locations = deriverPourBesoin(besoinLimitParAnimal);
+  const idsSelectionnesManuel = (_dernierChargement.portee.ani_id || []).length > 0;
+  const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+  const estTrajectoire = mode === 'trajectoire';
+
+  clearMapPoints();
+  clearTrajectoire();
+  const count = renderPoints(locations, true, estTrajectoire, modeCouleur);
+  masquerIndividusSansPositions(locations, idsSelectionnesManuel);
+  mettreAJourPanneau(locations);
+  const idsPresents = new Set(locations.map(l => String(l.ani_id)));
+  mettreAJourIndividus(getAnimals().filter(a => idsPresents.has(String(a.ani_id))));
+
+  const mapScreen = document.getElementById('mapScreen');
+  if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
+    mapScreen?.classList.add('panel-open');
+    setTimeout(() => updateMapSize(), 310);
+  }
+  if (estTrajectoire) renderTrajectoire(locations, modeCouleur);
+
+  const posEl = document.getElementById('positionsCount');
+  if (posEl) posEl.textContent = count;
+  mettreAJourLegende(mode);
+  setLabelDatetime(estTrajectoire ? 'Date/Heure' : 'Date de localisation');
+
+  return true;
+}
+
+/**
+ * Sur-chargement preventif — quand on charge n positions/animal pour un mode, demande aussi
+ * au moins le N couramment utilise par l'autre mode (si c'est un nombre fixe, pas 'toutes')
+ * pour pre-alimenter _cachePositions et eviter une requete lors d'un futur basculement de
+ * mode. N'affecte jamais ce qui est affiche — le rendu est toujours tronque a n apres coup
+ * (cf. applyFilters), seul le volume mis en cache change.
+ */
+function calculerNEffectifPositions(n) {
+  const autre = getDernierNTrajectoire();
+  const autreNombre = autre && autre !== 'toutes' ? parseInt(autre) : null;
+  return autreNombre && autreNombre > n ? autreNombre : n;
+}
+
+function calculerNEffectifTrajectoire(nTraj) {
+  const autre = getDernierNPositions();
+  const autreNombre = autre && autre !== 'toutes' ? parseInt(autre) : null;
+  return autreNombre && autreNombre > nTraj ? autreNombre : nTraj;
+}
 
 export function getPeriodesActives() {
   // CHEMIN 1 — Periode (champs dateFrom/dateTo avec JJ/MM/AAAA)
@@ -262,8 +445,13 @@ function construireFiltersRPC(token, idsAnimaux, filters, suivisSeulement) {
 /**
  * APPLICATION DES FILTRES
  * Récupère les données filtrées depuis l'API et met à jour la carte.
+ * @param {boolean} sansZoomAuto - Si vrai, ne recentre/zoome pas automatiquement sur
+ *   l'etendue des points apres chargement. Utilise par les basculements de mode
+ *   (Positions <-> Trajectoire, cf. app.js) pour preserver le cadrage courant de
+ *   l'utilisateur — le clic sur "Appliquer les filtres" continue de zoomer (valeur
+ *   par defaut false).
  */
-export async function applyFilters(token, modeForce = null, nOverride = null) {
+export async function applyFilters(token, modeForce = null, nOverride = null, sansZoomAuto = false) {
   const btnApply = document.getElementById('btnApplyFilters');
   showMapLoading();
   lockSidebar();
@@ -345,76 +533,113 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const saisonFromApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
       const saisonToApi = hasSaisonnalite ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
 
-      const rpcFilters = construireFiltersRPC(token, idsPourRPC, {
-        ...filters,
-        date_from: dateMin || null,
-        date_to: dateMax || null,
-        saisonFrom: saisonFromApi,
-        saisonTo: saisonToApi,
-        annees: anneesSelectionnees.length > 0 ? anneesSelectionnees : null
-      }, suivisSeulement);
+      const porteeActuelle = construirePorteeComparaison(
+        idsAChercher, dateMin, dateMax, saisonFromApi, saisonToApi, anneesSelectionnees, filters, suivisSeulement
+      );
+      const besoinLimitParAnimal = toutesPositions ? null : n;
 
-      if (!toutesPositions && n) {
-        // Chemin A — N dernieres positions par animal via RPC (un seul batch attendu)
-        rpcFilters.limit_par_animal = n;
-        locations = await fetchLocalisationsRPC(token, rpcFilters, () => {
-          const bar = document.getElementById('mapLoadingBar');
-          const pctEl = document.getElementById('mapLoadingPct');
-          if (progEl) progEl.style.display = 'block';
-          if (bar) bar.style.width = '100%';
-          if (pctEl) pctEl.textContent = '100%';
-        });
-      } else {
-        // Chemin B — Toutes positions, avec modal volume + pagination RPC
-        const totalPositions = await fetchCountLocations(token, rpcFilters);
+      // Capture AVANT toute mutation de _dernierChargement (qui a lieu plus bas en cas de
+      // chargement reseau) — sert a sauter le fit()/animate() automatique si seul le N a
+      // change, la portee de filtres restant strictement identique au dernier chargement.
+      const porteeIdentique = _dernierChargement !== null &&
+        JSON.stringify(_dernierChargement.portee) === JSON.stringify(porteeActuelle);
 
-        let confirmed = true;
-        if (totalPositions > SEUIL_ALERTE_VOLUME) {
-          const modal = document.getElementById('modalVolume');
-          document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
-          modal.style.display = 'flex';
+      // Reutilisation client — les positions deja en cache (_cachePositions) couvrent-elles
+      // deja ce besoin (meme portee de filtres, volume >= besoin, ou cache "Toutes") ? Si
+      // oui, on evite l'aller-retour reseau (et le modal de volume si le besoin est
+      // "Toutes"), cf. peutReutiliser().
+      let reutiliseSansReseau = false;
+      if (peutReutiliser(porteeActuelle, besoinLimitParAnimal)) {
+        locations = deriverPourBesoin(besoinLimitParAnimal);
+        reutiliseSansReseau = true;
+      }
 
-          confirmed = await new Promise(resolve => {
-            document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(false); };
-            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(true); };
-          });
+      let limitParAnimalCharge = besoinLimitParAnimal;
 
-          if (!confirmed) {
-            hideMapLoading();
-            unlockSidebar();
-            if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
-            mettreAJourBoutonAppliquer();
-            return false;
-          }
-        }
+      if (!reutiliseSansReseau) {
+        const rpcFilters = construireFiltersRPC(token, idsPourRPC, {
+          ...filters,
+          date_from: dateMin || null,
+          date_to: dateMax || null,
+          saisonFrom: saisonFromApi,
+          saisonTo: saisonToApi,
+          annees: anneesSelectionnees.length > 0 ? anneesSelectionnees : null
+        }, suivisSeulement);
 
-        let _batchTotal = 0;
-        locations = await fetchLocalisationsRPC(
-          token,
-          rpcFilters,
-          (batch, clearBefore) => {
-            // Rendu progressif (apercu) — le rendu final est fait plus bas une fois tous les batches recus
-            const enrichis = enrichirLocations(batch);
-            const modeCouleurPreview = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-            renderPoints(enrichis, clearBefore, false, modeCouleurPreview);
-            // Mettre a jour le compteur en temps reel
-            const posEl = document.getElementById('positionsCount');
-            if (posEl) {
-              const current = parseInt(posEl.textContent) || 0;
-              posEl.textContent = clearBefore ? batch.length : current + batch.length;
-            }
-            // Barre de progression overlay — toujours affichee, sans condition de volume
-            _batchTotal = clearBefore ? batch.length : _batchTotal + batch.length;
-            if (progEl) progEl.style.display = 'block';
-            const pct = totalPositions > 0
-              ? Math.min(100, Math.round((_batchTotal / totalPositions) * 100))
-              : 100;
+        if (!toutesPositions && n) {
+          // Chemin A — N dernieres positions par animal via RPC (un seul batch attendu).
+          // Sur-chargement preventif : demande aussi le N couramment utilise par le mode
+          // Trajectoire (si fixe) pour pre-alimenter le cache, sans changer ce qui est affiche
+          // (troncature a besoinLimitParAnimal plus bas).
+          limitParAnimalCharge = calculerNEffectifPositions(n);
+          rpcFilters.limit_par_animal = limitParAnimalCharge;
+          locations = await fetchLocalisationsRPC(token, rpcFilters, () => {
             const bar = document.getElementById('mapLoadingBar');
             const pctEl = document.getElementById('mapLoadingPct');
-            if (bar) bar.style.width = pct + '%';
-            if (pctEl) pctEl.textContent = pct + '%';
+            if (progEl) progEl.style.display = 'block';
+            if (bar) bar.style.width = '100%';
+            if (pctEl) pctEl.textContent = '100%';
+          });
+        } else {
+          // Chemin B — Toutes positions, avec modal volume + pagination RPC
+          const totalPositions = await fetchCountLocations(token, rpcFilters);
+
+          let confirmed = true;
+          if (totalPositions > SEUIL_ALERTE_VOLUME) {
+            const modal = document.getElementById('modalVolume');
+            document.getElementById('modalVolumeCount').textContent = totalPositions.toLocaleString('fr-FR');
+            modal.style.display = 'flex';
+
+            confirmed = await new Promise(resolve => {
+              document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(false); };
+              document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(true); };
+            });
+
+            if (!confirmed) {
+              hideMapLoading();
+              unlockSidebar();
+              if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+              mettreAJourBoutonAppliquer();
+              return false;
+            }
           }
-        );
+
+          let _batchTotal = 0;
+          locations = await fetchLocalisationsRPC(
+            token,
+            rpcFilters,
+            (batch, clearBefore) => {
+              // Rendu progressif (apercu) — le rendu final est fait plus bas une fois tous les batches recus
+              const enrichis = enrichirLocations(batch);
+              const modeCouleurPreview = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+              renderPoints(enrichis, clearBefore, false, modeCouleurPreview);
+              // Mettre a jour le compteur en temps reel
+              const posEl = document.getElementById('positionsCount');
+              if (posEl) {
+                const current = parseInt(posEl.textContent) || 0;
+                posEl.textContent = clearBefore ? batch.length : current + batch.length;
+              }
+              // Barre de progression overlay — toujours affichee, sans condition de volume
+              _batchTotal = clearBefore ? batch.length : _batchTotal + batch.length;
+              if (progEl) progEl.style.display = 'block';
+              const pct = totalPositions > 0
+                ? Math.min(100, Math.round((_batchTotal / totalPositions) * 100))
+                : 100;
+              const bar = document.getElementById('mapLoadingBar');
+              const pctEl = document.getElementById('mapLoadingPct');
+              if (bar) bar.style.width = pct + '%';
+              if (pctEl) pctEl.textContent = pct + '%';
+            }
+          );
+        }
+
+        locations = enrichirLocations(locations);
+        _cachePositions = locations;
+        _dernierChargement = { portee: porteeActuelle, limitParAnimal: limitParAnimalCharge };
+        if (besoinLimitParAnimal !== null && limitParAnimalCharge > besoinLimitParAnimal) {
+          // Sur-charge : ce qui est affiche reste limite au besoin reellement demande
+          locations = deriverNDernieresPositionsParAnimal(locations, besoinLimitParAnimal);
+        }
       }
 
       if (toutesPositions) { setDernierNPositions('toutes'); }
@@ -422,7 +647,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       mettreAJourBadgeNPositions();
 
       // Rendu carte
-      locations = enrichirLocations(locations);
       clearTrajectoire();
       clearMapPoints();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
@@ -433,7 +657,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const idsPresents = new Set(locations.map(l => String(l.ani_id)));
       mettreAJourIndividus(getAnimals().filter(a => idsPresents.has(String(a.ani_id))));
 
-      ouvrirPanneauSiNecessaire();
       const mapScreen = document.getElementById('mapScreen');
       if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
         mapScreen?.classList.add('panel-open');
@@ -444,19 +667,21 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       mettreAJourLegende('positions');
       setLabelDatetime('Date de localisation');
 
-      setTimeout(() => {
-        const extent = getGpsSource().getExtent();
-        if (!extent || ol.extent.isEmpty(extent)) return;
+      if (!sansZoomAuto && !porteeIdentique) {
+        setTimeout(() => {
+          const extent = getGpsSource().getExtent();
+          if (!extent || ol.extent.isEmpty(extent)) return;
 
-        const [minX, minY, maxX, maxY] = extent;
-        const isPoint = minX === maxX && minY === maxY;
+          const [minX, minY, maxX, maxY] = extent;
+          const isPoint = minX === maxX && minY === maxY;
 
-        if (isPoint) {
-          getMap().getView().animate({ center: [minX, minY], zoom: ZOOM_FILTER_SINGLE, duration: 400 });
-        } else {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
-        }
-      }, 400);
+          if (isPoint) {
+            getMap().getView().animate({ center: [minX, minY], zoom: ZOOM_FILTER_SINGLE, duration: 400 });
+          } else {
+            getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_FILTER_MULTI, duration: 400 });
+          }
+        }, 400);
+      }
 
       window._derniersFiltresAppliques = {
         ani_id: idsAChercher,
@@ -507,9 +732,9 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
 
       const inputNTraj = document.getElementById('inputNDernieres');
       const nModeToutesCheck = document.getElementById('nModeToutes');
-      const nValTraj = nOverride !== null ? String(nOverride) : (inputNTraj?.value || '25');
+      const nValTraj = nOverride !== null ? String(nOverride) : (inputNTraj?.value || '5');
       const toutesPositionsTraj = nValTraj === 'toutes' || nModeToutesCheck?.checked;
-      const nTraj = toutesPositionsTraj ? null : (parseInt(nValTraj) || 25);
+      const nTraj = toutesPositionsTraj ? null : (parseInt(nValTraj) || 5);
 
       const hasSaisonnaliteTraj = periodesT.some(p => p.source === 'saisonnalite' || p.source === 'saisonnalite_all');
 
@@ -517,91 +742,123 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       const saisonFromApiTraj = hasSaisonnaliteTraj ? formatSaisonPourAPI(document.getElementById('saisonFrom')?.value) : null;
       const saisonToApiTraj = hasSaisonnaliteTraj ? formatSaisonPourAPI(document.getElementById('saisonTo')?.value) : null;
 
-      const rpcFiltersTraj = construireFiltersRPC(token, idsPourRPC, {
-        ...filters,
-        date_from: dateFromApi || null,
-        date_to: dateToApi || null,
-        saisonFrom: saisonFromApiTraj,
-        saisonTo: saisonToApiTraj,
-        annees: anneesSelectionneesTraj.length > 0 ? anneesSelectionneesTraj : null
-      }, suivisSeulement);
+      const porteeActuelleTraj = construirePorteeComparaison(
+        idsAChercher, dateFromApi, dateToApi, saisonFromApiTraj, saisonToApiTraj,
+        anneesSelectionneesTraj, filters, suivisSeulement
+      );
+      const besoinLimitParAnimalTraj = toutesPositionsTraj ? null : nTraj;
 
-      if (!toutesPositionsTraj && nTraj) {
-        // Chemin C — N dernieres positions par animal via RPC (un seul batch attendu)
-        rpcFiltersTraj.limit_par_animal = nTraj;
-        locations = await fetchLocalisationsRPC(token, rpcFiltersTraj, () => {
-          const bar = document.getElementById('mapLoadingBar');
-          const pctEl = document.getElementById('mapLoadingPct');
-          if (progEl) progEl.style.display = 'block';
-          if (bar) bar.style.width = '100%';
-          if (pctEl) pctEl.textContent = '100%';
-        });
-      } else {
-        // Chemin D — Toutes positions, avec modal volume + pagination RPC
-        const totalTrajPositions = await fetchCountLocations(token, rpcFiltersTraj);
+      // Capture AVANT toute mutation de _dernierChargement — cf. commentaire equivalent
+      // en branche Positions.
+      const porteeIdentiqueTraj = _dernierChargement !== null &&
+        JSON.stringify(_dernierChargement.portee) === JSON.stringify(porteeActuelleTraj);
 
-        let confirmedTraj = true;
+      // Reutilisation client — meme mecanisme que la branche Positions, cf. peutReutiliser().
+      let reutiliseSansReseauTraj = false;
+      if (peutReutiliser(porteeActuelleTraj, besoinLimitParAnimalTraj)) {
+        locations = deriverPourBesoin(besoinLimitParAnimalTraj);
+        reutiliseSansReseauTraj = true;
+      }
 
-        if (totalTrajPositions > SEUIL_ALERTE_VOLUME) {
-          const modal = document.getElementById('modalVolume');
-          document.getElementById('modalVolumeCount').textContent = totalTrajPositions.toLocaleString('fr-FR');
+      let limitParAnimalChargeTraj = besoinLimitParAnimalTraj;
 
-          const sousTexte = modal.querySelector('.modal-volume-sous');
-          const texteOriginalSous = sousTexte.textContent;
-          sousTexte.textContent = 'Afficher un grand nombre de trajectoires peut rendre la carte illisible avec de nombreux traits superposés, en plus d\'entraîner des lenteurs importantes. Vous pouvez affiner votre recherche avec les filtres de date, saison, sexe, population ou individu pour réduire le nombre de résultats.';
+      if (!reutiliseSansReseauTraj) {
+        const rpcFiltersTraj = construireFiltersRPC(token, idsPourRPC, {
+          ...filters,
+          date_from: dateFromApi || null,
+          date_to: dateToApi || null,
+          saisonFrom: saisonFromApiTraj,
+          saisonTo: saisonToApiTraj,
+          annees: anneesSelectionneesTraj.length > 0 ? anneesSelectionneesTraj : null
+        }, suivisSeulement);
 
-          modal.style.display = 'flex';
-
-          confirmedTraj = await new Promise(resolve => {
-            document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(false); };
-            document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(true); };
-          });
-
-          sousTexte.textContent = texteOriginalSous;
-
-          if (!confirmedTraj) {
-            hideMapLoading();
-            unlockSidebar();
-            if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
-            mettreAJourBoutonAppliquer();
-            return false;
-          }
-        }
-
-        let _batchTotal = 0;
-        locations = await fetchLocalisationsRPC(
-          token,
-          rpcFiltersTraj,
-          (batch, clearBefore) => {
-            // Rendu progressif (apercu) — le rendu final est fait plus bas une fois tous les batches recus
-            const enrichis = enrichirLocations(batch);
-            const modeCouleurPreview = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-            renderPoints(enrichis, clearBefore, true, modeCouleurPreview);
-            // Mettre a jour le compteur en temps reel
-            const posEl = document.getElementById('positionsCount');
-            if (posEl) {
-              const current = parseInt(posEl.textContent) || 0;
-              posEl.textContent = clearBefore ? batch.length : current + batch.length;
-            }
-            // Barre de progression overlay — toujours affichee, sans condition de volume
-            _batchTotal = clearBefore ? batch.length : _batchTotal + batch.length;
-            if (progEl) progEl.style.display = 'block';
-            const pct = totalTrajPositions > 0
-              ? Math.min(100, Math.round((_batchTotal / totalTrajPositions) * 100))
-              : 100;
+        if (!toutesPositionsTraj && nTraj) {
+          // Chemin C — N dernieres positions par animal via RPC (un seul batch attendu).
+          // Sur-chargement preventif : demande aussi le N couramment utilise par le mode
+          // Positions (si fixe) pour pre-alimenter le cache, sans changer ce qui est affiche
+          // (troncature a besoinLimitParAnimalTraj plus bas).
+          limitParAnimalChargeTraj = calculerNEffectifTrajectoire(nTraj);
+          rpcFiltersTraj.limit_par_animal = limitParAnimalChargeTraj;
+          locations = await fetchLocalisationsRPC(token, rpcFiltersTraj, () => {
             const bar = document.getElementById('mapLoadingBar');
             const pctEl = document.getElementById('mapLoadingPct');
-            if (bar) bar.style.width = pct + '%';
-            if (pctEl) pctEl.textContent = pct + '%';
+            if (progEl) progEl.style.display = 'block';
+            if (bar) bar.style.width = '100%';
+            if (pctEl) pctEl.textContent = '100%';
+          });
+        } else {
+          // Chemin D — Toutes positions, avec modal volume + pagination RPC
+          const totalTrajPositions = await fetchCountLocations(token, rpcFiltersTraj);
+
+          let confirmedTraj = true;
+
+          if (totalTrajPositions > SEUIL_ALERTE_VOLUME) {
+            const modal = document.getElementById('modalVolume');
+            document.getElementById('modalVolumeCount').textContent = totalTrajPositions.toLocaleString('fr-FR');
+
+            const sousTexte = modal.querySelector('.modal-volume-sous');
+            const texteOriginalSous = sousTexte.textContent;
+            sousTexte.textContent = 'Afficher un grand nombre de trajectoires peut rendre la carte illisible avec de nombreux traits superposés, en plus d\'entraîner des lenteurs importantes. Vous pouvez affiner votre recherche avec les filtres de date, saison, sexe, population ou individu pour réduire le nombre de résultats.';
+
+            modal.style.display = 'flex';
+
+            confirmedTraj = await new Promise(resolve => {
+              document.getElementById('modalVolumeBtnAnnuler').onclick = () => { modal.style.display = 'none'; resolve(false); };
+              document.getElementById('modalVolumeBtnConfirmer').onclick = () => { modal.style.display = 'none'; resolve(true); };
+            });
+
+            sousTexte.textContent = texteOriginalSous;
+
+            if (!confirmedTraj) {
+              hideMapLoading();
+              unlockSidebar();
+              if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+              mettreAJourBoutonAppliquer();
+              return false;
+            }
           }
-        );
+
+          let _batchTotal = 0;
+          locations = await fetchLocalisationsRPC(
+            token,
+            rpcFiltersTraj,
+            (batch, clearBefore) => {
+              // Rendu progressif (apercu) — le rendu final est fait plus bas une fois tous les batches recus
+              const enrichis = enrichirLocations(batch);
+              const modeCouleurPreview = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+              renderPoints(enrichis, clearBefore, true, modeCouleurPreview);
+              // Mettre a jour le compteur en temps reel
+              const posEl = document.getElementById('positionsCount');
+              if (posEl) {
+                const current = parseInt(posEl.textContent) || 0;
+                posEl.textContent = clearBefore ? batch.length : current + batch.length;
+              }
+              // Barre de progression overlay — toujours affichee, sans condition de volume
+              _batchTotal = clearBefore ? batch.length : _batchTotal + batch.length;
+              if (progEl) progEl.style.display = 'block';
+              const pct = totalTrajPositions > 0
+                ? Math.min(100, Math.round((_batchTotal / totalTrajPositions) * 100))
+                : 100;
+              const bar = document.getElementById('mapLoadingBar');
+              const pctEl = document.getElementById('mapLoadingPct');
+              if (bar) bar.style.width = pct + '%';
+              if (pctEl) pctEl.textContent = pct + '%';
+            }
+          );
+        }
+
+        locations = enrichirLocations(locations);
+        _cachePositions = locations;
+        _dernierChargement = { portee: porteeActuelleTraj, limitParAnimal: limitParAnimalChargeTraj };
+        if (besoinLimitParAnimalTraj !== null && limitParAnimalChargeTraj > besoinLimitParAnimalTraj) {
+          locations = deriverNDernieresPositionsParAnimal(locations, besoinLimitParAnimalTraj);
+        }
       }
 
       if (toutesPositionsTraj) { setDernierNTrajectoire('toutes'); }
       else if (nTraj) { setDernierNTrajectoire(String(nTraj)); }
       mettreAJourBadgeNPositions();
 
-      locations = enrichirLocations(locations);
       clearMapPoints();
       clearTrajectoire();
       const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
@@ -611,7 +868,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       mettreAJourPanneau(locations);
       const idsPresentsTraj = new Set(locations.map(l => String(l.ani_id)));
       mettreAJourIndividus(getAnimals().filter(a => idsPresentsTraj.has(String(a.ani_id))));
-      ouvrirPanneauSiNecessaire();
       const mapScreenTraj = document.getElementById('mapScreen');
       if (document.getElementById('sidebarRight')?.classList.contains('visible')) {
         mapScreenTraj?.classList.add('panel-open');
@@ -623,15 +879,17 @@ export async function applyFilters(token, modeForce = null, nOverride = null) {
       if (posEl) posEl.textContent = count;
       mettreAJourLegende('trajectoire');
 
-      setTimeout(() => {
-        const extent = getGpsSource().getExtent();
-        if (!extent || ol.extent.isEmpty(extent)) return;
-        if (idsAChercher.length === 1) {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
-        } else if (idsAChercher.length > 1) {
-          getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
-        }
-      }, 300);
+      if (!sansZoomAuto && !porteeIdentiqueTraj) {
+        setTimeout(() => {
+          const extent = getGpsSource().getExtent();
+          if (!extent || ol.extent.isEmpty(extent)) return;
+          if (idsAChercher.length === 1) {
+            getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
+          } else if (idsAChercher.length > 1) {
+            getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
+          }
+        }, 300);
+      }
 
       window._derniersFiltresAppliques = {
         ani_id: idsAChercher,
@@ -779,6 +1037,13 @@ export async function mettreAJourListeParDate() {
     if (df || dt) {
       console.warn('[mettreAJourListeParDate] Périodes vides malgré dateFrom/dateTo :', df, dt);
     }
+    // Reinitialiser un eventuel grisage residuel laisse par une requete precedente
+    // (en vol ou perimee, cf. bloc finally plus bas) — ce chemin ne lance aucune
+    // requete, la liste ne doit jamais rester grisee en attendant une reponse qui
+    // ne viendra pas.
+    document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+      label.style.opacity = '';
+    });
     if (requeteId !== _derniereRequeteId) return;
     filtrerListeIndividus();
     return;
@@ -853,19 +1118,25 @@ export async function mettreAJourListeParDate() {
     const results = await Promise.all(promises);
     results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
 
-    if (requeteId !== _derniereRequeteId) return;
+    // Guard anti-peremption — n'applique les donnees que si aucune requete plus
+    // recente n'a demarre entretemps (evite d'ecraser un resultat plus a jour deja
+    // affiche). Ne gouverne plus le nettoyage de l'opacity, cf. finally ci-dessous :
+    // une requete perimee doit quand meme lever son propre grisage.
+    if (requeteId === _derniereRequeteId) {
+      // Mettre en cache le résultat
+      _derniereCleperiode = cleperiode;
+      _dernierIdsperiode = new Set(idsUnion);
 
-    // Mettre en cache le résultat
-    _derniereCleperiode = cleperiode;
-    _dernierIdsperiode = new Set(idsUnion);
-
-    _appliquerFiltreListeAvecIds(idsUnion);
-
+      _appliquerFiltreListeAvecIds(idsUnion);
+    }
+  } catch (err) {
+    console.error('[mettreAJourListeParDate] Erreur:', err);
+  } finally {
+    // Toujours execute — succes, erreur, ou requete perimee — pour ne jamais
+    // laisser la liste grisee indefiniment (cf. bug retraits rapides #selectAnnee).
     document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
       label.style.opacity = '';
     });
-  } catch (err) {
-    console.error('[mettreAJourListeParDate] Erreur:', err);
   }
 }
 function _appliquerFiltreListeAvecIds(idsAvecDonnees) {
