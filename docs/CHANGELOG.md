@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.69.0] - 2026-07-22
+
+### Optimisations basculement Positions/Trajectoire
+- fetchAniIdsAvecGeom supprime - derive de fetchAniCalendrier (evite un scan redondant de v_localisation)
+- locationsAll (limit=1) supprime dans startApp et reinitialiserTousLesFiltres - derive de locationsSuiviesRaw
+- Unification du nombre de positions (N) entre les modes Positions et Trajectoire - un seul champ partage au lieu de deux, configurable via N_POSITIONS_DEFAUT
+- Clamp automatique a N_POSITIONS_MIN_TRAJECTOIRE (2) quand le mode Trajectoire est insuffisant pour tracer un segment
+- Boutons Positions/Trajectoire ne rechargent plus depuis le reseau et n'appliquent plus les filtres UI - basculement pur via rebasculerModeAffichage(), reutilisant les dernieres donnees validees
+- Bouton Trajectoire grise automatiquement quand les donnees validees ne couvrent pas le minimum de positions necessaire
+- Cache de basculement enregistre des le chargement initial (enregistrerChargementInitial) - evite une requete reseau des le premier clic sur Trajectoire
+- Coherence du cache et de l'etat du bouton Trajectoire apres Reinitialiser les filtres
+- Correction bug _nModeManuel efface a chaque basculement de mode - le choix manuel de N restait perdu apres un aller-retour Positions/Trajectoire
+- Zoom automatique desactive au changement de N seul (portee de filtres identique) - conserve au changement reel de filtres
+- Panneau attributaire ne s'ouvre plus automatiquement (filtre applique ou changement de mode) - seul le bouton dedie l'ouvre desormais
+
 ## [0.68.0] - 2026-07-20
 
 ### Corrections suite retours Ludovic (session 2)
