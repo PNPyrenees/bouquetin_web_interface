@@ -1404,6 +1404,20 @@ input[type="checkbox"] {
   background: var(--map-ui-bg-active);
 }
 
+/* Cf. .basemap-scroll-btn:disabled — meme convention grise/non-cliquable. Place apres
+   .toolbar-btn.active pour gagner le depart a egalite de specificite si le bouton
+   reste "active" (mode en cours d'affichage) alors qu'il devient indisponible. */
+.toolbar-btn:disabled {
+  opacity: 0.3;
+  pointer-events: none;
+  cursor: not-allowed;
+  background: var(--map-ui-bg);
+}
+
+.toolbar-btn:disabled img {
+  opacity: 0.9;
+}
+
 /* Separateur entre boutons */
 .toolbar-btn + .toolbar-btn {
   border-top: 1px solid #f0f0f0;
