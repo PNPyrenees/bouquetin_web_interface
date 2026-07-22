@@ -1,8 +1,8 @@
-import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAniIdsAvecGeom, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
-import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE } from './config.js';
+import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
+import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
-import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques } from './filters.js';
+import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 
 /**
  * VARIABLES GLOBALES
@@ -23,8 +23,9 @@ let mapListenersInitialized = false;
 let mapInitialized = false;
 let temporelInitialized = false;
 
-let _dernierNPositions = '5';
-let _dernierNTrajectoire = '25';
+// N partage entre les modes Positions et Trajectoire — un seul champ visuel
+// (#inputNDernieres), plus de valeur "swappee" silencieusement selon le mode actif.
+let _dernierNPartage = String(N_POSITIONS_DEFAUT);
 let _nEstToutes = false;
 let _nModeManuel = false;
 let _filtreGeom = null;
@@ -39,8 +40,15 @@ export function getAniCalendrier() { return _aniCalendrier; }
 export function setAnimals(val) { animals = val; }
 export function setActiveIds(val) { activeIds = val; }
 export function setCurrentToken(val) { currentToken = val; }
-export function setDernierNPositions(val) { _dernierNPositions = val; }
-export function setDernierNTrajectoire(val) { _dernierNTrajectoire = val; }
+// Les 4 accesseurs ci-dessous lisent/ecrivent tous _dernierNPartage — conserves
+// distincts (au lieu d'un seul getDernierNPartage/setDernierNPartage) uniquement pour
+// ne pas casser calculerNEffectifPositions/calculerNEffectifTrajectoire (filters.js),
+// qui les appellent encore pour lire "le N de l'autre mode" (devenu la meme valeur
+// partagee — laisse tel quel pour l'instant, cf. echange du 22/07).
+export function getDernierNPositions() { return _dernierNPartage; }
+export function getDernierNTrajectoire() { return _dernierNPartage; }
+export function setDernierNPositions(val) { _dernierNPartage = val; }
+export function setDernierNTrajectoire(val) { _dernierNPartage = val; }
 export function getFiltreGeom() { return _filtreGeom; }
 export function setFiltreGeom(val) { _filtreGeom = val; }
 
@@ -77,6 +85,29 @@ export function enrichirAnimauxAvecPositions(locations) {
         derniere_position: dates[dates.length - 1] || null
       };
     });
+}
+
+/**
+ * Deduit les N positions les plus recentes par animal a partir d'un lot de positions
+ * deja charge (limit_par_animal >= N) — evite une requete RPC separee en limit_par_animal=N
+ * pour obtenir la meme information. Utilisee avec n=1 pour activeIds/annees/derniere position
+ * (cf. startApp/reinitialiserTousLesFiltres), et avec n=valeur du filtre "N dernieres positions"
+ * par filters.js (reutilisation client Trajectoire->Positions, cf. peutReutiliserPositions).
+ */
+export function deriverNDernieresPositionsParAnimal(locations, n = 1) {
+  const parAnimal = new Map();
+  locations.forEach(loc => {
+    if (!parAnimal.has(loc.ani_id)) parAnimal.set(loc.ani_id, []);
+    parAnimal.get(loc.ani_id).push(loc);
+  });
+  const resultat = [];
+  parAnimal.forEach(locs => {
+    const triees = [...locs].sort((a, b) =>
+      new Date(b.loc_datetime_local || b.loc_date_local) - new Date(a.loc_datetime_local || a.loc_date_local)
+    );
+    resultat.push(...triees.slice(0, n));
+  });
+  return resultat;
 }
 
 function initSidebarRight() {
@@ -176,12 +207,18 @@ function adapterSelectNPourMode(mode) {
   const nModeLimite = document.getElementById('nModeLimite');
   if (!inputN) return;
 
-  _nModeManuel = false;
-  const valeurCible = mode === 'trajectoire'
-    ? (_dernierNPositions === 'toutes' ? 'toutes' : _dernierNTrajectoire)
-    : _dernierNPositions;
-
-  if (valeurCible === 'toutes') {
+  // N partage entre les deux modes — plus de valeur distincte a selectionner selon
+  // "mode" (le clamp minimum Trajectoire est applique en amont, au clic sur
+  // #btnTrajectoire, avant l'appel a applyFilters() — cf. listener plus bas).
+  //
+  // _nModeManuel n'est PAS reinitialise ici — un basculement de mode ne doit pas
+  // effacer un choix manuel de N deja fait par l'utilisateur (bug confirme le
+  // 22/07 : un individu reste coche, et sans ce garde-fou le prochain appel a
+  // mettreAJourSelectN() force "Toutes" a nouveau, ecrasant silencieusement le
+  // choix). La reinitialisation de _nModeManuel reste geree explicitement par
+  // reinitialiserTousLesFiltres() uniquement (reset complet, geste utilisateur
+  // volontaire) — pas par un simple changement de mode.
+  if (_dernierNPartage === 'toutes') {
     _nEstToutes = true;
     if (nModeToutes) nModeToutes.checked = true;
     if (nModeLimite) nModeLimite.checked = false;
@@ -191,10 +228,26 @@ function adapterSelectNPourMode(mode) {
     if (nModeLimite) nModeLimite.checked = true;
     if (nModeToutes) nModeToutes.checked = false;
     inputN.disabled = false;
-    inputN.value = valeurCible || (mode === 'trajectoire' ? '25' : '5');
+    inputN.value = _dernierNPartage || String(N_POSITIONS_DEFAUT);
   }
   mettreAJourLabelN();
   mettreAJourBadgeNPositions();
+}
+
+/**
+ * Grise #btnTrajectoire quand le dernier chargement valide (cf. filters.js,
+ * peutAfficherTrajectoire()) ne couvre pas le minimum de N_POSITIONS_MIN_TRAJECTOIRE
+ * positions/animal — a appeler apres tout chargement reussi (initial ou via
+ * #btnApplyFilters) qui peut avoir change ce qui est en cache.
+ */
+function mettreAJourEtatBoutonTrajectoire() {
+  const btnTraj = document.getElementById('btnTrajectoire');
+  if (!btnTraj) return;
+  const disponible = peutAfficherTrajectoire();
+  btnTraj.disabled = !disponible;
+  btnTraj.title = disponible
+    ? 'Trajectoire'
+    : `Trajectoire indisponible — au moins ${N_POSITIONS_MIN_TRAJECTOIRE} positions par individu sont necessaires`;
 }
 
 function gererExclusiviteTemporel(actif) {
@@ -393,28 +446,30 @@ async function startApp(token) {
 
     const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
 
-    // Cinq requêtes en parallèle — fusion des anciens Bloc A (métadonnées) et
+    // Quatre requêtes en parallèle — fusion des anciens Bloc A (métadonnées) et
     // Bloc B (positions), qui étaient séquentiels sans dépendance entre eux.
     // populations/gestionnaires ne sont plus des requêtes dediees — extraites de fetchAnimals()
     const [
       animaux, programmations, ,
-      locationsAll, locationsSuiviesRaw, idsTranslocations
+      locationsSuiviesRaw, idsTranslocations
     ] = await Promise.all([
       fetchAnimals(token),
       fetchProgrammations(token),
       chargerProgrammationsGPS(token),
-      // Dernière position par animal suivi — pour activeIds, années, liste individus
-      fetchLocalisationsRPC(currentToken, {
-        ani_is_followed: true,
-        limit_par_animal: 1
-      }),
-      // N dernières positions par animal suivi — pour le rendu carte
+      // N dernières positions par animal suivi — pour le rendu carte. Sert aussi a
+      // deriver la derniere position par animal (activeIds, annees, liste individus,
+      // cf. deriverNDernieresPositionsParAnimal) au lieu d'un second appel RPC dedie a
+      // limit_par_animal=1 : n >= 1 dans tous les cas (defaut 5, min HTML "1" sur
+      // #inputNDernieres), donc la plus recente parmi les n deja recuperees est
+      // strictement identique a ce que retournerait cet appel separe.
       fetchLocalisationsRPC(currentToken, {
         ani_is_followed: true,
         limit_par_animal: n
       }),
       fetchTranslocationIds(token)
     ]);
+
+    const locationsAll = deriverNDernieresPositionsParAnimal(locationsSuiviesRaw, 1);
 
     setAnimals(animaux);
     animaux.forEach(a => {
@@ -481,9 +536,30 @@ async function startApp(token) {
       await exporterCSV(currentToken, filtresExport);
     });
 
-    // Calendrier en arrière-plan — ne bloque pas le rendu carte
+    // Calendrier en arrière-plan — ne bloque pas le rendu carte. Sert aussi a deriver les
+    // animaux avec au moins une position valide (memes filtres WHERE que l'ancien
+    // fetchAniIdsAvecGeom sur v_localisation : loc_anomalie/loc_outlier/geom, cf. api.js) —
+    // evite un second scan complet de la table pour la meme information.
     fetchAniCalendrier(currentToken).then(calendrier => {
       _aniCalendrier = calendrier;
+
+      const idsAvecGeom = new Set(calendrier.keys());
+      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+        const checkbox = label.querySelector('input');
+        const aniId = checkbox?.value;
+        if (aniId && !idsAvecGeom.has(String(aniId))) {
+          label.style.display = 'none';
+          label.dataset.sansGeom = 'true';
+        }
+      });
+
+      // Enregistre le chargement initial dans le cache de reutilisation de filters.js —
+      // sans cela, le premier basculement vers Trajectoire repart toujours en reseau meme
+      // si les N sont identiques (startApp() fait son propre fetch, hors applyFilters()).
+      // Fait ICI (apres le flaggage sansGeom ci-dessus, pas avant) pour que idsAChercher
+      // corresponde exactement a ce qu'un futur applyFilters() calculerait.
+      enregistrerChargementInitial(locationsSuiviesRaw, n);
+      mettreAJourEtatBoutonTrajectoire();
     }).catch(err => {
       if (err.name !== 'AbortError') {
         console.warn('fetchAniCalendrier échoué:', err);
@@ -558,22 +634,6 @@ async function startApp(token) {
       ani_is_followed: true,
       limit_par_animal: n
     };
-
-    // Identifier les animaux avec géométrie en arrière-plan — ne bloque pas le rendu carte
-    fetchAniIdsAvecGeom(currentToken).then(idsAvecGeom => {
-      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-        const checkbox = label.querySelector('input');
-        const aniId = checkbox?.value;
-        if (aniId && !idsAvecGeom.has(String(aniId))) {
-          label.style.display = 'none';
-          label.dataset.sansGeom = 'true';
-        }
-      });
-    }).catch(err => {
-      if (err.name !== 'AbortError') {
-        console.warn('fetchAniIdsAvecGeom échoué:', err);
-      }
-    });
 
     mettreAJourPanneau(locationsSuivies);
     const posEl = document.getElementById('positionsCount');
@@ -924,8 +984,8 @@ async function startApp(token) {
       if (!nModeToutes.checked) return;
       _nEstToutes = true;
       _nModeManuel = true;
-      // Ne pas modifier _dernierNPositions/_dernierNTrajectoire ici
-      // Ces variables ne sont mises a jour qu apres un applyFilters() reussi
+      // Ne pas modifier _dernierNPartage ici — mise a jour uniquement apres un
+      // applyFilters() reussi
       mettreAJourLabelN();
       decocherCochesAutomatiques();
       mettreAJourBoutonAppliquer();
@@ -936,9 +996,7 @@ async function startApp(token) {
       _nEstToutes = false;
       _nModeManuel = true;
       inputN.disabled = false;
-      const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-      const derniere = isTrajectoire ? _dernierNTrajectoire : _dernierNPositions;
-      if (derniere && derniere !== 'toutes') inputN.value = derniere;
+      if (_dernierNPartage && _dernierNPartage !== 'toutes') inputN.value = _dernierNPartage;
       mettreAJourLabelN();
       mettreAJourBoutonAppliquer();
     });
@@ -955,8 +1013,8 @@ async function startApp(token) {
             nModeLimite.checked = true;
             if (nModeToutes) nModeToutes.checked = false;
           }
-          // Ne pas modifier _dernierNPositions/_dernierNTrajectoire ici
-          // Ces variables ne sont mises a jour qu apres un applyFilters() reussi
+          // Ne pas modifier _dernierNPartage ici — mise a jour uniquement apres un
+          // applyFilters() reussi
           mettreAJourLabelN();
           mettreAJourBoutonAppliquer();
         }
@@ -975,6 +1033,18 @@ async function startApp(token) {
 
     mettreAJourFiltresActifs();
     filtrerListeIndividus();
+
+    // Enregistrement precoce du cache de reutilisation (filters.js) — fetchAniCalendrier()
+    // (ci-dessus) interroge toute v_localisation sans pagination et peut prendre plusieurs
+    // secondes : attendre sa resolution pour enregistrer le cache (seul emplacement avant
+    // ce correctif) le rendait inutile des que l'utilisateur cliquait Trajectoire avant
+    // cette resolution — le cas courant, pas un cas limite rare. Ici, ni ce calcul ni un
+    // futur calcul dans applyFilters() n'excluent encore les individus sansGeom (le
+    // flaggage n'a pas encore eu lieu des deux cotes) — les portees correspondent donc
+    // quand meme. Le second enregistrement (dans le .then() de fetchAniCalendrier) prend
+    // le relais avec la liste corrigee pour les clics plus tardifs.
+    enregistrerChargementInitial(locationsSuiviesRaw, n);
+    mettreAJourEtatBoutonTrajectoire();
 
     const btnApply = document.getElementById('btnApplyFilters');
     if (btnApply) {
@@ -1076,45 +1146,31 @@ async function startApp(token) {
       const btnPos = document.getElementById('btnPositions');
       const btnTraj = document.getElementById('btnTrajectoire');
       if (btnPos && btnTraj) {
+        // Basculement pur — ne fait plus jamais appel a applyFilters() (donc jamais au
+        // reseau ni au DOM des filtres) : ne fait que re-rendre, sous l'autre mode, les
+        // dernieres donnees reellement validees par un clic sur #btnApplyFilters (ou le
+        // chargement initial), cf. rebasculerModeAffichage() dans filters.js. Un filtre
+        // modifie dans l'UI sans avoir clique "Appliquer" ne peut donc plus jamais fuiter
+        // dans l'affichage via ces boutons.
         btnPos.addEventListener('click', () => {
           decocherCochesAutomatiques();
-
-          const nCiblePos = _dernierNPositions;
-
-          applyFilters(currentToken, 'positions', nCiblePos).then(confirme => {
-            if (confirme !== false) {
-              adapterSelectNPourMode('positions');
-              btnPos.classList.add('active');
-              btnTraj.classList.remove('active');
-              clearTrajectoire();
-              setLabelDatetime('Date de localisation');
-              mettreAJourLegende('positions'); // ← correction timing
-            }
-          });
+          const besoin = _dernierNPartage === 'toutes' ? null : (parseInt(_dernierNPartage) || null);
+          const ok = rebasculerModeAffichage('positions', besoin);
+          if (ok !== false) {
+            adapterSelectNPourMode('positions');
+            btnPos.classList.add('active');
+            btnTraj.classList.remove('active');
+          }
         });
         btnTraj.addEventListener('click', () => {
-          const nCibleTraj = _dernierNPositions === 'toutes' ? 'toutes' : _dernierNTrajectoire;
-
-          applyFilters(currentToken, 'trajectoire', nCibleTraj).then(confirme => {
-            if (confirme !== false) {
-              adapterSelectNPourMode('trajectoire');
-              btnTraj.classList.add('active');
-              btnPos.classList.remove('active');
-              setLabelDatetime('Date/Heure');
-              mettreAJourLegende('trajectoire'); // ← correction timing
-              setTimeout(() => {
-                const ids = window._idsAChercherTraj || [];
-                if (ids.length === 0) return;
-                const extent = getGpsSource().getExtent();
-                if (!extent || ol.extent.isEmpty(extent)) return;
-                if (ids.length === 1) {
-                  getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_SINGLE, duration: 400 });
-                } else {
-                  getMap().getView().fit(extent, { padding: [60, 60, 60, 60], maxZoom: ZOOM_TRAJECTOIRE_MULTI, duration: 400 });
-                }
-              }, 800);
-            }
-          });
+          if (btnTraj.disabled) return;
+          const besoin = _dernierNPartage === 'toutes' ? null : (parseInt(_dernierNPartage) || null);
+          const ok = rebasculerModeAffichage('trajectoire', besoin);
+          if (ok !== false) {
+            adapterSelectNPourMode('trajectoire');
+            btnTraj.classList.add('active');
+            btnPos.classList.remove('active');
+          }
         });
       }
 
@@ -1270,7 +1326,7 @@ function initSidebarBadges(token) {
 
   const btnApply = document.getElementById('btnApplyFilters');
   if (btnApply) {
-    btnApply.addEventListener('click', () => applyFilters(token));
+    btnApply.addEventListener('click', () => applyFilters(token).then(() => mettreAJourEtatBoutonTrajectoire()));
   }
 
   document.querySelectorAll('input[name="modeCouleur"]').forEach(radio => {
@@ -1660,10 +1716,8 @@ export function mettreAJourSelectN() {
     if (nModeLimite) nModeLimite.checked = true;
     if (nModeToutes) nModeToutes.checked = false;
     inputN.disabled = false;
-    const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
-    const derniere = isTrajectoire ? _dernierNTrajectoire : _dernierNPositions;
-    if (derniere && derniere !== 'toutes') {
-      inputN.value = derniere;
+    if (_dernierNPartage && _dernierNPartage !== 'toutes') {
+      inputN.value = _dernierNPartage;
     }
     mettreAJourLabelN();
   }
@@ -1758,8 +1812,7 @@ async function reinitialiserTousLesFiltres() {
 
     _nModeManuel = false;
     _nEstToutes = false;
-    _dernierNPositions = '5';
-    _dernierNTrajectoire = '25';
+    _dernierNPartage = String(N_POSITIONS_DEFAUT);
     adapterSelectNPourMode('positions');
 
     const inputNReinit = document.getElementById('inputNDernieres');
@@ -1818,11 +1871,11 @@ async function reinitialiserTousLesFiltres() {
       try {
         const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
 
-        const [locationsAllReinit, locationsSuiviesRaw] = await Promise.all([
-          fetchLocalisationsRPC(currentToken, { ani_is_followed: true, limit_par_animal: 1 }),
-          fetchLocalisationsRPC(currentToken, { ani_is_followed: true, limit_par_animal: n })
-        ]);
+        // N dernieres positions par animal suivi — sert aussi a deriver activeIds
+        // (position la plus recente par animal), cf. deriverNDernieresPositionsParAnimal.
+        const locationsSuiviesRaw = await fetchLocalisationsRPC(currentToken, { ani_is_followed: true, limit_par_animal: n });
 
+        const locationsAllReinit = deriverNDernieresPositionsParAnimal(locationsSuiviesRaw, 1);
         setActiveIds(new Set(locationsAllReinit.map(l => l.ani_id)));
         const locationsSuivies = enrichirLocations(locationsSuiviesRaw);
         clearMapPoints();
@@ -1836,6 +1889,15 @@ async function reinitialiserTousLesFiltres() {
         mettreAJourLegende();
         setLabelDatetime('Date de localisation');
         filtrerListeIndividus();
+
+        // Reenregistre le cache de reutilisation (filters.js) avec les donnees
+        // fraichement rechargees par le reset — sans cela, _cachePositions/_dernierChargement
+        // restaient sur l'ancien etat (Reinitialiser fait son propre fetch hors
+        // applyFilters()) et un clic ulterieur sur Trajectoire rebasculait sur des
+        // donnees perimees, cf. rebasculerModeAffichage(). Appele apres filtrerListeIndividus()
+        // ci-dessus pour que idsAChercher corresponde a l'etat de visibilite post-reset.
+        enregistrerChargementInitial(locationsSuiviesRaw, n);
+        mettreAJourEtatBoutonTrajectoire();
 
         setTimeout(() => {
           const extent = getGpsSource().getExtent();
