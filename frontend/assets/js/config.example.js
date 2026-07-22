@@ -32,6 +32,12 @@ export const ROLE_INITIALES = {
 
 export const SEUIL_ALERTE_VOLUME = 40000;
 
+// Nombre de positions par defaut (champ #inputNDernieres, partage entre les modes
+// Positions et Trajectoire) et minimum impose au mode Trajectoire — une trajectoire
+// necessite au moins 2 points pour tracer un segment.
+export const N_POSITIONS_DEFAUT = 5;
+export const N_POSITIONS_MIN_TRAJECTOIRE = 2;
+
 export const CLASSES_AGE = {
   F: [
     { label: 'Cabri',      min: 0, max: 0 },
