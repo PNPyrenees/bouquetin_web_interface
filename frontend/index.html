@@ -263,18 +263,18 @@
           </svg>
         </button>
         <button id="btnPositions" class="toolbar-btn toolbar-mode active" title="Positions">
-          <img src="assets/img/location-dot-solid-full.svg" width="16" height="16" alt="Positions">
+          <img src="assets/img/location-dot-solid-full.svg" class="icon-svg-map" alt="Positions">
         </button>
         <button id="btnTrajectoire" class="toolbar-btn toolbar-mode" title="Trajectoire">
-          <img src="assets/img/route-solid-full.svg" width="16" height="16" alt="Trajectoire">
+          <img src="assets/img/route-solid-full.svg" class="icon-svg-map" alt="Trajectoire">
         </button>
         <div class="toolbar-btn-wrapper">
           <button id="btnDessin" class="toolbar-btn" title="Filtre spatial">
-            <img src="assets/img/stylo.png" width="16" height="16" alt="Dessin">
+            <img src="assets/img/stylo.png" class="icon-svg-map" alt="Dessin">
           </button>
-          <div id="panneauDessin" class="panneau-dessin" style="display:none">
+          <div id="panneauDessin" class="panneau-dessin">
             <button id="btnDessinPolygone" class="panneau-dessin-btn" title="Polygone">
-              <img src="assets/img/draw-polygon-solid-full.svg" width="16" height="16" alt="Polygone">
+              <img src="assets/img/draw-polygon-solid-full.svg" class="icon-svg-map" alt="Polygone">
             </button>
             <button id="btnDessinRectangle" class="panneau-dessin-btn" title="Rectangle">
               <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
@@ -284,14 +284,14 @@
           </div>
         </div>
         <button id="btnFondsCarte" class="toolbar-btn" title="Fonds de carte">
-          <img src="assets/img/layer-group-solid-full.svg" width="16" height="16" alt="Fonds de carte">
+          <img src="assets/img/layer-group-solid-full.svg" class="icon-svg-map" alt="Fonds de carte">
         </button>
       </div>
       <div id="toolbarZoom" class="map-toolbar">
         <button id="btnZoomIn" class="toolbar-btn" title="Zoom avant">+</button>
         <button id="btnZoomOut" class="toolbar-btn" title="Zoom arrière">−</button>
         <button id="btnZoomReset" class="toolbar-btn" title="Recentrer">
-          <img src="assets/img/crosshairs-solid-full.svg" width="16" height="16" alt="Recentrer">
+          <img src="assets/img/crosshairs-solid-full.svg" class="icon-svg-map" alt="Recentrer">
         </button>
       </div>
     </div>
@@ -346,6 +346,7 @@
         </div>
       </div>
       <div id="scaleTarget"></div>
+      <div id="mouseCoordsTarget"></div>
     </div>
     <div id="panneau-attributaire" class="panneau-attributaire" style="display:none">
       <button class="panneau-toggle" id="panneauToggle" title="Masquer/Afficher le panneau">
