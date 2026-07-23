@@ -155,6 +155,22 @@ export function getCouleur(loc, mode) {
 }
 
 /**
+ * Formate la position du curseur pour ol.control.MousePosition — Lambert-93 (systeme
+ * natif du stockage/API, cf. LAMBERT93) en 1ere ligne, WGS84 (repere universel, deja
+ * manipule pour le filtre spatial cf. activerDessinSpatial) en 2eme ligne. La vue est
+ * nativement en EPSG:3857 (Web Mercator, cf. ol.proj.fromLonLat dans renderPoints) —
+ * la coordonnee recue ici est donc deja en EPSG:3857, memes transformations proj4 que
+ * le reste du fichier mais en sens inverse (3857 -> 2154 / 3857 -> 4326).
+ */
+function formatMouseCoordinates(coordonnee) {
+  const lambert93 = proj4('EPSG:3857', 'EPSG:2154', coordonnee);
+  const wgs84 = proj4('EPSG:3857', 'EPSG:4326', coordonnee);
+  const ligneL93 = `X : ${Math.round(lambert93[0])}&nbsp;&nbsp;Y : ${Math.round(lambert93[1])} (Lambert-93)`;
+  const ligneWgs84 = `Lat : ${wgs84[1].toFixed(5)}&nbsp;&nbsp;Lon : ${wgs84[0].toFixed(5)} (WGS84)`;
+  return `${ligneL93}<br>${ligneWgs84}`;
+}
+
+/**
  * Initialise la carte et ses couches de base.
  * @param {string} targetId - ID de l'élément HTML contenant la carte
  * @param {string} popupId - ID de l'élément HTML servant de popup
@@ -242,9 +258,29 @@ export function initMap(targetId, popupId) {
         minWidth: 100,
         target: document.getElementById('scaleTarget')
       }),
+      new ol.control.MousePosition({
+        className: 'ol-mouse-position-custom',
+        target: document.getElementById('mouseCoordsTarget'),
+        coordinateFormat: formatMouseCoordinates,
+        undefinedHTML: ''
+      }),
+      // Pas de target: ici, contrairement a MousePosition — ce controle ne partage
+      // pas de conteneur de mise en page avec lui (.legende-wrapper est le cluster
+      // bas-gauche coordonnees/legende ; FullScreen reste en haut-droite, positionne
+      // independamment via .ol-fullscreen-custom en absolu dans main.css). L'y
+      // deplacer casserait le placement visuel actuel et l'espacement de
+      // #toolbarZoom, prevu pour laisser la place a ce bouton juste au-dessus de
+      // lui (cf. audit controles carte, point 2).
       new ol.control.FullScreen({
         className: 'ol-fullscreen-custom',
-        tipLabel: 'Plein écran'
+        tipLabel: 'Plein écran',
+        label: (() => {
+          const img = document.createElement('img');
+          img.src = 'assets/img/expand-arrows-alt-solid.svg';
+          img.className = 'icon-svg-map';
+          img.alt = '';
+          return img;
+        })()
       })
     ])
   });
