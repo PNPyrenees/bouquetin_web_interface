@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## [0.70.0] - 2026-07-23
+
+### Mouse Coordinates et nettoyage controles carte
+- Ajout d'un affichage Mouse Coordinates sur la carte principale - coordonnees du curseur en Lambert-93 et WGS84, mises a jour en temps reel
+- Style harmonise avec le theme vert translucide des autres controles carte (legende, echelle)
+- Suppression du CSS mort .ol-zoom-custom (residu d'une implementation anterieure jamais appliquee)
+- Factorisation du filtre icone blanche (icon-svg-map) reutilise entre toolbar, panneau de dessin et bouton plein ecran
+- panneauDessin migre de style.display vers classList.toggle('open') - coherent avec les autres flyouts de l'application
+- Suppression du code mort .header-bottom dans app.js - fonctionnalite deja migree vers la sidebar accordeon depuis mai
+- Harmonisation du nommage des controles OpenLayers (ol-mouse-position-custom, ol-fullscreen-custom) - ScaleLine garde les classes par defaut d'OL apres une tentative de nommage custom ayant cause une regression
+- Correction de la barre d'echelle - reconstruction complete apres regression de positionnement et d'affichage
+
 ## [0.69.0] - 2026-07-22
 
 ### Optimisations basculement Positions/Trajectoire
