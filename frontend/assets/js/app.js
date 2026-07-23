@@ -1511,7 +1511,7 @@ function initBasemapSelector() {
 function demarrerDessinSpatial(geometryType) {
   const btn = document.getElementById('btnDessin');
   const panneau = document.getElementById('panneauDessin');
-  if (panneau) panneau.style.display = 'none';
+  panneau?.classList.remove('open');
   btn?.classList.add('active');
   _dessinEnCours = true;
 
@@ -1534,19 +1534,12 @@ function initToolbarCarte() {
 
   document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
     const sidebar = document.getElementById('sidebar');
-    const headerBottom = document.querySelector('.header-bottom');
     const btn = document.getElementById('btnToggleSidebar');
 
     sidebar.classList.toggle('collapsed');
     const collapsed = sidebar.classList.contains('collapsed');
 
     btn.classList.toggle('active', !collapsed);
-
-    if (collapsed) {
-      if (headerBottom) headerBottom.style.marginLeft = '0';
-    } else {
-      if (headerBottom) headerBottom.style.marginLeft = '330px';
-    }
     updateMapSize();
   });
 
@@ -1589,15 +1582,15 @@ function initToolbarCarte() {
       effacerDessinSpatial();
       desactiverDessinSpatial();
       btn.classList.remove('active');
-      if (panneau) panneau.style.display = 'none';
+      panneau?.classList.remove('open');
       supprimerBadgeById('filtre-spatial');
       mettreAJourBoutonAppliquer();
       return;
     }
 
     // Toggle le panneau de choix Polygone/Rectangle
-    const estOuvert = panneau && panneau.style.display !== 'none';
-    if (panneau) panneau.style.display = estOuvert ? 'none' : 'flex';
+    const estOuvert = panneau?.classList.contains('open');
+    panneau?.classList.toggle('open', !estOuvert);
     btn.classList.toggle('active', !estOuvert);
   });
 
@@ -1615,10 +1608,10 @@ function initToolbarCarte() {
   document.addEventListener('click', (e) => {
     const panneau = document.getElementById('panneauDessin');
     const btn = document.getElementById('btnDessin');
-    if (!panneau || panneau.style.display === 'none') return;
+    if (!panneau || !panneau.classList.contains('open')) return;
     if (panneau.contains(e.target) || btn?.contains(e.target)) return;
 
-    panneau.style.display = 'none';
+    panneau.classList.remove('open');
     if (!_filtreGeom && !_dessinEnCours) {
       btn?.classList.remove('active');
     }
@@ -1757,8 +1750,7 @@ async function reinitialiserTousLesFiltres() {
     effacerDessinSpatial();
     desactiverDessinSpatial();
     document.getElementById('btnDessin')?.classList.remove('active');
-    const panneauDessinReinit = document.getElementById('panneauDessin');
-    if (panneauDessinReinit) panneauDessinReinit.style.display = 'none';
+    document.getElementById('panneauDessin')?.classList.remove('open');
     supprimerBadgeById('filtre-spatial');
 
     // 3. Mode Positions par défaut
@@ -1923,7 +1915,6 @@ async function reinitialiserTousLesFiltres() {
 
 document.getElementById('sidebarToggle').addEventListener('click', function () {
   const sidebar = document.getElementById('sidebar');
-  const headerBottom = document.querySelector('.header-bottom');
   const icon = this.querySelector('.toggle-icon');
 
   sidebar.classList.toggle('collapsed');
@@ -1932,10 +1923,8 @@ document.getElementById('sidebarToggle').addEventListener('click', function () {
 
   if (sidebar.classList.contains('collapsed')) {
     if (icon) icon.textContent = '›';
-    if (headerBottom) headerBottom.style.marginLeft = '0';
   } else {
     if (icon) icon.textContent = '‹';
-    if (headerBottom) headerBottom.style.marginLeft = '330px';
   }
 });
 
