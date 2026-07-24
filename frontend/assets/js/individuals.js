@@ -441,21 +441,24 @@ const COULEUR_COLLIER_DEFAUT = '#9e9e9e';
 const COULEUR_OREILLE_DEFAUT = '#9e9e9e';
 
 function appliquerCouleursMarquage(detail) {
-  const pathCollier = document.getElementById('pathColorCollier');
-  if (pathCollier) {
-    pathCollier.style.fill = normaliserCouleur(detail?.ani_marquage_couleur_collier) || COULEUR_COLLIER_DEFAUT;
+  // Depuis le passage au sprite SVG, la colorisation se fait via la propriété CSS `color`
+  // sur l'élément <use>. Le <path> dans le sprite porte fill="currentColor", qui hérite
+  // de `color` à travers le shadow DOM du <use> référençant un fichier externe.
+  const useCollier = document.getElementById('useCollier');
+  if (useCollier) {
+    useCollier.style.color = normaliserCouleur(detail?.ani_marquage_couleur_collier) || COULEUR_COLLIER_DEFAUT;
   }
 
   // Mapping direct — l'inversion gauche/droite (point de vue anatomique du bouquetin
   // vs position ecran) est geree cote CSS (.fiche-illustration-oreille-gauche/droite).
-  const pathOreilleGauche = document.getElementById('pathColorOreilleGauche');
-  if (pathOreilleGauche) {
-    pathOreilleGauche.style.fill = normaliserCouleur(detail?.ani_marquage_oreille_gauche) || COULEUR_OREILLE_DEFAUT;
+  const useOreilleGauche = document.getElementById('useOreilleGauche');
+  if (useOreilleGauche) {
+    useOreilleGauche.style.color = normaliserCouleur(detail?.ani_marquage_oreille_gauche) || COULEUR_OREILLE_DEFAUT;
   }
 
-  const pathOreilleDroite = document.getElementById('pathColorOreilleDroite');
-  if (pathOreilleDroite) {
-    pathOreilleDroite.style.fill = normaliserCouleur(detail?.ani_marquage_oreille_droite) || COULEUR_OREILLE_DEFAUT;
+  const useOreilleDroite = document.getElementById('useOreilleDroite');
+  if (useOreilleDroite) {
+    useOreilleDroite.style.color = normaliserCouleur(detail?.ani_marquage_oreille_droite) || COULEUR_OREILLE_DEFAUT;
   }
 }
 
