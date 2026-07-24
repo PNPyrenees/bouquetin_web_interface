@@ -258,15 +258,13 @@
     <div id="map">
       <div id="toolbarOutils" class="map-toolbar">
         <button id="btnToggleSidebar" class="toolbar-btn active" title="Filtres de recherches">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-            <path d="M3 18h6v-2H3v2zm0-5h12v-2H3v2zm0-7v2h18V6H3z"/>
-          </svg>
+          <svg width="16" height="16"><use href="assets/img/sprite.svg#icon-menu"/></svg>
         </button>
         <button id="btnPositions" class="toolbar-btn toolbar-mode active" title="Positions">
-          <img src="assets/img/location-dot-solid-full.svg" class="icon-svg-map" alt="Positions">
+          <svg width="16" height="16" class="icon-svg-map"><use href="assets/img/sprite.svg#icon-position"/></svg>
         </button>
         <button id="btnTrajectoire" class="toolbar-btn toolbar-mode" title="Trajectoire">
-          <img src="assets/img/route-solid-full.svg" class="icon-svg-map" alt="Trajectoire">
+          <svg width="16" height="16" class="icon-svg-map"><use href="assets/img/sprite.svg#icon-trajectoire"/></svg>
         </button>
         <div class="toolbar-btn-wrapper">
           <button id="btnDessin" class="toolbar-btn" title="Filtre spatial">
@@ -274,24 +272,26 @@
           </button>
           <div id="panneauDessin" class="panneau-dessin">
             <button id="btnDessinPolygone" class="panneau-dessin-btn" title="Polygone">
-              <img src="assets/img/draw-polygon-solid-full.svg" class="icon-svg-map" alt="Polygone">
+              <svg width="16" height="16" class="icon-svg-map"><use href="assets/img/sprite.svg#icon-polygone"/></svg>
             </button>
             <button id="btnDessinRectangle" class="panneau-dessin-btn" title="Rectangle">
-              <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-                <path d="M3 5h18v14H3V5zm2 2v10h14V7H5z"/>
-              </svg>
+              <svg width="16" height="16"><use href="assets/img/sprite.svg#icon-rectangle"/></svg>
             </button>
           </div>
         </div>
         <button id="btnFondsCarte" class="toolbar-btn" title="Fonds de carte">
-          <img src="assets/img/layer-group-solid-full.svg" class="icon-svg-map" alt="Fonds de carte">
+          <svg width="16" height="16" class="icon-svg-map"><use href="assets/img/sprite.svg#icon-couches"/></svg>
         </button>
       </div>
       <div id="toolbarZoom" class="map-toolbar">
-        <button id="btnZoomIn" class="toolbar-btn" title="Zoom avant">+</button>
-        <button id="btnZoomOut" class="toolbar-btn" title="Zoom arrière">−</button>
+        <button id="btnZoomIn" class="toolbar-btn" title="Zoom avant">
+          <svg width="16" height="16"><use href="assets/img/sprite.svg#icon-zoom-in"/></svg>
+        </button>
+        <button id="btnZoomOut" class="toolbar-btn" title="Zoom arrière">
+          <svg width="16" height="16"><use href="assets/img/sprite.svg#icon-zoom-out"/></svg>
+        </button>
         <button id="btnZoomReset" class="toolbar-btn" title="Recentrer">
-          <img src="assets/img/crosshairs-solid-full.svg" class="icon-svg-map" alt="Recentrer">
+          <svg width="16" height="16" class="icon-svg-map"><use href="assets/img/sprite.svg#icon-recentrer"/></svg>
         </button>
       </div>
     </div>
@@ -382,11 +382,7 @@
         <div class="panel-tab-content" id="panelContentDonnees" style="display:flex">
           <div class="panel-toolbar">
             <button id="btnExportCSV" class="panel-btn-filtres" title="Exporter toutes les localisations en CSV">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
+              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><use href="assets/img/sprite.svg#icon-export-csv"/></svg>
               Exporter CSV
             </button>
             <div id="exportProgress" style="display:none">
