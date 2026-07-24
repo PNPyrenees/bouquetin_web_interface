@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [0.72.0] - 2026-07-24
+
+### Export CSV
+- Ajout des coordonnees loc_longitude et loc_latitude (WGS84, EPSG:4326) a l'export CSV des localisations - conversion depuis Lambert-93 via proj4, 6 decimales
+
 ## [0.71.0] - 2026-07-24
 
 ### Sprite SVG - maintenabilite des icones
