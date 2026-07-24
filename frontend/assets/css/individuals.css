@@ -268,7 +268,7 @@ select.indiv-col-filtre {
    flex), sans jamais etre forcee en dessous de son contenu — min-height (pas
    height) laisse #indivScreen (overflow-y:auto) defiler si le contenu est plus
    grand que l'ecran, au lieu d'ecraser les cartes en dessous de leur taille lisible
-   (cf. .fiche-col > .fiche-carte plus bas qui etire Marquage/Capteur GPS/Carte). */
+   (cf. .fiche-col > .fiche-carte plus bas qui etire Capteur GPS/Carte). */
 #vueFiche {
   display: flex;
   flex-direction: column;
@@ -458,7 +458,7 @@ select.indiv-col-filtre {
 }
 
 /* Ligne 1, 2 colonnes :
-   - Gauche : Marquage / Capteur GPS / Captures & Relaches (liste) empiles
+   - Gauche : Capteur GPS / Captures & Relaches (liste) empiles
    - Droite : Dernieres localisations (carte) / Sites de capture & relache (carte),
      meme hauteur chacune — la carte Dernieres localisations profite de tout
      l'espace disponible a droite (plus de 3e colonne qui la retrecissait). */
@@ -479,7 +479,7 @@ select.indiv-col-filtre {
   min-height: 0;
 }
 
-/* Etire Marquage/Capteur GPS (colonne gauche) et la carte Dernieres localisations
+/* Etire Capteur GPS (colonne gauche) et la carte Dernieres localisations
    (colonne droite) pour occuper toute la hauteur de la colonne — evite le vide sous
    les cartes courtes de gauche quand la carte OpenLayers de droite est plus haute.
    Scope a .fiche-col pour ne pas affecter les cartes Identite/Dates cles de l'entete. */
@@ -490,19 +490,17 @@ select.indiv-col-filtre {
   flex-direction: column;
 }
 
-/* Marquage et Capteur GPS ont un contenu de taille fixe (champs fixes, jamais
-   tres longs) — flex-grow:0 + flex-basis:auto les cale exactement sur la hauteur
-   de leur contenu, sans jamais grandir au-dela ni descendre en dessous (flex-shrink:0).
-   Tout l'espace restant de la colonne va donc a la 3e carte (#carteCapturesRelaches,
+/* Capteur GPS a un contenu de taille fixe (champs fixes, jamais tres longs) —
+   flex-grow:0 + flex-basis:auto le cale exactement sur la hauteur de son contenu,
+   sans jamais grandir au-dela ni descendre en dessous (flex-shrink:0). Tout
+   l'espace restant de la colonne va donc a la 2e carte (#carteCapturesRelaches,
    flex:1 via la regle generique), dont la liste peut etre longue et doit pouvoir
-   defiler/s'etirer plutot que pousser Marquage/Capteur GPS a se partager cet espace. */
-#carteMarquage,
+   defiler/s'etirer plutot que pousser Capteur GPS a se partager cet espace. */
 #carteInformationsGPS {
   flex: 0 0 auto;
   min-height: auto;
 }
 
-#carteMarquage .fiche-carte-corps,
 #carteInformationsGPS .fiche-carte-corps {
   flex-grow: 0;
   flex-basis: auto;
