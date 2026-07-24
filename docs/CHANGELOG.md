@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.74.0] - 2026-07-24
+
+### Marquage
+- Fiche individu : suppression du bloc Marquage (#carteMarquage) - couleur collier et code collier retires
+- Fiche individu : oreille droite et oreille gauche remontees dans le bloc Identite, affichees avant Commentaire
+- remplirMarquage() supprimee ainsi que son appel dans afficherFiche() - fonction devenue inutile
+- Illustration SVG collier/oreilles sur la photo de profil non modifiee - traitee separement
+
 ## [0.73.0] - 2026-07-24
 
 ### Programmation GPS
