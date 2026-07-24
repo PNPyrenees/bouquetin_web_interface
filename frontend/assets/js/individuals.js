@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchAnimauxSuivis, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal } from './api.js';
-import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, SAISONS_CONFIG } from './config.js';
+import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, SAISONS_CONFIG, COULEURS_MARQUAGE, COULEUR_COLLIER_DEFAUT, COULEUR_OREILLE_DEFAUT } from './config.js';
 
 let currentToken = null;
 let currentAniId = null;
@@ -399,18 +399,8 @@ function remplirDatesCles(captures, locations) {
 /**
  * ILLUSTRATION COMPOSEE (photo + collier/oreilles SVG recolores + capteur PNG fixe)
  * Couleurs texte libres en base (t_animal) — variantes de casse/accents/genre a normaliser.
+ * Mapping COULEURS_MARQUAGE/COULEUR_COLLIER_DEFAUT/COULEUR_OREILLE_DEFAUT centralise dans config.js.
  */
-const COULEURS_MARQUAGE = {
-  blanc: '#ffffff',
-  bleu: '#2563eb',
-  jaune: '#f2c14e',
-  noir: '#1a1a1a',
-  orange: '#e8720c',
-  rouge: '#c0392b',
-  vert: '#2D6A4F',
-  verte: '#2D6A4F',
-  violet: '#7b2d8e'
-};
 
 function normaliserCouleur(valeur) {
   if (!valeur) return null;
@@ -428,15 +418,6 @@ function normaliserCouleur(valeur) {
   }
   return couleur || null;
 }
-
-// Gris neutre de repli si la couleur est absente/non reconnue, pour ne pas garder
-// la couleur de l'individu precedent affiche sur ces memes elements DOM partages.
-// #9e9e9e — meme gris "non applicable" que le reste de l'app (badge translocation
-// non transloque, pastille statut non-suivi) — choisi pour rester nettement
-// distinct de #ffffff (valeur reelle possible dans COULEURS_MARQUAGE), a la
-// difference du gris d'origine des SVG (#d8d9d9/#d9d9d9) trop proche du blanc.
-const COULEUR_COLLIER_DEFAUT = '#9e9e9e';
-const COULEUR_OREILLE_DEFAUT = '#9e9e9e';
 
 function appliquerCouleursMarquage(detail) {
   // Depuis le passage au sprite SVG, la colorisation se fait via la propriété CSS `color`
