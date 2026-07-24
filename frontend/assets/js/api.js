@@ -199,7 +199,7 @@ export async function fetchGestionnaires(token) {
  */
 export async function fetchBibliothequeProgrammations(token) {
   const res = await fetch(
-    `${API_URL}/bib_programmation?select=prog_id,prog_frequence,prog_duree_acquisition&order=prog_id`,
+    `${API_URL}/bib_programmation?select=prog_id,prog_libelle,prog_frequence,prog_duree_acquisition&order=prog_id`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -294,7 +294,7 @@ export async function fetchAnimalDetail(token, aniId) {
  */
 export async function fetchCapteurParAnimal(token, aniId) {
   const res = await fetch(
-    `${API_URL}/cor_animal_capteur?ani_id=eq.${aniId}&select=cor_id,cor_date_debut,cor_date_fin,capt_id,prog_id,t_capteur(capt_id,capt_id_constructeur,capt_type,capt_frequence,capt_actif),bib_programmation(prog_libelle,prog_frequence,prog_duree_acquisition)&order=cor_date_debut.desc`,
+    `${API_URL}/cor_animal_capteur?ani_id=eq.${aniId}&select=cor_id,cor_date_debut,cor_date_fin,capt_id,prog_id,t_capteur(capt_id,capt_id_constructeur,capt_type,capt_frequence,capt_actif),bib_programmation(prog_libelle,prog_desciption,prog_frequence,prog_duree_acquisition)&order=cor_date_debut.desc`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
