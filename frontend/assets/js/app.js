@@ -2144,20 +2144,6 @@ export function mettreAJourLegende(modeForce = null) {
     if (label2) label2.textContent = 'PNRPA';
   }
 }
-// Calcule le nombre de localisations par jour à partir de la fréquence d'acquisition
-function calculerLocsParJour(frequence) {
-  const heures = parseInt(
-    String(frequence).replace('h', ''),
-    10
-  );
-
-  if (!heures || heures <= 0) {
-    return null;
-  }
-
-  return Math.round(24 / heures);
-}
-
 async function chargerProgrammationsGPS(token) {
   const select = document.getElementById('selectProgrammation');
   if (!select) return;
@@ -2169,11 +2155,9 @@ async function chargerProgrammationsGPS(token) {
       select.tomselect.clearOptions();
       select.tomselect.addOption({ value: '', text: 'Toutes' });
       programmations.forEach(prog => {
-        const locsParJour = calculerLocsParJour(prog.prog_frequence);
-        const duree = prog.prog_duree_acquisition ?? '?';
         select.tomselect.addOption({
           value: String(prog.prog_id),
-          text: `${locsParJour} locs/j (${duree}s)`
+          text: prog.prog_libelle
         });
       });
       select.tomselect.refreshOptions(false);
@@ -2186,10 +2170,8 @@ async function chargerProgrammationsGPS(token) {
 
       programmations.forEach(prog => {
         const opt = document.createElement('option');
-        const locsParJour = calculerLocsParJour(prog.prog_frequence);
-        const duree = prog.prog_duree_acquisition ?? '?';
         opt.value = prog.prog_id;
-        opt.textContent = `${locsParJour} locs/j (${duree}s)`;
+        opt.textContent = prog.prog_libelle;
         select.appendChild(opt);
       });
     }
