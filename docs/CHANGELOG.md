@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.75.0] - 2026-07-24
+
+### Marquage
+- Mapping COULEURS_MARQUAGE (couleur collier/oreilles -> hex) deplace de individuals.js vers config.js pour centraliser la config d'affichage
+- config.js etant gitignore (config sensible), le mapping est aussi ajoute a config.example.js pour rester versionne et partage entre postes/environnements
+- Solution intermediaire : migration vers une table dediee en base prevue ulterieurement (avec Ludovic)
+
 ## [0.74.0] - 2026-07-24
 
 ### Marquage
