@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.73.0] - 2026-07-24
+
+### Programmation GPS
+- Page Carte : select Programmation GPS utilise desormais prog_libelle (base) au lieu d'un calcul client redondant - suppression de calculerLocsParJour devenue morte
+- Fiche individu : champ Programmation affiche desormais prog_desciption (phrase longue) au lieu de prog_libelle - plus adapte a une page de detail
+- Retrait du champ Derniere transmission GPS sur la fiche individu - aucune source de donnee ne l'alimentait (toujours N/A)
+
 ## [0.72.0] - 2026-07-24
 
 ### Export CSV
