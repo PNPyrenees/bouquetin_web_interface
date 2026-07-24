@@ -146,3 +146,29 @@ export const BASEMAPS_CONFIG = [
 
 
 ];
+
+// Couleurs de marquage (collier/oreilles) — mapping temporaire cote client : le texte
+// libre en base (t_animal, ex. "rouge", "jaune / bleu") n'a pas de code couleur associe.
+// Migration vers une table dediee prevue plus tard — garde isole de sa consommation
+// (individuals.js: normaliserCouleur/appliquerCouleursMarquage) pour rester remplaçable
+// facilement (ex. par un fetch API) sans toucher a cette logique.
+export const COULEURS_MARQUAGE = {
+  blanc: '#ffffff',
+  bleu: '#2563eb',
+  jaune: '#f2c14e',
+  noir: '#1a1a1a',
+  orange: '#e8720c',
+  rouge: '#c0392b',
+  vert: '#2D6A4F',
+  verte: '#2D6A4F',
+  violet: '#7b2d8e'
+};
+
+// Gris neutre de repli si la couleur de marquage est absente/non reconnue (cf.
+// normaliserCouleur() dans individuals.js) — #9e9e9e, meme gris "non applicable" que
+// le reste de l'app (badge translocation non transloque, pastille statut non-suivi) —
+// choisi pour rester nettement distinct de #ffffff (valeur reelle possible dans
+// COULEURS_MARQUAGE), a la difference du gris d'origine des SVG (#d8d9d9/#d9d9d9)
+// trop proche du blanc.
+export const COULEUR_COLLIER_DEFAUT = '#9e9e9e';
+export const COULEUR_OREILLE_DEFAUT = '#9e9e9e';
