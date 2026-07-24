@@ -610,11 +610,12 @@ export async function exporterCSV(token, filters = {}) {
       return;
     }
 
-    // Generer le CSV — memes colonnes que le tableau attributaire (colonnesDisponibles)
+    // Generer le CSV — memes colonnes que le tableau attributaire (colonnesDisponibles),
+    // plus loc_longitude/loc_latitude (WGS84) derivees de loc.geom.coordinates (Lambert-93)
     const colonnesExport = colonnesDisponibles.map(c => c.key);
-    const header = colonnesExport.join(';');
-    const lignes = locs.map(loc =>
-      colonnesExport.map(col => {
+    const header = [...colonnesExport, 'loc_longitude', 'loc_latitude'].join(';');
+    const lignes = locs.map(loc => {
+      const cellules = colonnesExport.map(col => {
         const val = loc[col];
         if (val === null || val === undefined) return '';
         const str = String(val);
@@ -623,8 +624,18 @@ export async function exporterCSV(token, filters = {}) {
           return `"${str.replace(/"/g, '""')}"`;
         }
         return str;
-      }).join(';')
-    );
+      });
+
+      let longitude = '';
+      let latitude = '';
+      if (loc?.geom?.coordinates) {
+        const [lon, lat] = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
+        longitude = lon.toFixed(6);
+        latitude = lat.toFixed(6);
+      }
+
+      return [...cellules, longitude, latitude].join(';');
+    });
 
     const csvContent = '\ufeff' + [header, ...lignes].join('\n'); // BOM UTF-8 pour Excel
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
