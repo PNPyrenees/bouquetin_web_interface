@@ -275,11 +275,22 @@ export function initMap(targetId, popupId) {
         className: 'ol-fullscreen-custom',
         tipLabel: 'Plein écran',
         label: (() => {
-          const img = document.createElement('img');
-          img.src = 'assets/img/expand-arrows-alt-solid.svg';
-          img.className = 'icon-svg-map';
-          img.alt = '';
-          return img;
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('width', '16');
+          svg.setAttribute('height', '16');
+          const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+          use.setAttribute('href', 'assets/img/sprite.svg#icon-fullscreen-enter');
+          svg.appendChild(use);
+          return svg;
+        })(),
+        labelActive: (() => {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+          svg.setAttribute('width', '16');
+          svg.setAttribute('height', '16');
+          const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+          use.setAttribute('href', 'assets/img/sprite.svg#icon-fullscreen-exit');
+          svg.appendChild(use);
+          return svg;
         })()
       })
     ])
