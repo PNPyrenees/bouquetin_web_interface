@@ -367,6 +367,8 @@ function remplirIdentite(detail) {
   corps.appendChild(ligneInfo('Année de naissance', detail?.ani_annee_naissance));
   corps.appendChild(ligneInfo('Population', detail?.ani_pop_rattach));
   corps.appendChild(ligneInfo('Gestionnaire', detail?.ani_gestionnaire));
+  corps.appendChild(ligneInfo('Oreille droite', detail?.ani_marquage_oreille_droite));
+  corps.appendChild(ligneInfo('Oreille gauche', detail?.ani_marquage_oreille_gauche));
   corps.appendChild(ligneInfo('Commentaire', detail?.ani_commentaire));
 }
 
@@ -456,16 +458,6 @@ function appliquerCouleursMarquage(detail) {
   if (useOreilleDroite) {
     useOreilleDroite.style.color = normaliserCouleur(detail?.ani_marquage_oreille_droite) || COULEUR_OREILLE_DEFAUT;
   }
-}
-
-function remplirMarquage(detail) {
-  const corps = document.querySelector('#carteMarquage .fiche-carte-corps');
-  if (!corps) return;
-  corps.innerHTML = '';
-  corps.appendChild(ligneInfo('Oreille droite', detail?.ani_marquage_oreille_droite));
-  corps.appendChild(ligneInfo('Oreille gauche', detail?.ani_marquage_oreille_gauche));
-  corps.appendChild(ligneInfo('Couleur collier', detail?.ani_marquage_couleur_collier));
-  corps.appendChild(ligneInfo('Code collier', detail?.ani_marquage_code_collier));
 }
 
 /**
@@ -1267,7 +1259,6 @@ async function afficherFiche(aniId) {
 
     remplirIdentite(detail);
     remplirPastilleStatutPhoto(detail);
-    remplirMarquage(detail);
     remplirInformationsGPS(capteurs[0]);
     remplirListeCaptures(captures);
     remplirListeRelaches(captures);
