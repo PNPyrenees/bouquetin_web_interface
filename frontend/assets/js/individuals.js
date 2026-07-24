@@ -375,8 +375,6 @@ function remplirIdentite(detail) {
  * aucun nouvel appel API) et Derniere localisation (max sur le chargement initial
  * de la carte GPS, avant tout filtre manuel via Actualiser — pas recalculee ensuite
  * pour rester une donnee stable de l'animal plutot qu'un reflet du filtre courant).
- * Derniere transmission GPS : aucune source de donnee actuelle (ni t_capteur ni
- * cor_animal_capteur n'exposent de timestamp de derniere transmission) — reste N/A.
  */
 function remplirDatesCles(captures, locations) {
   const corps = document.getElementById('carteIdentiteDates');
@@ -394,8 +392,6 @@ function remplirDatesCles(captures, locations) {
     ? datesLocalisation.reduce((max, d) => d > max ? d : max)
     : null;
   corps.appendChild(ligneInfo('Dernière localisation', derniereLocalisation));
-
-  corps.appendChild(ligneInfo('Dernière transmission GPS', null));
 }
 
 /**
@@ -496,7 +492,7 @@ function remplirInformationsGPS(capteur) {
   corps.appendChild(ligneInfo('Type', t.capt_type));
   corps.appendChild(ligneInfo('Fréquence capteur', t.capt_frequence));
   corps.appendChild(ligneInfo('Actif', t.capt_actif === true ? 'Oui' : t.capt_actif === false ? 'Non' : null));
-  corps.appendChild(ligneInfo('Programmation', prog.prog_libelle));
+  corps.appendChild(ligneInfo('Programmation', prog.prog_desciption));
   corps.appendChild(ligneInfo('Fréquence programmation', prog.prog_frequence));
   corps.appendChild(ligneInfo('Durée acquisition', prog.prog_duree_acquisition));
 }
