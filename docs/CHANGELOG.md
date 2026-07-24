@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.71.0] - 2026-07-24
+
+### Sprite SVG - maintenabilite des icones
+- Creation d'un sprite SVG unique (assets/img/sprite.svg, 15 symboles) regroupant toutes les icones de l'interface
+- Remplacement des SVG inline dans index.html et individuals.html par des <use> references au sprite - HTML nettement plus lisible
+- Icone plein ecran (map.js) migree du systeme img/filter vers le sprite via <use> - gestion des etats enter/exit
+- Colorisation dynamique du collier et des oreilles (fiche individu) adaptee au sprite - ciblage via color sur l'element <use> au lieu de fill sur un path direct
+
 ## [0.70.0] - 2026-07-23
 
 ### Mouse Coordinates et nettoyage controles carte
