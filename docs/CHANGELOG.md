@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## [0.81.0] - 2026-07-27
+
+### Carte Localisations fiche individu - controles avances
+- Selecteur de date remplace par flatpickr, coherent avec la page Carte
+- Mode Toutes les positions / N dernieres positions ajoute (defaut 25), reutilisant le pattern de la page Carte
+- Compteur de positions effectivement affichees ajoute sur la carte Localisations
+- Boutons zoom avant/arriere/recentrer ajoutes sur les cartes Localisations et Sites
+- Correction doublon de controles zoom OpenLayers natifs - controls:[] ajoute a la creation des cartes fiche individu
+- Variables --map-ui-* deplacees de map.css vers main.css - partagees entre la page Carte et la fiche individu
+- Style de la legende (carte Sites) restaure - regles manquantes suite au deplacement des variables
+
 ## [0.80.0] - 2026-07-27
 
 ### Cartes fiche individu - fonds de carte et interaction
