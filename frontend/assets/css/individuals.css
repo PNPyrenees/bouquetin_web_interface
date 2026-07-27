@@ -691,12 +691,115 @@ select.indiv-col-filtre {
   margin: 2px 0 0;
 }
 
-/* #ficheMapLocalisations (onglet Synthese) est dans .fiche-col > .fiche-carte >
-   .fiche-carte-corps (flex column) — elle remplit tout l'espace restant sous les
-   controles (nombre de positions / dates / bouton Actualiser). */
-#ficheMapLocalisations {
+/* Conteneur positionne pour la carte Localisations (meme pattern que .capture-map-conteneur
+   deja existant pour Sites) — necessaire pour superposer toolbar zoom + compteur.
+   Remplace l'ancienne regle #ficheMapLocalisations { flex:1 } — la carte remplit
+   desormais ce conteneur en position absolue plutot que directement le flex parent. */
+.fiche-map-conteneur {
+  position: relative;
   flex: 1;
   min-height: 0;
+}
+
+.fiche-map-conteneur .fiche-map {
+  position: absolute;
+  inset: 0;
+}
+
+/* Toolbar zoom/recentrer sur les cartes Localisations et Sites — reprend l'apparence de
+   #toolbarZoom (map.css, non charge sur cette page) via les variables --map-ui-* deja
+   definies globalement dans main.css (charge ici). */
+.fiche-map-toolbar-zoom {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--map-ui-bg);
+  border-radius: 4px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.fiche-toolbar-btn {
+  width: 28px;
+  height: 28px;
+  background: var(--map-ui-bg);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--map-ui-icon);
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.fiche-toolbar-btn:hover {
+  background: var(--map-ui-bg-active);
+}
+
+/* icon-zoom-in/icon-zoom-out utilisent fill="currentColor" dans le sprite (heritent
+   directement de .fiche-toolbar-btn color) — icon-recentrer non, meme filtre que
+   .icon-svg-map (map.css) recree ici en scope. */
+.fiche-icon-recentrer {
+  width: 16px;
+  height: 16px;
+  opacity: 0.9;
+  filter: brightness(0) invert(1);
+}
+
+.fiche-map-compteur {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  z-index: 100;
+  background: var(--map-ui-bg);
+  color: var(--map-ui-text);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-family);
+  font-size: 11px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Legende de la carte Sites (capture-map-legende) — .legende-panel et ses enfants
+   sont definis dans map.css, non charge sur individuals.html. On redeclare ici les
+   regles strictement necessaires, scopees au conteneur pour eviter tout conflit. */
+.capture-map-conteneur .legende-panel {
+  background: var(--map-ui-bg);
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  font-family: var(--font-family);
+  font-size: 12px;
+  pointer-events: auto;
+}
+
+.capture-map-conteneur .legende-contenu {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.capture-map-conteneur .legende-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--map-ui-text);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.capture-map-conteneur .legende-pastille {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 /* ============================================
@@ -757,7 +860,7 @@ select.indiv-col-filtre {
   position: absolute;
   bottom: 10px;
   left: 10px;
-  z-index: 2;
+  z-index: 100;
 }
 
 .legende-pastille-capture {
