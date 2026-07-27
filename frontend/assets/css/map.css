@@ -1,20 +1,8 @@
-/* ========================================
-   VARIABLES CARTE
-   ======================================== */
 /* ============================================
    THEME CARTE — panneaux flottants superposes a la carte
    (legende, toolbar boutons carte, echelle, bouton plein ecran)
+   Variables --map-ui-* definies dans main.css (:root) — disponibles sur toutes les pages.
    ============================================ */
-:root {
-  --map-ui-color-rgb: 9, 148, 105;         /* vert pur (--color-primary) en RGB */
-  --map-ui-opacity: 0.5;                  /* opacite du fond — variable independante */
-  --map-ui-color-active-rgb: 6, 107, 74;   /* vert actif/selectionne en RGB */
-  --map-ui-opacity-active: 0.95;           /* opacite du fond en etat actif/hover */
-  --map-ui-bg: rgba(var(--map-ui-color-rgb), var(--map-ui-opacity));
-  --map-ui-bg-active: rgba(var(--map-ui-color-active-rgb), var(--map-ui-opacity-active));
-  --map-ui-text: #ffffff;                  /* texte/libelles/nombres (ex: "200 km") */
-  --map-ui-icon: #ffffff;                  /* icones des boutons + trait de l'echelle */
-}
 
 /* ========================================
    MAPSCREEN & MAP
