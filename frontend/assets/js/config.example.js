@@ -164,11 +164,3 @@ export const COULEURS_MARQUAGE = {
   violet: '#7b2d8e'
 };
 
-// Gris neutre de repli si la couleur de marquage est absente/non reconnue (cf.
-// normaliserCouleur() dans individuals.js) — #9e9e9e, meme gris "non applicable" que
-// le reste de l'app (badge translocation non transloque, pastille statut non-suivi) —
-// choisi pour rester nettement distinct de #ffffff (valeur reelle possible dans
-// COULEURS_MARQUAGE), a la difference du gris d'origine des SVG (#d8d9d9/#d9d9d9)
-// trop proche du blanc.
-export const COULEUR_COLLIER_DEFAUT = '#9e9e9e';
-export const COULEUR_OREILLE_DEFAUT = '#9e9e9e';
