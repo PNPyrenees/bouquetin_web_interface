@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## [0.77.0] - 2026-07-27
+
+### Illustration collier fiche individu
+- Illustration du collier et badge capteur GPS visibles uniquement si l'animal a un collier actif (cor_date_fin IS NULL sur la derniere pose) - ani_marquage_couleur_collier n'etant pas fiable hors de ce cas (aucun lien structurel entre la couleur et les poses successives de collier)
+
 ## [0.76.0] - 2026-07-27
 
 ### Reorganisation CSS carte
