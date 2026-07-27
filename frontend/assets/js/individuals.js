@@ -16,6 +16,8 @@ let _sourceLocalisations = null;
 let _carteSites = null;
 let _sourceSitesCapture = null;
 let _sourceSitesRelache = null;
+let _popupOverlayLocalisations = null;
+let _popupOverlaySites = null;
 let _projRegistered = false;
 
 // Dernieres positions chargees pour la mini-carte de localisations —
@@ -621,15 +623,66 @@ function assurerProjectionLambert93() {
   _projRegistered = true;
 }
 
-function creerCoucheFond() {
-  const config = BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0];
-  const url = config.url && config.url.includes('IGN_API_KEY')
-    ? config.url.replace('${IGN_API_KEY}', IGN_API_KEY)
-    : config.url;
-  return new ol.layer.Tile({
-    source: new ol.source.XYZ({ url, attributions: config.attributions })
+// Cree un layer OL Tile pour un fond de carte BASEMAPS_CONFIG donne — meme logique
+// xyz/osm/wms que map.js (basemaps, non importee : individuals.js reste volontairement
+// sans dependance sur map.js, singleton de la page Carte, cf. discussion prealable
+// plus haut). Remplace l'ancien creerCoucheFond() (xyz uniquement, fond fixe).
+function creerCoucheBasemap(bm) {
+  let source;
+  if (bm.type === 'osm') {
+    source = new ol.source.OSM();
+  } else if (bm.type === 'wms') {
+    source = new ol.source.TileWMS({
+      url: bm.url,
+      params: bm.wmsParams || {},
+      serverType: 'geoserver',
+      attributions: bm.attributions
+    });
+  } else {
+    source = new ol.source.XYZ({
+      url: bm.url && bm.url.includes('IGN_API_KEY') ? bm.url.replace('${IGN_API_KEY}', IGN_API_KEY) : bm.url,
+      attributions: bm.attributions
+    });
+  }
+  return new ol.layer.Tile({ source });
+}
+
+// Remplace le layer de fond (toujours index 0, cf. initCarteLocalisations/initCarteSites)
+// d'une carte OL par un nouveau fond BASEMAPS_CONFIG — retrait + insertion, pas de toggle
+// de visibilite comme switchBasemap() (map.js) : les cartes de la fiche individu ne
+// pre-creent qu'un seul layer de fond a la fois (pas les 8 empiles), pour rester legeres.
+function changerCoucheBasemap(carte, basemapId) {
+  if (!carte) return;
+  const bm = BASEMAPS_CONFIG.find(b => b.id === basemapId) || BASEMAPS_CONFIG[0];
+  carte.getLayers().removeAt(0);
+  carte.getLayers().insertAt(0, creerCoucheBasemap(bm));
+}
+
+// Peuple un <select> avec les 8 fonds de BASEMAPS_CONFIG (liste complete, non filtree —
+// meme choix que la carte principale, demande explicite de Ludovic). getCarteActuelle()
+// est un callback (pas la carte directement) car le select est peuple au chargement du
+// script, avant que _carteLocalisations/_carteSites existent (crees a la demande dans
+// initCarteLocalisations/initCarteSites, au premier affichage d'une fiche).
+function initSelectBasemap(selectId, getCarteActuelle) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+
+  select.innerHTML = '';
+  BASEMAPS_CONFIG.forEach(bm => {
+    const option = document.createElement('option');
+    option.value = bm.id;
+    option.textContent = bm.nom;
+    if (bm.visible) option.selected = true;
+    select.appendChild(option);
+  });
+
+  select.addEventListener('change', () => {
+    changerCoucheBasemap(getCarteActuelle(), select.value);
   });
 }
+
+initSelectBasemap('selectBasemapLocalisations', () => _carteLocalisations);
+initSelectBasemap('selectBasemapSites', () => _carteSites);
 
 // EPSG:2154 (Lambert-93) — coherent avec le reste du schema (t_animal/v_localisation
 // via f_get_localisation). Utilise pour l'avertissement de coherence du CRS/SRID dans
@@ -736,10 +789,54 @@ function initCarteLocalisations() {
     })
   });
 
+  const popupEl = document.getElementById('popupLocalisations');
+  _popupOverlayLocalisations = new ol.Overlay({
+    element: popupEl,
+    positioning: 'bottom-center',
+    offset: [0, -12]
+  });
+
   _carteLocalisations = new ol.Map({
     target: 'ficheMapLocalisations',
-    layers: [creerCoucheFond(), coucheLocalisations],
+    layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), coucheLocalisations],
+    overlays: [_popupOverlayLocalisations],
     view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
+  });
+
+  // Curseur pointer au survol d'un point — meme UX que la carte principale (map.js).
+  _carteLocalisations.on('pointermove', evt => {
+    _carteLocalisations.getViewport().style.cursor = _carteLocalisations.hasFeatureAtPixel(evt.pixel) ? 'pointer' : '';
+  });
+
+  // Clic sur un point — popup date + altitude uniquement pour l'instant (cf. analyse
+  // fiche individu, point 3 valide : loc_datetime_local/loc_date_local + loc_altitude_capteur,
+  // enrichissable plus tard avec d'autres colonnes de f_get_localisation).
+  _carteLocalisations.on('singleclick', evt => {
+    let hit = false;
+    _carteLocalisations.forEachFeatureAtPixel(evt.pixel, feature => {
+      if (hit) return;
+      hit = true;
+      const dateRaw = feature.get('loc_datetime_local') || feature.get('loc_date_local');
+      const dateStr = dateRaw ? dateRaw.replace('T', ' ').slice(0, 16) : 'N/A';
+      const altitude = feature.get('loc_altitude_capteur');
+
+      popupEl.innerHTML = '';
+      const strong = document.createElement('strong');
+      strong.textContent = 'Position GPS';
+      popupEl.appendChild(strong);
+      const ligneDate = document.createElement('div');
+      ligneDate.className = 'popup-champ';
+      ligneDate.textContent = `Date : ${dateStr}`;
+      popupEl.appendChild(ligneDate);
+      const ligneAltitude = document.createElement('div');
+      ligneAltitude.className = 'popup-champ';
+      ligneAltitude.textContent = `Altitude : ${altitude != null ? altitude + ' m' : 'N/A'}`;
+      popupEl.appendChild(ligneAltitude);
+
+      _popupOverlayLocalisations.setPosition(evt.coordinate);
+      popupEl.style.display = 'block';
+    });
+    if (!hit) popupEl.style.display = 'none';
   });
 
   observerRedimensionnementCarte(_carteLocalisations, 'ficheMapLocalisations');
@@ -770,6 +867,7 @@ function renderPointsLocalisations(locations) {
   const features = (locations || [])
     .filter(loc => loc.geom?.coordinates)
     .map(loc => new ol.Feature({
+      ...loc,
       geometry: new ol.geom.Point(lambert93VersEcran(loc.geom.coordinates))
     }));
 
@@ -833,21 +931,81 @@ function initCarteSites() {
 
   _sourceSitesCapture = new ol.source.Vector();
   _sourceSitesRelache = new ol.source.Vector();
+  const coucheSitesCapture = creerCoucheSitesCaptureRelache(_sourceSitesCapture, '#c0392b');
+  const coucheSitesRelache = creerCoucheSitesCaptureRelache(_sourceSitesRelache, '#2D6A4F');
+
+  const popupEl = document.getElementById('popupSites');
+  _popupOverlaySites = new ol.Overlay({
+    element: popupEl,
+    positioning: 'bottom-center',
+    offset: [0, -12]
+  });
+
   _carteSites = new ol.Map({
     target: 'ficheMapSites',
     layers: [
-      creerCoucheFond(),
-      creerCoucheSitesCaptureRelache(_sourceSitesCapture, '#c0392b'),
-      creerCoucheSitesCaptureRelache(_sourceSitesRelache, '#2D6A4F')
+      creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]),
+      coucheSitesCapture,
+      coucheSitesRelache
     ],
+    overlays: [_popupOverlaySites],
     view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
+  });
+
+  _carteSites.on('pointermove', evt => {
+    _carteSites.getViewport().style.cursor = _carteSites.hasFeatureAtPixel(evt.pixel) ? 'pointer' : '';
+  });
+
+  // Clic sur un site — distinction capture/relache via le layer touche (coucheSitesCapture
+  // vs coucheSitesRelache), pas une propriete stockee sur la feature : les deux sources
+  // sont deja separees (cf. _sourceSitesCapture/_sourceSitesRelache). Methode/objectif
+  // affiches seulement pour un site de capture (champs propres au leg capture, cf.
+  // creerCarteLegCapture/creerCarteLegRelache).
+  _carteSites.on('singleclick', evt => {
+    let hit = false;
+    _carteSites.forEachFeatureAtPixel(evt.pixel, (feature, layer) => {
+      if (hit) return;
+      hit = true;
+      const c = feature.getProperties();
+      const estCapture = layer === coucheSitesCapture;
+
+      popupEl.innerHTML = '';
+      const strong = document.createElement('strong');
+      strong.textContent = estCapture ? 'Site de capture' : 'Site de relâché';
+      popupEl.appendChild(strong);
+
+      const lignes = estCapture
+        ? [
+            ['Date', c.capture_date],
+            ['Zone', c.capture_zone],
+            ['Lieu-dit', c.capture_lieu_dit],
+            ['Méthode', c.capture_methode],
+            ['Objectif', c.capture_objectif]
+          ]
+        : [
+            ['Date', c.relache_date],
+            ['Zone', c.relache_zone],
+            ['Lieu-dit', c.relache_lieu_dit]
+          ];
+
+      lignes.forEach(([label, valeur]) => {
+        const div = document.createElement('div');
+        div.className = 'popup-champ';
+        div.textContent = `${label} : ${valeur || 'N/A'}`;
+        popupEl.appendChild(div);
+      });
+
+      _popupOverlaySites.setPosition(evt.coordinate);
+      popupEl.style.display = 'block';
+    });
+    if (!hit) popupEl.style.display = 'none';
   });
 
   observerRedimensionnementCarte(_carteSites, 'ficheMapSites');
 }
 
-function creerFeaturePointSite(coordLambert93) {
-  return new ol.Feature({ geometry: new ol.geom.Point(lambert93VersEcran(coordLambert93)) });
+function creerFeaturePointSite(coordLambert93, c) {
+  return new ol.Feature({ ...c, geometry: new ol.geom.Point(lambert93VersEcran(coordLambert93)) });
 }
 
 // Fit sur l'etendue combinee des deux sources (capture + relache) — un individu
@@ -855,13 +1013,17 @@ function creerFeaturePointSite(coordLambert93) {
 function renderPointsSites(captures) {
   if (!_sourceSitesCapture || !_sourceSitesRelache) return;
 
-  const coordsCapture = (captures || []).map(c => parseGeomPostGIS(c.capture_site_geom)).filter(Boolean);
-  const coordsRelache = (captures || []).map(c => parseGeomPostGIS(c.relache_site_geom)).filter(Boolean);
+  const capturesAvecGeomCapture = (captures || [])
+    .map(c => ({ c, coord: parseGeomPostGIS(c.capture_site_geom) }))
+    .filter(x => x.coord);
+  const capturesAvecGeomRelache = (captures || [])
+    .map(c => ({ c, coord: parseGeomPostGIS(c.relache_site_geom) }))
+    .filter(x => x.coord);
 
   _sourceSitesCapture.clear();
-  _sourceSitesCapture.addFeatures(coordsCapture.map(creerFeaturePointSite));
+  _sourceSitesCapture.addFeatures(capturesAvecGeomCapture.map(x => creerFeaturePointSite(x.coord, x.c)));
   _sourceSitesRelache.clear();
-  _sourceSitesRelache.addFeatures(coordsRelache.map(creerFeaturePointSite));
+  _sourceSitesRelache.addFeatures(capturesAvecGeomRelache.map(x => creerFeaturePointSite(x.coord, x.c)));
 
   const extent = ol.extent.createEmpty();
   ol.extent.extend(extent, _sourceSitesCapture.getExtent());
