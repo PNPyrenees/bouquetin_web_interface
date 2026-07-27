@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## [0.76.0] - 2026-07-27
+
+### Reorganisation CSS carte
+- Deplacement de tous les styles lies a la carte (~850 lignes) depuis main.css vers map.css - variables --map-ui-*, mapScreen, popup, loading overlay, basemap selector, toolbar, legende, echelle, mouse coordinates, plein ecran, attribution
+- main.css desormais dedie au layout global hors carte
+
 ## [0.75.0] - 2026-07-24
 
 ### Marquage
