@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchAnimauxSuivis, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal } from './api.js';
-import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, SAISONS_CONFIG, COULEURS_MARQUAGE, COULEUR_COLLIER_DEFAUT, COULEUR_OREILLE_DEFAUT } from './config.js';
+import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, SAISONS_CONFIG, COULEURS_MARQUAGE } from './config.js';
 
 let currentToken = null;
 let currentAniId = null;
@@ -398,13 +398,14 @@ function remplirDatesCles(captures, locations) {
 
 /**
  * ILLUSTRATION COMPOSEE (photo + collier/oreilles SVG recolores + capteur PNG fixe)
- * Illustration du collier + badge capteur masques en CSS (.fiche-illustration-masque,
- * cf. individuals.css) en attendant une decision de Ludovic sur la fiabilite de
- * ani_marquage_couleur_collier (valeur statique par animal, non liee a une pose precise
- * de collier — cf. analyse fiche individu). La colorisation ci-dessous continue de
- * s'appliquer sur l'element cache, sans erreur ni effet visible.
+ * Collier + badge capteur visibles seulement si collierActif (cor_date_fin IS NULL sur
+ * la pose la plus recente) ET couleur renseignee/reconnue — masques sinon
+ * (.fiche-illustration-masque, cf. individuals.css), meme logique que les oreilles :
+ * jamais de couleur grisee/incertaine affichee (cf. analyse fiche individu, decision
+ * Ludovic sur la fiabilite structurelle de ani_marquage_couleur_collier toujours en
+ * attente, mais devenue moins critique cote affichage).
  * Couleurs texte libres en base (t_animal) — variantes de casse/accents/genre a normaliser.
- * Mapping COULEURS_MARQUAGE/COULEUR_COLLIER_DEFAUT/COULEUR_OREILLE_DEFAUT centralise dans config.js.
+ * Mapping COULEURS_MARQUAGE centralise dans config.js.
  */
 
 function normaliserCouleur(valeur) {
@@ -419,7 +420,7 @@ function normaliserCouleur(valeur) {
 
   const couleur = COULEURS_MARQUAGE[cle];
   if (!couleur) {
-    console.warn(`Couleur de marquage non reconnue : "${brut}" (clé normalisée "${cle}") — fallback gris appliqué.`);
+    console.warn(`Couleur de marquage non reconnue : "${brut}" (clé normalisée "${cle}").`);
   }
   return couleur || null;
 }
@@ -428,31 +429,33 @@ function appliquerCouleursMarquage(detail, collierActif) {
   // Depuis le passage au sprite SVG, la colorisation se fait via la propriété CSS `color`
   // sur l'élément <use>. Le <path> dans le sprite porte fill="currentColor", qui hérite
   // de `color` à travers le shadow DOM du <use> référençant un fichier externe.
-  // Illustration collier + badge capteur visibles seulement si collierActif (cor_date_fin
-  // IS NULL sur la pose la plus recente) — ani_marquage_couleur_collier n'est pas fiable
-  // hors de ce cas (cf. analyse fiche individu, decision Ludovic en attente).
+  // Collier + badge capteur visibles seulement si collierActif ET couleur renseignee/
+  // reconnue — masques sinon (pas de gris par defaut, meme logique que les oreilles).
   const svgCollier = document.querySelector('.fiche-illustration-collier');
   const badgeCapteur = document.querySelector('.fiche-illustration-capteur');
-  svgCollier?.classList.toggle('fiche-illustration-masque', !collierActif);
-  badgeCapteur?.classList.toggle('fiche-illustration-masque', !collierActif);
-
-  // useCollier reste colore meme masque — assigner .style.color sur un element cache
-  // ne leve jamais d'erreur, la couleur est prete si l'illustration est reactivee.
   const useCollier = document.getElementById('useCollier');
-  if (useCollier) {
-    useCollier.style.color = normaliserCouleur(detail?.ani_marquage_couleur_collier) || COULEUR_COLLIER_DEFAUT;
-  }
+  const couleurCollier = normaliserCouleur(detail?.ani_marquage_couleur_collier);
+  const collierVisible = collierActif && !!couleurCollier;
+  svgCollier?.classList.toggle('fiche-illustration-masque', !collierVisible);
+  badgeCapteur?.classList.toggle('fiche-illustration-masque', !collierVisible);
+  if (useCollier && couleurCollier) useCollier.style.color = couleurCollier;
 
   // Mapping direct — l'inversion gauche/droite (point de vue anatomique du bouquetin
   // vs position ecran) est geree cote CSS (.fiche-illustration-oreille-gauche/droite).
+  // Oreille masquee (pas de gris) si la couleur est absente/non reconnue (N/A) — plutot
+  // que de representer une boucle qui n'existe pas forcement.
   const useOreilleGauche = document.getElementById('useOreilleGauche');
   if (useOreilleGauche) {
-    useOreilleGauche.style.color = normaliserCouleur(detail?.ani_marquage_oreille_gauche) || COULEUR_OREILLE_DEFAUT;
+    const couleurOreilleGauche = normaliserCouleur(detail?.ani_marquage_oreille_gauche);
+    useOreilleGauche.classList.toggle('fiche-illustration-masque', !couleurOreilleGauche);
+    if (couleurOreilleGauche) useOreilleGauche.style.color = couleurOreilleGauche;
   }
 
   const useOreilleDroite = document.getElementById('useOreilleDroite');
   if (useOreilleDroite) {
-    useOreilleDroite.style.color = normaliserCouleur(detail?.ani_marquage_oreille_droite) || COULEUR_OREILLE_DEFAUT;
+    const couleurOreilleDroite = normaliserCouleur(detail?.ani_marquage_oreille_droite);
+    useOreilleDroite.classList.toggle('fiche-illustration-masque', !couleurOreilleDroite);
+    if (couleurOreilleDroite) useOreilleDroite.style.color = couleurOreilleDroite;
   }
 }
 
