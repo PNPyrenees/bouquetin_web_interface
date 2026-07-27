@@ -398,6 +398,11 @@ function remplirDatesCles(captures, locations) {
 
 /**
  * ILLUSTRATION COMPOSEE (photo + collier/oreilles SVG recolores + capteur PNG fixe)
+ * Illustration du collier + badge capteur masques en CSS (.fiche-illustration-masque,
+ * cf. individuals.css) en attendant une decision de Ludovic sur la fiabilite de
+ * ani_marquage_couleur_collier (valeur statique par animal, non liee a une pose precise
+ * de collier — cf. analyse fiche individu). La colorisation ci-dessous continue de
+ * s'appliquer sur l'element cache, sans erreur ni effet visible.
  * Couleurs texte libres en base (t_animal) — variantes de casse/accents/genre a normaliser.
  * Mapping COULEURS_MARQUAGE/COULEUR_COLLIER_DEFAUT/COULEUR_OREILLE_DEFAUT centralise dans config.js.
  */
@@ -419,10 +424,20 @@ function normaliserCouleur(valeur) {
   return couleur || null;
 }
 
-function appliquerCouleursMarquage(detail) {
+function appliquerCouleursMarquage(detail, collierActif) {
   // Depuis le passage au sprite SVG, la colorisation se fait via la propriété CSS `color`
   // sur l'élément <use>. Le <path> dans le sprite porte fill="currentColor", qui hérite
   // de `color` à travers le shadow DOM du <use> référençant un fichier externe.
+  // Illustration collier + badge capteur visibles seulement si collierActif (cor_date_fin
+  // IS NULL sur la pose la plus recente) — ani_marquage_couleur_collier n'est pas fiable
+  // hors de ce cas (cf. analyse fiche individu, decision Ludovic en attente).
+  const svgCollier = document.querySelector('.fiche-illustration-collier');
+  const badgeCapteur = document.querySelector('.fiche-illustration-capteur');
+  svgCollier?.classList.toggle('fiche-illustration-masque', !collierActif);
+  badgeCapteur?.classList.toggle('fiche-illustration-masque', !collierActif);
+
+  // useCollier reste colore meme masque — assigner .style.color sur un element cache
+  // ne leve jamais d'erreur, la couleur est prete si l'illustration est reactivee.
   const useCollier = document.getElementById('useCollier');
   if (useCollier) {
     useCollier.style.color = normaliserCouleur(detail?.ani_marquage_couleur_collier) || COULEUR_COLLIER_DEFAUT;
@@ -1244,7 +1259,11 @@ async function afficherFiche(aniId) {
     remplirListeCaptures(captures);
     remplirListeRelaches(captures);
     verifierCoherenceTranslocation(captures);
-    appliquerCouleursMarquage(detail);
+    // Collier actif = pose la plus recente (capteurs[0], deja trie cor_date_debut.desc)
+    // sans date de fin — critere explicite de Ludovic (cor_date_fin IS NULL), distinct de
+    // idsSuivis/computeStatut qui exige en plus au moins une position GPS transmise.
+    const collierActif = capteurs.length > 0 && capteurs[0].cor_date_fin == null;
+    appliquerCouleursMarquage(detail, collierActif);
 
     initCarteSites();
     renderPointsSites(captures);
