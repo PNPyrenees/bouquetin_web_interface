@@ -194,16 +194,28 @@
                   Au
                   <input type="text" id="ficheDateTo" placeholder="JJ/MM/AAAA" autocomplete="off">
                 </label>
+                <label>
+                  Fond de carte
+                  <select id="selectBasemapLocalisations"></select>
+                </label>
                 <button id="btnActualiserFiche" class="btn-apply">Actualiser</button>
               </div>
               <div id="ficheMapLocalisations" class="fiche-map"></div>
+              <div id="popupLocalisations" class="fiche-map-popup"></div>
             </div>
           </div>
           <div class="fiche-carte" id="carteSites">
             <div class="fiche-carte-titre">Sites de capture &amp; relâché</div>
             <div class="fiche-carte-corps">
+              <div class="fiche-carte-controles">
+                <label>
+                  Fond de carte
+                  <select id="selectBasemapSites"></select>
+                </label>
+              </div>
               <div class="capture-map-conteneur">
                 <div id="ficheMapSites" class="fiche-map capture-map"></div>
+                <div id="popupSites" class="fiche-map-popup"></div>
                 <div class="legende-panel capture-map-legende">
                   <div class="legende-contenu">
                     <div class="legende-item">
