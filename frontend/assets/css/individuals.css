@@ -394,6 +394,15 @@ select.indiv-col-filtre {
   width: 41%;
 }
 
+/* Masque temporairement une piece de l'illustration sans la retirer du DOM — le JS de
+   colorisation (appliquerCouleursMarquage) continue de tourner sans erreur sur un
+   element cache. Collier + badge capteur masques en attendant une decision de Ludovic
+   sur la fiabilite de ani_marquage_couleur_collier (cf. analyse fiche individu) —
+   retirer cette classe en HTML pour reactiver l'affichage. */
+.fiche-illustration-masque {
+  display: none;
+}
+
 /* Gauche/droite = point de vue du bouquetin lui-meme (anatomique), pas du spectateur —
    sur une photo qui le montre de face, son oreille gauche apparait a droite de l'ecran. */
 .fiche-illustration-oreille-gauche {
