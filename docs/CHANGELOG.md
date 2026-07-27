@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [0.82.0] - 2026-07-27
+
+### Graphique Distance parcourue - refonte complete
+- Graphique Altitude moyenne par saison retire - juge non pertinent (site-dependant, pas de sens biologique une fois moyenne)
+- Graphique Distance parcourue migre d'ApexCharts vers Chart.js
+- Distance parcourue couvre desormais toute la periode de suivi de l'animal (plus de fenetre glissante 12 mois)
+- Distinction visuelle entre les mois avec collier actif (barre verte) et sans collier actif (bande de fond grisee) - evite de confondre un 0 km reel avec une absence de suivi
+- Largeur maximale des barres plafonnee (maxBarThickness) - evite un rendu disproportionne sur les animaux a historique court
+- ApexCharts conserve dans le projet (CDN) pour un eventuel futur graphique complementaire, meme si plus aucun appel actif actuellement
+
 ## [0.81.0] - 2026-07-27
 
 ### Carte Localisations fiche individu - controles avances
