@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.79.0] - 2026-07-27
+
+### Photo de profil - variante femelle
+- Ajout d'une illustration distincte pour les femelles (femelle.jpg) - cornes plus petites que les males
+- Conteneur photo de profil redimensionne de 220x220 (carre) a 180x250 (rectangle) - mieux adapte aux proportions des deux photos
+- Positions du collier, des oreilles et du badge capteur calibrees independamment pour chaque sexe (classe fiche-illustration--femelle) - les deux photos ayant un cadrage different
+
 ## [0.78.0] - 2026-07-27
 
 ### Marquage oreilles et collier - masquage si N/A
