@@ -426,6 +426,21 @@ function normaliserCouleur(valeur) {
 }
 
 function appliquerCouleursMarquage(detail, collierActif) {
+  // Photo de profil generique — variante femelle (cornes plus petites) si ani_sexe = 'F',
+  // sinon photo par defaut (couvre aussi M/N/A). Classe --femelle sur le conteneur pilote
+  // aussi les positions collier/oreilles/capteur specifiques (cf. individuals.css) — les
+  // deux photos ont un cadrage different, un seul jeu de % ne convient pas aux deux.
+  const estFemelle = detail?.ani_sexe === 'F';
+  const ficheIllustration = document.querySelector('.fiche-illustration');
+  ficheIllustration?.classList.toggle('fiche-illustration--femelle', estFemelle);
+
+  const fichePhoto = document.getElementById('fichePhoto');
+  if (fichePhoto) {
+    fichePhoto.src = estFemelle
+      ? '../assets/img/femelle.jpg'
+      : '../assets/img/bqt_profil_normal.jpg';
+  }
+
   // Depuis le passage au sprite SVG, la colorisation se fait via la propriété CSS `color`
   // sur l'élément <use>. Le <path> dans le sprite porte fill="currentColor", qui hérite
   // de `color` à travers le shadow DOM du <use> référençant un fichier externe.
