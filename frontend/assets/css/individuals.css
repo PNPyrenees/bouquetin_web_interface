@@ -363,13 +363,14 @@ select.indiv-col-filtre {
    valeurs de depart approximatives a ajuster visuellement. */
 .fiche-illustration {
   position: relative;
-  width: 220px;
-  height: 220px;
+  width: 180px;
+  height: 250px;
   flex-shrink: 0;
   overflow: hidden;
   border-radius: 4px;
   border: 1px solid var(--color-border);
   background: #e8efec;
+  top : 15px;
 }
 
 .fiche-illustration-photo {
@@ -422,6 +423,42 @@ select.indiv-col-filtre {
   left: 37%;
   top: 80%;
   width: 23%;
+}
+
+/* Positions femelle — cadrage photo different (femelle.jpg vs bqt_profil_normal.jpg,
+   cf. analyse fiche individu), classe appliquee dynamiquement en JS sur .fiche-illustration
+   selon ani_sexe (cf. appliquerCouleursMarquage). Valeurs calibrees visuellement (collier
+   et capteur inclines pour suivre l'angle du cou sur femelle.jpg — cadrage different du
+   male). .fiche-illustration-oreille-gauche ne redefinit pas transform ici : elle herite
+   du scaleX(-1) de la regle de base (.fiche-illustration-oreille-gauche plus haut), le
+   flip horizontal anatomique reste donc actif — la cascade CSS resout chaque propriete
+   independamment, pas bloc de regle entier. */
+
+.fiche-illustration--femelle .fiche-illustration-collier {
+  left: 37.5%;
+  top: 71.5%;
+  width: 46.5%;
+  transform: rotate(-39deg);
+}
+
+.fiche-illustration--femelle .fiche-illustration-oreille-gauche {
+  left: 75%;
+  top: 37%;
+  width: 12%;
+}
+
+.fiche-illustration--femelle .fiche-illustration-oreille-droite {
+  left: 8%;
+  top: 33%;
+  width: 12%;
+  transform: rotate(7deg);
+}
+
+.fiche-illustration--femelle .fiche-illustration-capteur {
+  left: 32%;
+  top: 90%;
+  width: 20%;
+  transform: rotate(-7deg);
 }
 
 /* Pastille de statut superposee en bas a droite de la photo — reutilise les cles
