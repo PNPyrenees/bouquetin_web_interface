@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchAnimauxSuivis, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal } from './api.js';
-import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, SAISONS_CONFIG, COULEURS_MARQUAGE } from './config.js';
+import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, COULEURS_MARQUAGE } from './config.js';
 
 let currentToken = null;
 let currentAniId = null;
@@ -20,20 +20,8 @@ let _popupOverlayLocalisations = null;
 let _popupOverlaySites = null;
 let _projRegistered = false;
 
-// Dernieres positions chargees pour la mini-carte de localisations —
-// reutilisees par initGraphiquesSynthese() si leur plage couvre suffisamment de mois
-// ET si la limite de nombre de positions appliquee lors de ce chargement n'a
-// vraisemblablement rien tronque (cf. obtenirLocalisationsPourGraphiques), pour
-// eviter un appel API redondant.
-let _dernieresLocalisationsChargees = [];
-// Valeur de "Nombre de dernieres positions" (var_limit_par_animal) utilisee lors du
-// dernier chargement de _dernieresLocalisationsChargees — toujours definie (defaut 25),
-// cf. chargerEtRenderLocalisations().
-let _dernieresLocalisationsLimiteAppliquee = null;
-
-// Graphiques ApexCharts (ligne Distance/Altitude)
+// Graphique Distance (Chart.js)
 let _chartDistanceMois = null;
-let _chartAltitudeSaison = null;
 let _resizeObserversGraphiques = [];
 
 /**
@@ -919,8 +907,6 @@ async function chargerEtRenderLocalisations(aniId) {
     dateMax
   });
   const count = renderPointsLocalisations(locations);
-  _dernieresLocalisationsChargees = locations;
-  _dernieresLocalisationsLimiteAppliquee = modeToutes ? null : n;
 
   const compteurEl = document.getElementById('compteurPositionsLocalisations');
   if (compteurEl) compteurEl.textContent = `${count} position${count !== 1 ? 's' : ''} affichée${count !== 1 ? 's' : ''}`;
@@ -1171,59 +1157,12 @@ function verifierCoherenceTranslocation(captures) {
 }
 
 /**
- * GRAPHIQUES DISTANCE/ALTITUDE (ApexCharts).
- * Deux besoins de donnees distincts, recuperes en parallele dans initGraphiquesSynthese :
- * - Distance/mois : fenetre roulante de 12 mois (obtenirLocalisationsPourGraphiques, reutilise
- *   _dernieresLocalisationsChargees seulement si sa limite de nombre de positions n'a
- *   rien tronque ET si sa plage couvre au moins ~11 mois, sinon requete independante non
- *   bornee en nombre) — sous-titre de periode affiche sous le titre (#periodeDistanceMois).
- * - Altitude/saison : historique complet de l'animal (pas limite a 12 mois — une migration
- *   altitudinale saisonniere n'est parlante que sur plusieurs annees), donc appel dedie
- *   fetchLocalisationsAnimal(aniId, {}) sans aucune borne de date. NB : ce dernier reste
- *   plafonne par var_limit=10000 côte RPC (api.js, hors perimetre ici) — largement suffisant
- *   pour une moyenne saisonniere mais a garder en tete pour un individu suivi tres longtemps.
+ * GRAPHIQUE DISTANCE (Chart.js).
+ * Couvre toute la periode de suivi de l'animal (plus de fenetre glissante 12 mois) —
+ * sous-titre de periode affiche sous le titre (#periodeDistanceMois). Distinction
+ * visuelle des mois sans collier actif (barre grisee, cf. collierActifPourMois) pour
+ * ne pas confondre avec un "0 km reellement immobile".
  */
-
-function calculerDateMinDouzeMois() {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 12);
-  return d.toISOString().slice(0, 10);
-}
-
-// Reutilise les positions deja chargees pour la carte "Dernieres localisations" si :
-// 1) leur limite de nombre de positions (limitParAnimal, cf. chargerEtRenderLocalisations)
-//    n'a vraisemblablement rien tronque — heuristique : si le nombre de positions
-//    renvoyees est INFERIEUR a la limite demandee, tout ce qui existait dans la plage
-//    a ete renvoye (rien de coupe) ; si le nombre renvoye ATTEINT la limite, on ne peut
-//    pas exclure qu'il y ait eu d'autres positions au-dela — traite comme tronque par
-//    prudence (faux positif possible seulement si le total reel tombe pile sur la limite,
-//    auquel cas on refait un appel independant pour rien — sans consequence, juste un
-//    appel API en plus) ;
-// 2) ET leur plage temporelle couvre au moins ~11 mois (330 jours — marge sous 365 pour
-//    ne pas refaire un appel a quelques jours pres).
-// Sinon (limite tronquee OU plage insuffisante) : requete independante et non bornee en
-// nombre sur les 12 derniers mois, pour ne jamais sous-estimer la distance parcourue.
-async function obtenirLocalisationsPourGraphiques(aniId, locationsInitiales, limiteAppliquee) {
-  const limiteTronquee = limiteAppliquee != null && (locationsInitiales || []).length >= limiteAppliquee;
-  if (limiteTronquee) {
-    return fetchLocalisationsAnimal(currentToken, aniId, { dateMin: calculerDateMinDouzeMois() });
-  }
-
-  const dates = (locationsInitiales || [])
-    .map(l => l.loc_datetime_local || l.loc_date_local)
-    .filter(Boolean)
-    .sort();
-
-  const spanJours = dates.length >= 2
-    ? (new Date(dates[dates.length - 1]) - new Date(dates[0])) / 86400000
-    : 0;
-
-  if (spanJours >= 330) {
-    return locationsInitiales;
-  }
-
-  return fetchLocalisationsAnimal(currentToken, aniId, { dateMin: calculerDateMinDouzeMois() });
-}
 
 // Au-dela de cet ecart entre deux positions consecutives, la distance euclidienne entre
 // les deux n'est plus un proxy fiable du trajet reellement parcouru (le capteur a pu ne pas
@@ -1232,11 +1171,10 @@ async function obtenirLocalisationsPourGraphiques(aniId, locationsInitiales, lim
 // PNP ont un pas de transmission tres different de quelques heures (cf. prog_frequence).
 const GAP_MAX_HEURES = 48;
 
-// Fenetre roulante de 12 mois maximum, mais demarre au premier mois reellement
-// couvert par les donnees si celles-ci sont plus recentes (moins d'un an d'historique).
 // Distance = somme des segments euclidiens entre positions GPS consecutives (triees), sur
 // coordonnees Lambert-93/EPSG:2154 (geom.coordinates, cf. lambert93VersEcran plus haut) —
-// projection en metres, donc pas de reprojection necessaire pour ce calcul.
+// projection en metres, donc pas de reprojection necessaire pour ce calcul. Couvre toute
+// la periode de suivi (plus de fenetre glissante 12 mois).
 function agregerDistanceParMois(locations) {
   const positionsValides = (locations || [])
     .filter(l => l.geom?.coordinates && (l.loc_datetime_local || l.loc_date_local))
@@ -1269,16 +1207,11 @@ function agregerDistanceParMois(locations) {
   if (distanceParMois.size === 0) return { categories: [], valeurs: [] };
 
   const premiereCleDonnees = [...distanceParMois.keys()].sort()[0];
+  const [anneeDonnees, moisDonnees] = premiereCleDonnees.split('-').map(Number);
+  const debut = new Date(anneeDonnees, moisDonnees - 1, 1);
 
   const maintenant = new Date();
   const finFenetre = new Date(maintenant.getFullYear(), maintenant.getMonth(), 1);
-  const debutRoulant = new Date(finFenetre);
-  debutRoulant.setMonth(debutRoulant.getMonth() - 11);
-
-  const [anneeDonnees, moisDonnees] = premiereCleDonnees.split('-').map(Number);
-  const debutDonnees = new Date(anneeDonnees, moisDonnees - 1, 1);
-
-  const debut = debutDonnees > debutRoulant ? debutDonnees : debutRoulant;
 
   const categories = [];
   const valeurs = [];
@@ -1294,6 +1227,23 @@ function agregerDistanceParMois(locations) {
   return { categories, valeurs };
 }
 
+// Determine si l'animal avait un collier actif au moins un jour du mois "cle" (YYYY-MM) —
+// croise avec les poses de cor_animal_capteur (cor_date_debut/cor_date_fin, deja
+// recuperees via fetchCapteurParAnimal dans afficherFiche, transmises en parametre).
+// cor_date_fin null = pose toujours active (collier actif jusqu'a aujourd'hui).
+function collierActifPourMois(cle, capteurs) {
+  const [annee, mois] = cle.split('-').map(Number);
+  const debutMois = new Date(annee, mois - 1, 1);
+  const finMois = new Date(annee, mois, 1);
+
+  return (capteurs || []).some(c => {
+    if (!c.cor_date_debut) return false;
+    const debutPose = new Date(c.cor_date_debut);
+    const finPose = c.cor_date_fin ? new Date(c.cor_date_fin) : new Date();
+    return debutPose < finMois && finPose >= debutMois;
+  });
+}
+
 function formaterMoisLabel(cle) {
   const [annee, mois] = cle.split('-').map(Number);
   return new Date(annee, mois - 1, 1).toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
@@ -1305,62 +1255,6 @@ function formaterMoisLabel(cle) {
 function formaterMoisLabelLong(cle) {
   const [annee, mois] = cle.split('-').map(Number);
   return new Date(annee, mois - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-}
-
-// Ordre calendaire d'affichage — memes bornes que SAISONS_CONFIG (config.js), deja utilisees
-// par les boutons radio "Saisonnalite" de la page Carte (filters.js) et l'entete du site.
-// Libelles avec accents corrects (SAISONS_CONFIG.ete.label vaut 'Ete' sans accent — pas repris
-// tel quel pour l'affichage, mais les bornes from/to restent la source de verite).
-const SAISONS_ORDRE = ['hiver', 'printemps', 'ete', 'rut'];
-const SAISONS_LABELS_AFFICHAGE = { hiver: 'Hiver', printemps: 'Printemps', ete: 'Été', rut: 'Rut' };
-
-function parseJJMMVersMoisJour(jjmm) {
-  const [j, m] = jjmm.split('/').map(Number);
-  return m * 100 + j;
-}
-
-function determinerSaison(date) {
-  const md = (date.getMonth() + 1) * 100 + date.getDate();
-  for (const cle of SAISONS_ORDRE) {
-    const config = SAISONS_CONFIG[cle];
-    if (!config) continue;
-    const from = parseJJMMVersMoisJour(config.from);
-    const to = parseJJMMVersMoisJour(config.to);
-    const correspond = from <= to ? (md >= from && md <= to) : (md >= from || md <= to);
-    if (correspond) return cle;
-  }
-  return null;
-}
-
-// Altitude moyenne par saison, sur l'historique complet (pas la fenetre roulante 12 mois
-// du graphique de distance) — positions sans loc_altitude_capteur exclues du calcul (pas
-// comptees comme 0, sinon la moyenne serait faussee vers le bas).
-function calculerAltitudeParSaison(locations) {
-  const sommeParSaison = { hiver: 0, printemps: 0, ete: 0, rut: 0 };
-  const compteParSaison = { hiver: 0, printemps: 0, ete: 0, rut: 0 };
-
-  (locations || []).forEach(l => {
-    const altitude = l.loc_altitude_capteur;
-    if (altitude === null || altitude === undefined) return;
-
-    const dateStr = l.loc_datetime_local || l.loc_date_local;
-    if (!dateStr) return;
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return;
-
-    const saison = determinerSaison(date);
-    if (!saison) return;
-
-    sommeParSaison[saison] += altitude;
-    compteParSaison[saison] += 1;
-  });
-
-  const categories = SAISONS_ORDRE.map(cle => SAISONS_LABELS_AFFICHAGE[cle]);
-  const valeurs = SAISONS_ORDRE.map(cle =>
-    compteParSaison[cle] > 0 ? Math.round(sommeParSaison[cle] / compteParSaison[cle]) : null
-  );
-
-  return { categories, valeurs };
 }
 
 // ResizeObserver + dispatch d'un evenement resize global — ApexCharts ne redetecte
@@ -1384,99 +1278,96 @@ function detruireGraphiquesSynthese() {
     _chartDistanceMois.destroy();
     _chartDistanceMois = null;
   }
-  if (_chartAltitudeSaison) {
-    _chartAltitudeSaison.destroy();
-    _chartAltitudeSaison = null;
-  }
   // Vide le sous-titre de periode pendant le rechargement — evite d'afficher
   // brievement la periode de l'individu precedent.
   const elPeriodeDistance = document.getElementById('periodeDistanceMois');
   if (elPeriodeDistance) elPeriodeDistance.textContent = '';
 }
 
-const APEXCHARTS_OPTIONS_COMMUNES = {
-  chart: {
-    toolbar: { show: false },
-    animations: { enabled: false },
-    fontFamily: 'Source Sans 3, sans-serif',
-    foreColor: '#666666',
-    zoom: { enabled: false }
-  },
-  grid: { borderColor: '#e0e0e0', strokeDashArray: 3 },
-  dataLabels: { enabled: false },
-  colors: ['#2D6A4F'],
-  tooltip: { theme: 'light' }
-};
-
-async function initGraphiquesSynthese(aniId) {
+async function initGraphiquesSynthese(aniId, capteurs) {
   detruireGraphiquesSynthese();
 
-  let locationsRoulantes, locationsCompletes;
+  let locations;
   try {
-    [locationsRoulantes, locationsCompletes] = await Promise.all([
-      obtenirLocalisationsPourGraphiques(aniId, _dernieresLocalisationsChargees, _dernieresLocalisationsLimiteAppliquee),
-      fetchLocalisationsAnimal(currentToken, aniId, {})
-    ]);
+    locations = await fetchLocalisationsAnimal(currentToken, aniId, {});
   } catch (err) {
     console.error('Erreur chargement données graphiques Synthèse:', err);
     return;
   }
 
   // L'individu affiché a pu changer pendant l'appel ci-dessus (async) — n'initialise
-  // pas des graphiques pour un individu qui n'est plus celui affiché a l'ecran.
+  // pas de graphique pour un individu qui n'est plus celui affiché a l'ecran.
   if (String(currentAniId) !== String(aniId)) return;
 
-  const { categories, valeurs } = agregerDistanceParMois(locationsRoulantes);
-  const { categories: categoriesSaisons, valeurs: valeursAltitude } = calculerAltitudeParSaison(locationsCompletes);
+  const { categories, valeurs } = agregerDistanceParMois(locations);
 
-  // Sous-titre de periode du graphique Distance — dynamique : periode reelle si
-  // l'historique de l'individu est plus court que 12 mois, sinon libelle fixe.
+  // Sous-titre de periode — periode complete desormais (plus de fenetre glissante 12 mois).
   const elPeriodeDistance = document.getElementById('periodeDistanceMois');
   if (elPeriodeDistance) {
-    if (categories.length === 0) {
-      elPeriodeDistance.textContent = 'Aucune donnée disponible';
-    } else if (categories.length < 12) {
-      elPeriodeDistance.textContent = `Depuis ${formaterMoisLabelLong(categories[0])}`;
-    } else {
-      elPeriodeDistance.textContent = '12 derniers mois';
-    }
+    elPeriodeDistance.textContent = categories.length === 0
+      ? 'Aucune donnée disponible'
+      : `Depuis ${formaterMoisLabelLong(categories[0])}`;
   }
 
-  const elDistance = document.getElementById('chartDistanceMois');
-  if (elDistance) {
-    _chartDistanceMois = new ApexCharts(elDistance, {
-      ...APEXCHARTS_OPTIONS_COMMUNES,
-      chart: { ...APEXCHARTS_OPTIONS_COMMUNES.chart, type: 'bar', height: '100%' },
-      series: [{ name: 'Distance (km)', data: valeurs }],
-      xaxis: {
-        categories: categories.map(formaterMoisLabel),
-        labels: { style: { fontSize: '11px' } }
-      },
-      yaxis: {
-        labels: { style: { fontSize: '11px' }, formatter: (v) => v.toFixed(1) },
-        forceNiceScale: true
-      },
-      plotOptions: { bar: { columnWidth: '55%', borderRadius: 2 } }
-    });
-    await _chartDistanceMois.render();
-    observerRedimensionnementGraphique('chartDistanceMois');
-  }
+  const ctx = document.getElementById('chartDistanceMois');
+  if (ctx) {
+    const couleurs = categories.map(cle => collierActifPourMois(cle, capteurs) ? '#2D6A4F' : '#9e9e9e');
 
-  const elAltitudeSaison = document.getElementById('chartAltitudeSaison');
-  if (elAltitudeSaison) {
-    _chartAltitudeSaison = new ApexCharts(elAltitudeSaison, {
-      ...APEXCHARTS_OPTIONS_COMMUNES,
-      chart: { ...APEXCHARTS_OPTIONS_COMMUNES.chart, type: 'bar', height: '100%' },
-      series: [{ name: 'Altitude moyenne (m)', data: valeursAltitude }],
-      xaxis: {
-        categories: categoriesSaisons,
-        labels: { style: { fontSize: '11px' } }
+    // Plugin custom (pas de dependance externe type chartjs-plugin-annotation) — dessine
+    // une bande grisee en fond, sur toute la hauteur du graphique, pour chaque mois sans
+    // collier actif. Necessaire car une barre a valeur 0 a une hauteur de 0px (rien a voir,
+    // meme avec backgroundColor gris) — le probleme n'est pas la couleur, c'est l'absence
+    // de hauteur. La bande de fond rend le mois visible independamment de la valeur de la barre.
+    const fondCollierInactif = {
+      id: 'fondCollierInactif',
+      beforeDraw(chart) {
+        const { ctx: c, chartArea, scales: { x } } = chart;
+        const largeur = chartArea.width / categories.length;
+        c.save();
+        c.fillStyle = 'rgba(158, 158, 158, 0.18)';
+        categories.forEach((cle, index) => {
+          if (collierActifPourMois(cle, capteurs)) return;
+          const centre = x.getPixelForValue(index);
+          c.fillRect(centre - largeur / 2, chartArea.top, largeur, chartArea.height);
+        });
+        c.restore();
+      }
+    };
+
+    _chartDistanceMois = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: categories.map(formaterMoisLabel),
+        datasets: [{
+          label: 'Distance (km)',
+          data: valeurs,
+          backgroundColor: couleurs,
+          borderRadius: 2,
+          maxBarThickness: 40
+        }]
       },
-      yaxis: { title: { text: 'Altitude (m)' }, labels: { style: { fontSize: '11px' } } },
-      plotOptions: { bar: { columnWidth: '45%', borderRadius: 2 } }
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              afterLabel: (context) => collierActifPourMois(categories[context.dataIndex], capteurs)
+                ? ''
+                : 'Pas de collier actif ce mois'
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { beginAtZero: true, ticks: { font: { size: 11 } } }
+        }
+      },
+      plugins: [fondCollierInactif]
     });
-    await _chartAltitudeSaison.render();
-    observerRedimensionnementGraphique('chartAltitudeSaison');
+    observerRedimensionnementGraphique('chartDistanceMoisWrapper');
   }
 }
 
@@ -1514,7 +1405,7 @@ async function afficherFiche(aniId) {
     initCarteLocalisations();
     const locations = await chargerEtRenderLocalisations(aniId);
     remplirDatesCles(captures, locations);
-    await initGraphiquesSynthese(aniId);
+    await initGraphiquesSynthese(aniId, capteurs);
 
     setTimeout(() => {
       _carteLocalisations?.updateSize();
