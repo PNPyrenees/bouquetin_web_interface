@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.80.0] - 2026-07-27
+
+### Cartes fiche individu - fonds de carte et interaction
+- Selecteur de fond de carte ajoute sur les cartes Localisations et Sites - reprend l'integralite des 8 fonds de BASEMAPS_CONFIG, comme la carte principale
+- Fonction creerCoucheBasemap generalisee (xyz/osm/wms) remplace creerCoucheFond (xyz uniquement, fond fixe)
+- Clic sur un point des cartes Localisations et Sites affiche desormais une popup d'information (date/altitude pour les positions GPS, date/zone/lieu-dit/methode/objectif pour les sites de capture et relache)
+- Curseur pointer au survol des points sur les deux cartes, coherent avec la carte principale
+
 ## [0.79.0] - 2026-07-27
 
 ### Photo de profil - variante femelle
