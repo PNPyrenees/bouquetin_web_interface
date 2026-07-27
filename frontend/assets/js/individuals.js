@@ -798,6 +798,7 @@ function initCarteLocalisations() {
 
   _carteLocalisations = new ol.Map({
     target: 'ficheMapLocalisations',
+    controls: [],
     layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), coucheLocalisations],
     overlays: [_popupOverlayLocalisations],
     view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
@@ -839,6 +840,26 @@ function initCarteLocalisations() {
     if (!hit) popupEl.style.display = 'none';
   });
 
+  // Boutons zoom in/out/recentrer — memes parametres que le fit automatique de
+  // renderPointsLocalisations() (padding/maxZoom), pas ceux de la carte principale
+  // (app.js, 80px/zoom13) non adaptes a une carte ~180px de haut.
+  document.getElementById('btnZoomInLocalisations')?.addEventListener('click', () => {
+    const view = _carteLocalisations.getView();
+    view.animate({ zoom: view.getZoom() + 1, duration: 200 });
+  });
+  document.getElementById('btnZoomOutLocalisations')?.addEventListener('click', () => {
+    const view = _carteLocalisations.getView();
+    view.animate({ zoom: view.getZoom() - 1, duration: 200 });
+  });
+  document.getElementById('btnZoomResetLocalisations')?.addEventListener('click', () => {
+    const extent = _sourceLocalisations?.getExtent();
+    if (extent && !ol.extent.isEmpty(extent)) {
+      _carteLocalisations.getView().fit(extent, { padding: [40, 40, 40, 40], maxZoom: 15, duration: 300 });
+    } else {
+      _carteLocalisations.getView().animate({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM, duration: 300 });
+    }
+  });
+
   observerRedimensionnementCarte(_carteLocalisations, 'ficheMapLocalisations');
 }
 
@@ -861,7 +882,7 @@ function observerRedimensionnementCarte(carte, targetId) {
 }
 
 function renderPointsLocalisations(locations) {
-  if (!_sourceLocalisations) return;
+  if (!_sourceLocalisations) return 0;
   _sourceLocalisations.clear();
 
   const features = (locations || [])
@@ -877,6 +898,7 @@ function renderPointsLocalisations(locations) {
   if (!ol.extent.isEmpty(extent)) {
     _carteLocalisations.getView().fit(extent, { padding: [40, 40, 40, 40], maxZoom: 15, duration: 300 });
   }
+  return features.length;
 }
 
 function parseDateFR(str) {
@@ -886,18 +908,23 @@ function parseDateFR(str) {
 }
 
 async function chargerEtRenderLocalisations(aniId) {
+  const modeToutes = document.getElementById('ficheNModeToutes')?.checked;
   const n = parseInt(document.getElementById('ficheInputN')?.value) || 25;
   const dateMin = parseDateFR(document.getElementById('ficheDateFrom')?.value);
   const dateMax = parseDateFR(document.getElementById('ficheDateTo')?.value);
 
   const locations = await fetchLocalisationsAnimal(currentToken, aniId, {
-    limitParAnimal: n,
+    limitParAnimal: modeToutes ? null : n,
     dateMin,
     dateMax
   });
-  renderPointsLocalisations(locations);
+  const count = renderPointsLocalisations(locations);
   _dernieresLocalisationsChargees = locations;
-  _dernieresLocalisationsLimiteAppliquee = n;
+  _dernieresLocalisationsLimiteAppliquee = modeToutes ? null : n;
+
+  const compteurEl = document.getElementById('compteurPositionsLocalisations');
+  if (compteurEl) compteurEl.textContent = `${count} position${count !== 1 ? 's' : ''} affichée${count !== 1 ? 's' : ''}`;
+
   return locations;
 }
 
@@ -909,6 +936,20 @@ document.getElementById('btnActualiserFiche')?.addEventListener('click', async (
     console.error('Erreur actualisation localisations:', err);
   }
 });
+
+document.getElementById('ficheNModeToutes')?.addEventListener('change', () => {
+  const inputN = document.getElementById('ficheInputN');
+  if (inputN) inputN.disabled = true;
+});
+document.getElementById('ficheNModeLimite')?.addEventListener('change', () => {
+  const inputN = document.getElementById('ficheInputN');
+  if (inputN) inputN.disabled = false;
+});
+
+if (window.flatpickr) {
+  flatpickr('#ficheDateFrom', { dateFormat: 'd/m/Y', allowInput: true, locale: 'fr' });
+  flatpickr('#ficheDateTo', { dateFormat: 'd/m/Y', allowInput: true, locale: 'fr' });
+}
 
 // --- Carte fusionnee sites de capture + sites de relache ---
 
@@ -943,6 +984,7 @@ function initCarteSites() {
 
   _carteSites = new ol.Map({
     target: 'ficheMapSites',
+    controls: [],
     layers: [
       creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]),
       coucheSitesCapture,
@@ -999,6 +1041,27 @@ function initCarteSites() {
       popupEl.style.display = 'block';
     });
     if (!hit) popupEl.style.display = 'none';
+  });
+
+  // Boutons zoom in/out/recentrer — memes parametres que le fit automatique de
+  // renderPointsSites() (padding/maxZoom, extent combine capture+relache).
+  document.getElementById('btnZoomInSites')?.addEventListener('click', () => {
+    const view = _carteSites.getView();
+    view.animate({ zoom: view.getZoom() + 1, duration: 200 });
+  });
+  document.getElementById('btnZoomOutSites')?.addEventListener('click', () => {
+    const view = _carteSites.getView();
+    view.animate({ zoom: view.getZoom() - 1, duration: 200 });
+  });
+  document.getElementById('btnZoomResetSites')?.addEventListener('click', () => {
+    const extent = ol.extent.createEmpty();
+    ol.extent.extend(extent, _sourceSitesCapture?.getExtent() || ol.extent.createEmpty());
+    ol.extent.extend(extent, _sourceSitesRelache?.getExtent() || ol.extent.createEmpty());
+    if (!ol.extent.isEmpty(extent)) {
+      _carteSites.getView().fit(extent, { padding: [30, 30, 30, 30], maxZoom: 14, duration: 300 });
+    } else {
+      _carteSites.getView().animate({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM, duration: 300 });
+    }
   });
 
   observerRedimensionnementCarte(_carteSites, 'ficheMapSites');
