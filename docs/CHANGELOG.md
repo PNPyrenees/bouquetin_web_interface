@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.78.0] - 2026-07-27
+
+### Marquage oreilles et collier - masquage si N/A
+- Boucles d'oreille masquees (au lieu d'un gris par defaut) quand la couleur de marquage est N/A ou non reconnue
+- Collier et badge capteur masques si couleur N/A ou non reconnue, meme quand le collier est actif - meme logique de masquage que les oreilles
+- Suppression de COULEUR_OREILLE_DEFAUT et COULEUR_COLLIER_DEFAUT (config.js/config.example.js) - devenues du code mort suite au passage au masquage systematique
+
 ## [0.77.0] - 2026-07-27
 
 ### Illustration collier fiche individu
