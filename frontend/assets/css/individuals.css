@@ -644,7 +644,8 @@ select.indiv-col-filtre {
   color: var(--color-text-muted);
 }
 
-.fiche-carte-controles input {
+.fiche-carte-controles input,
+.fiche-carte-controles select {
   border: 1px solid var(--color-border);
   border-radius: var(--input-border-radius);
   padding: 6px 10px;
@@ -657,6 +658,37 @@ select.indiv-col-filtre {
   background: #e8efec;
   border-radius: 4px;
   border: 1px solid var(--color-border);
+}
+
+/* Popup carte (Localisations/Sites) — classe partagee. map.css (style du #popup de la
+   carte principale) n'est pas charge sur cette page (individuals.html ne charge que
+   main.css + individuals.css) — meme apparence recreee ici plutot qu'importee. */
+.fiche-map-popup {
+  display: none;
+  position: absolute;
+  z-index: 2000;
+  background: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 140px;
+  max-width: 220px;
+  font-family: var(--font-family);
+  font-size: 12px;
+}
+
+.fiche-map-popup strong {
+  display: block;
+  color: #2D6A4F;
+  font-weight: 700;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.fiche-map-popup .popup-champ {
+  color: #333;
+  font-size: 11px;
+  margin: 2px 0 0;
 }
 
 /* #ficheMapLocalisations (onglet Synthese) est dans .fiche-col > .fiche-carte >
