@@ -49,6 +49,22 @@
   --select-width: 85%;
 }
 
+/* ============================================
+   THEME CARTE — variables partagees entre la page Carte et la fiche individu.
+   Definies ici (main.css charge partout) plutot que dans map.css (non charge sur
+   individuals.html) pour que .fiche-map-toolbar-zoom, .fiche-map-compteur et
+   .capture-map-legende recoivent bien le fond vert translucide.
+   ============================================ */
+:root {
+  --map-ui-color-rgb: 9, 148, 105;         /* vert pur (--color-primary) en RGB */
+  --map-ui-opacity: 0.5;                   /* opacite du fond — variable independante */
+  --map-ui-color-active-rgb: 6, 107, 74;   /* vert actif/selectionne en RGB */
+  --map-ui-opacity-active: 0.95;           /* opacite du fond en etat actif/hover */
+  --map-ui-bg: rgba(var(--map-ui-color-rgb), var(--map-ui-opacity));
+  --map-ui-bg-active: rgba(var(--map-ui-color-active-rgb), var(--map-ui-opacity-active));
+  --map-ui-text: #ffffff;                  /* texte/libelles/nombres (ex: "200 km") */
+  --map-ui-icon: #ffffff;                  /* icones des boutons + trait de l'echelle */
+}
 
 * {
   margin: 0;
