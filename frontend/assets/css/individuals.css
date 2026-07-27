@@ -436,9 +436,9 @@ select.indiv-col-filtre {
 
 .fiche-illustration--femelle .fiche-illustration-collier {
   left: 37.5%;
-  top: 71.5%;
-  width: 46.5%;
-  transform: rotate(-39deg);
+  top: 64.5%;
+  width: 48.5%;
+  transform: rotate(-38deg);
 }
 
 .fiche-illustration--femelle .fiche-illustration-oreille-gauche {
@@ -455,10 +455,10 @@ select.indiv-col-filtre {
 }
 
 .fiche-illustration--femelle .fiche-illustration-capteur {
-  left: 32%;
-  top: 90%;
-  width: 20%;
-  transform: rotate(-7deg);
+  left: 37.5%;
+  top: 81.5%;
+  width: 21%;
+  transform: rotate(-11deg);
 }
 
 /* Pastille de statut superposee en bas a droite de la photo — reutilise les cles
