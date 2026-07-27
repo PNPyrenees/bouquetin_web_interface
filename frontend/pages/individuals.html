@@ -15,6 +15,7 @@
   <script src="https://cdn.jsdelivr.net/npm/ol@v10.9.0/dist/ol.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
   <link rel="stylesheet" href="../assets/css/main.css">
@@ -278,14 +279,19 @@
           <div class="fiche-carte-titre">Distance parcourue par mois</div>
           <div class="fiche-carte-periode" id="periodeDistanceMois"></div>
           <div class="fiche-carte-corps">
-            <div class="fiche-graphique-bloc" id="chartDistanceMois"></div>
-          </div>
-        </div>
-        <div class="fiche-carte">
-          <div class="fiche-carte-titre">Altitude moyenne par saison</div>
-          <div class="fiche-carte-periode">Historique complet</div>
-          <div class="fiche-carte-corps">
-            <div class="fiche-graphique-bloc" id="chartAltitudeSaison"></div>
+            <div class="fiche-graphique-bloc" id="chartDistanceMoisWrapper">
+              <canvas id="chartDistanceMois"></canvas>
+            </div>
+            <div class="fiche-graphique-legende">
+              <div class="legende-item">
+                <div class="legende-pastille legende-pastille-collier-actif"></div>
+                <span>Collier actif</span>
+              </div>
+              <div class="legende-item">
+                <div class="legende-pastille legende-pastille-collier-inactif"></div>
+                <span>Pas de collier actif</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
