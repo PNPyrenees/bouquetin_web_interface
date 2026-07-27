@@ -19,6 +19,9 @@
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
   <link rel="stylesheet" href="../assets/css/main.css">
   <link rel="stylesheet" href="../assets/css/individuals.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/fr.js"></script>
 </head>
 
 <body>
@@ -182,10 +185,21 @@
             <div class="fiche-carte-titre">Dernières localisations</div>
             <div class="fiche-carte-corps">
               <div class="fiche-carte-controles">
-                <label>
-                  Nombre de dernières positions
-                  <input type="number" id="ficheInputN" min="1" value="25">
-                </label>
+                <div class="input-group-n">
+                  <div class="positions-mode">
+                    <label class="checkbox-label">
+                      <input type="radio" name="ficheNPositionsMode" id="ficheNModeToutes" value="toutes">
+                      <span>Toutes les positions</span>
+                    </label>
+                    <label class="checkbox-label">
+                      <input type="radio" name="ficheNPositionsMode" id="ficheNModeLimite" value="limite" checked>
+                      <div class="inputn-wrapper">
+                        <input type="number" id="ficheInputN" class="inputn-field" min="1" value="25">
+                      </div>
+                      <span>dernières positions</span>
+                    </label>
+                  </div>
+                </div>
                 <label>
                   Du
                   <input type="text" id="ficheDateFrom" placeholder="JJ/MM/AAAA" autocomplete="off">
@@ -200,8 +214,22 @@
                 </label>
                 <button id="btnActualiserFiche" class="btn-apply">Actualiser</button>
               </div>
-              <div id="ficheMapLocalisations" class="fiche-map"></div>
-              <div id="popupLocalisations" class="fiche-map-popup"></div>
+              <div class="fiche-map-conteneur">
+                <div id="ficheMapLocalisations" class="fiche-map"></div>
+                <div id="popupLocalisations" class="fiche-map-popup"></div>
+                <div class="fiche-map-toolbar-zoom">
+                  <button id="btnZoomInLocalisations" class="fiche-toolbar-btn" title="Zoom avant">
+                    <svg width="16" height="16"><use href="../assets/img/sprite.svg#icon-zoom-in"/></svg>
+                  </button>
+                  <button id="btnZoomOutLocalisations" class="fiche-toolbar-btn" title="Zoom arrière">
+                    <svg width="16" height="16"><use href="../assets/img/sprite.svg#icon-zoom-out"/></svg>
+                  </button>
+                  <button id="btnZoomResetLocalisations" class="fiche-toolbar-btn" title="Recentrer">
+                    <svg width="16" height="16" class="fiche-icon-recentrer"><use href="../assets/img/sprite.svg#icon-recentrer"/></svg>
+                  </button>
+                </div>
+                <div id="compteurPositionsLocalisations" class="fiche-map-compteur">0 position</div>
+              </div>
             </div>
           </div>
           <div class="fiche-carte" id="carteSites">
@@ -216,6 +244,17 @@
               <div class="capture-map-conteneur">
                 <div id="ficheMapSites" class="fiche-map capture-map"></div>
                 <div id="popupSites" class="fiche-map-popup"></div>
+                <div class="fiche-map-toolbar-zoom">
+                  <button id="btnZoomInSites" class="fiche-toolbar-btn" title="Zoom avant">
+                    <svg width="16" height="16"><use href="../assets/img/sprite.svg#icon-zoom-in"/></svg>
+                  </button>
+                  <button id="btnZoomOutSites" class="fiche-toolbar-btn" title="Zoom arrière">
+                    <svg width="16" height="16"><use href="../assets/img/sprite.svg#icon-zoom-out"/></svg>
+                  </button>
+                  <button id="btnZoomResetSites" class="fiche-toolbar-btn" title="Recentrer">
+                    <svg width="16" height="16" class="fiche-icon-recentrer"><use href="../assets/img/sprite.svg#icon-recentrer"/></svg>
+                  </button>
+                </div>
                 <div class="legende-panel capture-map-legende">
                   <div class="legende-contenu">
                     <div class="legende-item">
