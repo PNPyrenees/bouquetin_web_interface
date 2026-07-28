@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## [0.83.0] - 2026-07-28
+
+### Carte Sites - couleurs dynamiques, formes et traits fleches
+- GLASBEY_32 et getCouleurParIndex deplaces vers config.js - partages entre map.js et individuals.js sans dependance croisee
+- Couleurs dynamiques par paire capture/relache transloquee et par objectif de capture simple - filtrage des teintes sombres de la palette pour rester lisible avec bordure fixe
+- Formes differenciees sur la carte Sites : rond pour un evenement transloque, carre pour une capture simple
+- Bordures fixes par role : noire pour toute capture, blanche pour tout relache
+- Trait et fleche reliant capture et relache d'un meme evenement transloque
+- Pastille de couleur ajoutee dans l'en-tete texte de chaque evenement - coherence visuelle carte et bloc texte
+- Legende de la carte Sites reconstruite dynamiquement (une entree par evenement/objectif avec sa vraie couleur) - clic sur une ligne zoome sur le ou les points correspondants
+- Ordre des evenements Capture et Relache inverse en chronologique croissant (plus ancien en premier)
+- Correction affichage dates dans le popup de la carte Sites (format sans heure, coherent avec le reste de la fiche)
+- Correction calcul Date de premiere capture - utilise desormais le fallback relache_date comme le tri des evenements
+
 ## [0.82.0] - 2026-07-27
 
 ### Graphique Distance parcourue - refonte complete
