@@ -151,43 +151,18 @@
               <h2 id="ficheNom">N/A</h2>
             </div>
             <div class="fiche-entete-champs" id="carteIdentitePrincipale"></div>
-            <hr class="fiche-entete-separateur">
+            <div class="fiche-entete-champs" id="carteIdentiteMarquage"></div>
             <div class="fiche-entete-champs" id="carteIdentiteDates"></div>
           </div>
         </div>
       </div>
 
-      <div class="fiche-grid-2col">
-        <div class="fiche-col">
-          <div class="fiche-carte" id="carteCapturesRelaches">
-            <div class="fiche-carte-titre">Captures &amp; Relâchés</div>
-            <div class="fiche-carte-corps">
-              <div class="capture-relache-liste" id="captureRelacheListe">
-                <!-- Peuplée en JS par remplirEvenementsCaptureRelache() -->
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="fiche-col fiche-col-carte">
+      <div class="fiche-grid-2x2">
           <div class="fiche-carte" id="carteDernieresLocalisations">
-            <div class="fiche-carte-titre">Dernières localisations</div>
-            <div class="fiche-carte-corps">
+            <div class="fiche-carte-entete-ligne">
+              <div class="fiche-carte-titre">Dernières localisations</div>
               <div class="fiche-carte-controles">
-                <div class="input-group-n">
-                  <div class="positions-mode">
-                    <label class="checkbox-label">
-                      <input type="radio" name="ficheNPositionsMode" id="ficheNModeToutes" value="toutes">
-                      <span>Toutes les positions</span>
-                    </label>
-                    <label class="checkbox-label">
-                      <input type="radio" name="ficheNPositionsMode" id="ficheNModeLimite" value="limite" checked>
-                      <div class="inputn-wrapper">
-                        <input type="number" id="ficheInputN" class="inputn-field" min="1" value="25">
-                      </div>
-                      <span>dernières positions</span>
-                    </label>
-                  </div>
-                </div>
+                <input type="number" id="ficheInputN" placeholder="Toutes" min="1" title="Nombre de positions">
                 <label>
                   Du
                   <input type="text" id="ficheDateFrom" placeholder="JJ/MM/AAAA" autocomplete="off">
@@ -196,12 +171,10 @@
                   Au
                   <input type="text" id="ficheDateTo" placeholder="JJ/MM/AAAA" autocomplete="off">
                 </label>
-                <label>
-                  Fond de carte
-                  <select id="selectBasemapLocalisations"></select>
-                </label>
                 <button id="btnActualiserFiche" class="btn-apply">Actualiser</button>
               </div>
+            </div>
+            <div class="fiche-carte-corps">
               <div class="fiche-map-conteneur">
                 <div id="ficheMapLocalisations" class="fiche-map"></div>
                 <div id="popupLocalisations" class="fiche-map-popup"></div>
@@ -215,48 +188,19 @@
                   <button id="btnZoomResetLocalisations" class="fiche-toolbar-btn" title="Recentrer">
                     <svg width="16" height="16" class="fiche-icon-recentrer"><use href="../assets/img/sprite.svg#icon-recentrer"/></svg>
                   </button>
+                  <button id="btnFondsCarteLocalisations" class="fiche-toolbar-btn" title="Fonds de carte">
+                    <svg width="16" height="16" class="fiche-icon-recentrer"><use href="../assets/img/sprite.svg#icon-couches"/></svg>
+                  </button>
+                </div>
+                <div class="fiche-basemap-panel" id="basemapPanelLocalisations">
+                  <div class="fiche-basemap-liste" id="basemapListeLocalisations">
+                    <!-- Peuplée en JS par initBoutonFondsCarte() -->
+                  </div>
                 </div>
                 <div id="compteurPositionsLocalisations" class="fiche-map-compteur">0 position</div>
               </div>
             </div>
           </div>
-          <div class="fiche-carte" id="carteSites">
-            <div class="fiche-carte-titre">Sites de capture &amp; relâché</div>
-            <div class="fiche-carte-corps">
-              <div class="fiche-carte-controles">
-                <label>
-                  Fond de carte
-                  <select id="selectBasemapSites"></select>
-                </label>
-              </div>
-              <div class="capture-map-conteneur">
-                <div id="ficheMapSites" class="fiche-map capture-map"></div>
-                <div id="popupSites" class="fiche-map-popup"></div>
-                <div class="fiche-map-toolbar-zoom">
-                  <button id="btnZoomInSites" class="fiche-toolbar-btn" title="Zoom avant">
-                    <svg width="16" height="16"><use href="../assets/img/sprite.svg#icon-zoom-in"/></svg>
-                  </button>
-                  <button id="btnZoomOutSites" class="fiche-toolbar-btn" title="Zoom arrière">
-                    <svg width="16" height="16"><use href="../assets/img/sprite.svg#icon-zoom-out"/></svg>
-                  </button>
-                  <button id="btnZoomResetSites" class="fiche-toolbar-btn" title="Recentrer">
-                    <svg width="16" height="16" class="fiche-icon-recentrer"><use href="../assets/img/sprite.svg#icon-recentrer"/></svg>
-                  </button>
-                </div>
-                <div class="legende-panel capture-map-legende">
-                  <div class="legende-contenu">
-                    <div id="legendeSitesCouleurs" class="legende-sites-couleurs">
-                      <!-- Peuplée en JS par construireLegendeSites() -->
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="fiche-grid-graphiques">
         <div class="fiche-carte">
           <div class="fiche-carte-titre">Distance parcourue par mois</div>
           <div class="fiche-carte-periode" id="periodeDistanceMois"></div>
@@ -276,6 +220,49 @@
             </div>
           </div>
         </div>
+        <div class="fiche-carte" id="carteCapturesRelaches">
+          <div class="fiche-carte-titre">Captures &amp; Relâchés</div>
+          <div class="fiche-carte-corps">
+            <div class="capture-relache-liste" id="captureRelacheListe">
+              <!-- Peuplée en JS par remplirEvenementsCaptureRelache() -->
+            </div>
+          </div>
+        </div>
+          <div class="fiche-carte" id="carteSites">
+            <div class="fiche-carte-titre">Sites de capture &amp; relâché</div>
+            <div class="fiche-carte-corps">
+              <div class="capture-map-conteneur">
+                <div id="ficheMapSites" class="fiche-map capture-map"></div>
+                <div id="popupSites" class="fiche-map-popup"></div>
+                <div class="fiche-map-toolbar-zoom">
+                  <button id="btnZoomInSites" class="fiche-toolbar-btn" title="Zoom avant">
+                    <svg width="16" height="16"><use href="../assets/img/sprite.svg#icon-zoom-in"/></svg>
+                  </button>
+                  <button id="btnZoomOutSites" class="fiche-toolbar-btn" title="Zoom arrière">
+                    <svg width="16" height="16"><use href="../assets/img/sprite.svg#icon-zoom-out"/></svg>
+                  </button>
+                  <button id="btnZoomResetSites" class="fiche-toolbar-btn" title="Recentrer">
+                    <svg width="16" height="16" class="fiche-icon-recentrer"><use href="../assets/img/sprite.svg#icon-recentrer"/></svg>
+                  </button>
+                  <button id="btnFondsCarteSites" class="fiche-toolbar-btn" title="Fonds de carte">
+                    <svg width="16" height="16" class="fiche-icon-recentrer"><use href="../assets/img/sprite.svg#icon-couches"/></svg>
+                  </button>
+                </div>
+                <div class="fiche-basemap-panel" id="basemapPanelSites">
+                  <div class="fiche-basemap-liste" id="basemapListeSites">
+                    <!-- Peuplée en JS par initBoutonFondsCarte() -->
+                  </div>
+                </div>
+                <div class="legende-panel capture-map-legende">
+                  <div class="legende-contenu">
+                    <div id="legendeSitesCouleurs" class="legende-sites-couleurs">
+                      <!-- Peuplée en JS par construireLegendeSites() -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
       </div>
     </div>
 
