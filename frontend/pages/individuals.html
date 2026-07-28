@@ -159,24 +159,11 @@
 
       <div class="fiche-grid-2col">
         <div class="fiche-col">
-          <div class="fiche-carte" id="carteInformationsGPS">
-            <div class="fiche-carte-titre">Capteur GPS</div>
-            <div class="fiche-carte-corps"></div>
-          </div>
           <div class="fiche-carte" id="carteCapturesRelaches">
             <div class="fiche-carte-titre">Captures &amp; Relâchés</div>
             <div class="fiche-carte-corps">
-              <div class="capture-relache-section">
-                <div class="capture-relache-soustitre">Captures</div>
-                <div class="capture-relache-liste" id="captureListe">
-                  <!-- Peuplée en JS par remplirListeCaptures() -->
-                </div>
-              </div>
-              <div class="capture-relache-section">
-                <div class="capture-relache-soustitre">Relâchés</div>
-                <div class="capture-relache-liste" id="relacheListe">
-                  <!-- Peuplée en JS par remplirListeRelaches() -->
-                </div>
+              <div class="capture-relache-liste" id="captureRelacheListe">
+                <!-- Peuplée en JS par remplirEvenementsCaptureRelache() -->
               </div>
             </div>
           </div>
@@ -258,13 +245,8 @@
                 </div>
                 <div class="legende-panel capture-map-legende">
                   <div class="legende-contenu">
-                    <div class="legende-item">
-                      <div class="legende-pastille legende-pastille-capture"></div>
-                      <span>Site de capture</span>
-                    </div>
-                    <div class="legende-item">
-                      <div class="legende-pastille legende-pastille-default"></div>
-                      <span>Site de relâché</span>
+                    <div id="legendeSitesCouleurs" class="legende-sites-couleurs">
+                      <!-- Peuplée en JS par construireLegendeSites() -->
                     </div>
                   </div>
                 </div>
