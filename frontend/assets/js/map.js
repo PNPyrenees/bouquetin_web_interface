@@ -1,4 +1,4 @@
-import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG } from './config.js';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG, GLASBEY_32, getCouleurParIndex } from './config.js';
 let map;
 let gpsSource;
 let gpsLayer;
@@ -21,43 +21,6 @@ let _webglContextLost = false;
 // changerModeCouleur() sache quels attributs sont deja en place sur les features.
 let _modeCouleurActif = 'individu';
 
-// Palette Glasbey 32 — conçue pour maximiser la distance perceptuelle
-// Source : Glasbey et al. (2007), utilisée en bioinformatique et cartographie SIG
-const GLASBEY_32 = [
-  '#0000FF', // 1  Bleu
-  '#FF0000', // 2  Rouge
-  '#00FF00', // 3  Vert
-  '#000033', // 4  Bleu nuit
-  '#FF00B6', // 5  Rose
-  '#005300', // 6  Vert fonce
-  '#FFD300', // 7  Jaune
-  '#009FFF', // 8  Bleu ciel
-  '#9A4D42', // 9  Marron
-  '#00FFBE', // 10 Turquoise
-  '#783FC1', // 11 Violet
-  '#1F9698', // 12 Teal
-  '#FFACFD', // 13 Rose clair
-  '#B1CC71', // 14 Vert-jaune
-  '#F1085C', // 15 Rouge-rose
-  '#FE8F42', // 16 Orange
-  '#DD00FF', // 17 Magenta
-  '#201A01', // 18 Noir-marron
-  '#720055', // 19 Bordeaux
-  '#766C95', // 20 Gris-violet
-  '#02AD24', // 21 Vert vif
-  '#C8FF00', // 22 Vert citron
-  '#886C00', // 23 Or fonce
-  '#FFB79F', // 24 Saumon
-  '#858567', // 25 Kaki
-  '#A10300', // 26 Rouge fonce
-  '#14F9FF', // 27 Cyan vif
-  '#00478E', // 28 Bleu marine
-  '#96F1FA', // 29 Bleu clair
-  '#65FF00', // 30 Vert lime
-  '#FF937E', // 31 Corail
-  '#CB0076', // 32 Framboise
-];
-
 // Contours variables — 4 styles pour differencier les individus avec couleurs proches
 const CONTOURS = [
   { strokeR: 255, strokeG: 255, strokeB: 255, strokeA: 1, strokeWidth: 2 }, // Blanc
@@ -69,10 +32,6 @@ const CONTOURS = [
 // Suffixe normalise par mode — utilise par renderPoints() (mode actif uniquement)
 // et changerModeCouleur() (injection des nouvelles couleurs a la volee).
 const MODES_COULEUR_SUFFIXES = { individu: 'Individu', sexe: 'Sexe', gestionnaire: 'Gestionnaire' };
-
-function getCouleurParIndex(index) {
-  return GLASBEY_32[index % GLASBEY_32.length];
-}
 
 // Override — couleurs de remplissage de GLASBEY_32 assez sombres (luminance percue
 // ITU-R BT.601 <= 58, seuil fixe par #00478E) pour que le contour cyclique (Blanc/Noir/
