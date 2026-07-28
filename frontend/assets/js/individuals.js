@@ -370,17 +370,23 @@ function ligneInfo(label, valeur) {
 }
 
 function remplirIdentite(detail) {
-  const corps = document.getElementById('carteIdentitePrincipale');
-  if (!corps) return;
-  corps.innerHTML = '';
-  corps.appendChild(ligneInfo('Code', detail?.ani_code));
-  corps.appendChild(ligneInfo('Sexe', detail?.ani_sexe));
-  corps.appendChild(ligneInfo('Année de naissance', detail?.ani_annee_naissance));
-  corps.appendChild(ligneInfo('Population', detail?.ani_pop_rattach));
-  corps.appendChild(ligneInfo('Gestionnaire', detail?.ani_gestionnaire));
-  corps.appendChild(ligneInfo('Oreille droite', detail?.ani_marquage_oreille_droite));
-  corps.appendChild(ligneInfo('Oreille gauche', detail?.ani_marquage_oreille_gauche));
-  corps.appendChild(ligneInfo('Commentaire', detail?.ani_commentaire));
+  const corpsPrincipal = document.getElementById('carteIdentitePrincipale');
+  if (corpsPrincipal) {
+    corpsPrincipal.innerHTML = '';
+    corpsPrincipal.appendChild(ligneInfo('Code', detail?.ani_code));
+    corpsPrincipal.appendChild(ligneInfo('Sexe', detail?.ani_sexe));
+    corpsPrincipal.appendChild(ligneInfo('Année de naissance', detail?.ani_annee_naissance));
+    corpsPrincipal.appendChild(ligneInfo('Population', detail?.ani_pop_rattach));
+    corpsPrincipal.appendChild(ligneInfo('Gestionnaire', detail?.ani_gestionnaire));
+  }
+
+  const corpsMarquage = document.getElementById('carteIdentiteMarquage');
+  if (corpsMarquage) {
+    corpsMarquage.innerHTML = '';
+    corpsMarquage.appendChild(ligneInfo('Oreille droite', detail?.ani_marquage_oreille_droite));
+    corpsMarquage.appendChild(ligneInfo('Oreille gauche', detail?.ani_marquage_oreille_gauche));
+    corpsMarquage.appendChild(ligneInfo('Commentaire', detail?.ani_commentaire));
+  }
 }
 
 /**
@@ -850,26 +856,57 @@ function changerCoucheBasemap(carte, basemapId) {
 // est un callback (pas la carte directement) car le select est peuple au chargement du
 // script, avant que _carteLocalisations/_carteSites existent (crees a la demande dans
 // initCarteLocalisations/initCarteSites, au premier affichage d'une fiche).
-function initSelectBasemap(selectId, getCarteActuelle) {
-  const select = document.getElementById(selectId);
-  if (!select) return;
+// Bouton + panneau liste verticale compacte pour choisir le fond de carte — remplace
+// l'ancien <select>. Reutilise changerCoucheBasemap() (layer unique remplace, pas
+// d'empilement des 8 fonds comme sur la page Carte — carte fiche individu volontairement
+// plus legere, decision documentee sur changerCoucheBasemap).
+function initBoutonFondsCarte(suffixe, getCarteActuelle) {
+  const bouton = document.getElementById(`btnFondsCarte${suffixe}`);
+  const panneau = document.getElementById(`basemapPanel${suffixe}`);
+  const liste = document.getElementById(`basemapListe${suffixe}`);
+  if (!bouton || !panneau || !liste) return;
 
-  select.innerHTML = '';
+  liste.innerHTML = '';
   BASEMAPS_CONFIG.forEach(bm => {
-    const option = document.createElement('option');
-    option.value = bm.id;
-    option.textContent = bm.nom;
-    if (bm.visible) option.selected = true;
-    select.appendChild(option);
+    const item = document.createElement('div');
+    item.className = `fiche-basemap-item${bm.visible ? ' active' : ''}`;
+
+    const img = document.createElement('div');
+    img.className = 'fiche-basemap-item-img';
+    const imgEl = document.createElement('img');
+    imgEl.src = `../${bm.apercu}`;
+    imgEl.alt = bm.nom;
+    imgEl.onerror = () => { imgEl.style.display = 'none'; };
+    img.appendChild(imgEl);
+
+    const nom = document.createElement('span');
+    nom.textContent = bm.nom;
+
+    item.append(img, nom);
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      liste.querySelectorAll('.fiche-basemap-item').forEach(el => el.classList.remove('active'));
+      item.classList.add('active');
+      changerCoucheBasemap(getCarteActuelle(), bm.id);
+      panneau.classList.remove('open');
+    });
+    liste.appendChild(item);
   });
 
-  select.addEventListener('change', () => {
-    changerCoucheBasemap(getCarteActuelle(), select.value);
+  bouton.addEventListener('click', (e) => {
+    e.stopPropagation();
+    panneau.classList.toggle('open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (panneau.classList.contains('open') && !panneau.contains(e.target) && !bouton.contains(e.target)) {
+      panneau.classList.remove('open');
+    }
   });
 }
 
-initSelectBasemap('selectBasemapLocalisations', () => _carteLocalisations);
-initSelectBasemap('selectBasemapSites', () => _carteSites);
+initBoutonFondsCarte('Localisations', () => _carteLocalisations);
+initBoutonFondsCarte('Sites', () => _carteSites);
 
 // EPSG:2154 (Lambert-93) — coherent avec le reste du schema (t_animal/v_localisation
 // via f_get_localisation). Utilise pour l'avertissement de coherence du CRS/SRID dans
@@ -1095,13 +1132,13 @@ function parseDateFR(str) {
 }
 
 async function chargerEtRenderLocalisations(aniId) {
-  const modeToutes = document.getElementById('ficheNModeToutes')?.checked;
-  const n = parseInt(document.getElementById('ficheInputN')?.value) || 25;
+  const valeurN = document.getElementById('ficheInputN')?.value.trim();
+  const n = valeurN ? parseInt(valeurN) : null;
   const dateMin = parseDateFR(document.getElementById('ficheDateFrom')?.value);
   const dateMax = parseDateFR(document.getElementById('ficheDateTo')?.value);
 
   const locations = await fetchLocalisationsAnimal(currentToken, aniId, {
-    limitParAnimal: modeToutes ? null : n,
+    limitParAnimal: n,
     dateMin,
     dateMax
   });
@@ -1120,15 +1157,6 @@ document.getElementById('btnActualiserFiche')?.addEventListener('click', async (
   } catch (err) {
     console.error('Erreur actualisation localisations:', err);
   }
-});
-
-document.getElementById('ficheNModeToutes')?.addEventListener('change', () => {
-  const inputN = document.getElementById('ficheInputN');
-  if (inputN) inputN.disabled = true;
-});
-document.getElementById('ficheNModeLimite')?.addEventListener('change', () => {
-  const inputN = document.getElementById('ficheInputN');
-  if (inputN) inputN.disabled = false;
 });
 
 if (window.flatpickr) {
