@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.84.0] - 2026-07-30
+
+### Disposition generale fiche individu (point 2.6)
+- Restructuration en grille 2x2 symetrique : Dernieres localisations et Graphique en premiere rangee, Captures & Relaches et Sites capture/relache en seconde rangee - hauteur fixe identique sur les 4 cellules, totalement independantes les unes des autres
+- Scroll interne uniquement sur Captures & Relaches si le contenu depasse la hauteur fixe - les 3 autres cellules (cartes OpenLayers, graphique) remplissent exactement leur espace
+- Controles de la carte Dernieres localisations (Positions/Du/Au/Actualiser) deplaces sur la meme ligne que le titre, format compact - libere l'espace vertical pour la carte
+- En-tete d'identite passe de 2 a 3 colonnes : identite principale / marquage (oreilles, commentaire) / dates cles
+
 ## [0.83.0] - 2026-07-28
 
 ### Carte Sites - couleurs dynamiques, formes et traits fleches
