@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchAnimauxSuivis, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal } from './api.js';
-import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, COULEURS_MARQUAGE } from './config.js';
+import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, COULEURS_MARQUAGE, GLASBEY_32, getCouleurParIndex } from './config.js';
 
 let currentToken = null;
 let currentAniId = null;
@@ -14,8 +14,8 @@ let _sourceLocalisations = null;
 // Carte "sites de capture/relache" fusionnee — deux sources vectorielles (couleurs
 // distinctes) sur une seule instance OpenLayers, plutot que deux cartes separees.
 let _carteSites = null;
-let _sourceSitesCapture = null;
-let _sourceSitesRelache = null;
+let _sourceSitesPoints = null;
+let _sourceSitesLiens = null;
 let _popupOverlayLocalisations = null;
 let _popupOverlaySites = null;
 let _projRegistered = false;
@@ -337,6 +337,27 @@ function creerValeurNode(v) {
   return document.createTextNode(v);
 }
 
+// Formate une date/heure ISO (YYYY-MM-DD ou YYYY-MM-DDTHH:mm[:ss]) en JJ/MM/AAAA, ou
+// JJ/MM/AAAA HH:mm si une heure significative est presente (differente de minuit) —
+// beaucoup de dates de capture/pose n'ont pas d'heure reelle (minuit par defaut cote
+// base), qu'il serait trompeur d'afficher comme un horaire precis. Parsing par regex
+// plutot que new Date() : evite tout decalage d'un jour du a l'interpretation UTC
+// d'une chaine date-only par le fuseau local du navigateur. Retourne la valeur brute
+// inchangee si le format n'est pas reconnu (securite).
+function formaterDateHeure(valeur, avecHeure = true) {
+  if (!valeur) return valeur;
+  const chaine = String(valeur);
+  const correspondance = chaine.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!correspondance) return valeur;
+
+  const [, aaaa, mm, jj, hh, min, ss] = correspondance;
+  const dateFormatee = `${jj}/${mm}/${aaaa}`;
+  if (!avecHeure) return dateFormatee;
+
+  const heureMinuit = !hh || (hh === '00' && min === '00' && (ss === undefined || ss === '00'));
+  return heureMinuit ? dateFormatee : `${dateFormatee} ${hh}:${min}`;
+}
+
 // Ligne label/valeur — evite d'ajouter de nouvelles classes CSS (hors perimetre de cette etape)
 function ligneInfo(label, valeur) {
   const p = document.createElement('p');
@@ -373,9 +394,9 @@ function remplirDatesCles(captures, locations) {
   if (!corps) return;
   corps.innerHTML = '';
 
-  const datesCapture = (captures || []).map(c => c.capture_date).filter(Boolean);
+  const datesCapture = (captures || []).map(dateReferenceEvenement).filter(Boolean);
   const premiereCapture = datesCapture.length > 0 ? datesCapture.reduce((min, d) => d < min ? d : min) : null;
-  corps.appendChild(ligneInfo('Date de première capture', premiereCapture));
+  corps.appendChild(ligneInfo('Date de première capture', formaterDateHeure(premiereCapture, false)));
 
   const datesLocalisation = (locations || [])
     .map(l => l.loc_datetime_local || l.loc_date_local)
@@ -383,7 +404,7 @@ function remplirDatesCles(captures, locations) {
   const derniereLocalisation = datesLocalisation.length > 0
     ? datesLocalisation.reduce((max, d) => d > max ? d : max)
     : null;
-  corps.appendChild(ligneInfo('Dernière localisation', derniereLocalisation));
+  corps.appendChild(ligneInfo('Dernière localisation', formaterDateHeure(derniereLocalisation, false)));
 }
 
 /**
@@ -464,35 +485,6 @@ function appliquerCouleursMarquage(detail, collierActif) {
   }
 }
 
-/**
- * Carte "Informations GPS" — champs t_capteur/bib_programmation disponibles
- * via fetchCapteurParAnimal, cf. mail Ludovic.
- */
-function remplirInformationsGPS(capteur) {
-  const corps = document.querySelector('#carteInformationsGPS .fiche-carte-corps');
-  if (!corps) return;
-  corps.innerHTML = '';
-
-  if (!capteur) {
-    corps.textContent = 'Aucun capteur associé';
-    return;
-  }
-
-  // t_capteur / bib_programmation — objets embarques par PostgREST (relation many-to-one),
-  // absents (undefined) si l embedding echoue ou si capt_id/prog_id est null sur la ligne
-  const t = capteur.t_capteur || {};
-  const prog = capteur.bib_programmation || {};
-
-  corps.appendChild(ligneInfo('ID capteur', t.capt_id));
-  corps.appendChild(ligneInfo('ID constructeur', t.capt_id_constructeur));
-  corps.appendChild(ligneInfo('Type', t.capt_type));
-  corps.appendChild(ligneInfo('Fréquence capteur', t.capt_frequence));
-  corps.appendChild(ligneInfo('Actif', t.capt_actif === true ? 'Oui' : t.capt_actif === false ? 'Non' : null));
-  corps.appendChild(ligneInfo('Programmation', prog.prog_desciption));
-  corps.appendChild(ligneInfo('Fréquence programmation', prog.prog_frequence));
-  corps.appendChild(ligneInfo('Durée acquisition', prog.prog_duree_acquisition));
-}
-
 // Ligne label/valeur pour une carte-evenement capture/relache — meme pattern que
 // ligneInfo() mais rendue via la classe .capture-event-champ (CSS dedie) plutot
 // que du style inline.
@@ -506,17 +498,96 @@ function creerChampCaptureRelache(label, valeur) {
   return p;
 }
 
-/**
- * Carte-evenement pour la colonne Capture — un champ 'jambe' (leg) capture par
- * evenement, independante de la colonne Relache (cf. creerCarteLegRelache).
- * Meme quand translocation=false (capture_zone/lieu_dit/site_geom garantis
- * identiques a relache_zone/lieu_dit/site_geom, regle metier Ludovic), chaque
- * colonne affiche son propre champ — pas de fusion, redondant mais coherent.
- * Badge translocation affiche uniquement ici (pas sur la carte Relache
- * correspondante, cf. creerCarteLegRelache) — un seul badge par evenement,
- * l'info etant la meme des deux cotes.
- */
-function creerCarteLegCapture(c) {
+// Heuristique de rapprochement pose de collier <-> evenement de capture : aucune FK
+// directe en base entre cor_animal_capteur et t_capture_relache (confirme en base le
+// 2026-07-28) — une pose est associee a un evenement si cor_date_debut tombe a +/- 1 jour
+// de la date de reference de l'evenement (capture_date, ou relache_date en repli si
+// capture_date est NULL — confirme en base le 2026-07-29 : ~78% des evenements
+// historiques (287/367) n'ont pas de capture_date renseignee, cf. cas Baptiste/ani_id 95 :
+// capture_date NULL, relache_date = cor_date_debut d'une pose reelle). Approximation
+// admise, pas une certitude garantie par le schema. Pas de garde anti-doublon si deux
+// evenements sont espaces de moins de 2 jours (cas trop rare pour justifier une regle
+// d'exclusivite, decision explicite du 2026-07-28).
+const TOLERANCE_JOURS_POSE_CAPTURE = 1;
+
+function joursEntre(dateA, dateB) {
+  return Math.abs(new Date(dateA) - new Date(dateB)) / 86400000;
+}
+
+// Date de reference d'un evenement pour le rapprochement avec une pose — capture_date
+// en priorite, relache_date en repli si absente (cf. commentaire TOLERANCE_JOURS_POSE_CAPTURE).
+function dateReferenceEvenement(c) {
+  return c.capture_date || c.relache_date || null;
+}
+
+function posesPourCapture(capture, capteurs) {
+  const dateReference = dateReferenceEvenement(capture);
+  if (!dateReference) return [];
+  return (capteurs || []).filter(cap =>
+    cap.cor_date_debut && joursEntre(cap.cor_date_debut, dateReference) <= TOLERANCE_JOURS_POSE_CAPTURE
+  );
+}
+
+// Avertissement uniquement (n'affecte jamais le rendu) : une pose sans evenement proche
+// est une anomalie potentielle (une pose est censee avoir lieu pendant une capture ou un
+// relache) — meme pattern que verifierCoherenceTranslocation.
+function signalerPosesOrphelines(captures, capteurs) {
+  (capteurs || []).forEach(cap => {
+    if (!cap.cor_date_debut) return;
+    const matchTrouve = (captures || []).some(c => {
+      const dateReference = dateReferenceEvenement(c);
+      return dateReference && joursEntre(cap.cor_date_debut, dateReference) <= TOLERANCE_JOURS_POSE_CAPTURE;
+    });
+    if (!matchTrouve) {
+      console.warn(
+        `Pose de collier (cor_id ${cap.cor_id}, cor_date_debut ${cap.cor_date_debut}) sans capture correspondante à ± ${TOLERANCE_JOURS_POSE_CAPTURE} jour — association heuristique par date, aucune capture proche trouvée.`,
+        cap
+      );
+    }
+  });
+}
+
+// Sous-bloc generique (Collier / Relache) imbrique dans une carte-evenement.
+function creerSousBlocCaptureRelache(titre, options = {}) {
+  const bloc = document.createElement('div');
+  bloc.className = `capture-event-sousbloc ${options.classe || ''}`.trim();
+  if (options.title) bloc.title = options.title;
+  const soustitre = document.createElement('div');
+  soustitre.className = 'capture-event-soustitre';
+  soustitre.textContent = titre;
+  bloc.appendChild(soustitre);
+  return bloc;
+}
+
+// Sous-bloc Collier — un par pose matchee (cf. posesPourCapture). title natif = tooltip
+// discret rappelant que l'association est heuristique (cf. Pas d'icones creees, texte/
+// attribut natif plutot qu'une icone inventee).
+function creerSousBlocCollier(pose) {
+  const bloc = creerSousBlocCaptureRelache('Collier posé', { classe: 'capture-event-sousbloc-collier' });
+  const t = pose.t_capteur || {};
+  const prog = pose.bib_programmation || {};
+  bloc.appendChild(creerChampCaptureRelache('Identifiant collier constructeur', t.capt_id_constructeur));
+  bloc.appendChild(creerChampCaptureRelache('Constructeur', t.capt_constructeur));
+  bloc.appendChild(creerChampCaptureRelache('Programmation', prog.prog_desciption));
+  bloc.appendChild(creerChampCaptureRelache('Date début pose', formaterDateHeure(pose.cor_date_debut, false)));
+  bloc.appendChild(creerChampCaptureRelache('Date fin pose', formaterDateHeure(pose.cor_date_fin, false)));
+  return bloc;
+}
+
+// Sous-bloc Relache — uniquement si translocation===true (sinon redondant avec le
+// leg capture, regle metier deja documentee sur l'ancienne creerCarteLegCapture).
+function creerSousBlocRelache(c) {
+  const bloc = creerSousBlocCaptureRelache('Relâché', { classe: 'capture-event-sousbloc-relache' });
+  bloc.appendChild(creerChampCaptureRelache('Date', formaterDateHeure(c.relache_date, false)));
+  bloc.appendChild(creerChampCaptureRelache('Zone', c.relache_zone));
+  bloc.appendChild(creerChampCaptureRelache('Lieu-dit', c.relache_lieu_dit));
+  return bloc;
+}
+
+// Carte-evenement unique par ligne t_capture_relache — remplace creerCarteLegCapture/
+// creerCarteLegRelache (deux colonnes separees). Integre le(s) sous-bloc(s) Collier
+// (poses matchees par date) et le sous-bloc Relache (si translocation).
+function creerCarteEvenementCaptureRelache(c, capteurs, couleurs) {
   const carte = document.createElement('div');
   carte.className = 'capture-event-carte';
 
@@ -524,11 +595,28 @@ function creerCarteLegCapture(c) {
   entete.className = 'capture-event-entete';
   const dateEl = document.createElement('span');
   dateEl.className = 'capture-event-date-principale';
-  dateEl.appendChild(creerValeurNode(c.capture_date));
-  const badge = document.createElement('span');
-  badge.className = `capture-event-badge-translocation ${c.translocation ? 'oui' : 'non'}`;
-  badge.textContent = c.translocation ? 'Transloqué' : 'Non transloqué';
-  entete.append(dateEl, badge);
+
+  const couleurEvenement = c.translocation === true
+    ? couleurs?.couleurParEvenement.get(c.capture_relache_id)
+    : couleurs?.couleurParObjectif.get(c.capture_objectif);
+  if (couleurEvenement) {
+    const pastille = document.createElement('span');
+    pastille.className = c.translocation === true
+      ? 'capture-event-pastille-couleur'
+      : 'capture-event-pastille-couleur carre';
+    pastille.style.backgroundColor = couleurEvenement;
+    dateEl.appendChild(pastille);
+  }
+
+  dateEl.appendChild(document.createTextNode('Capturé le '));
+  dateEl.appendChild(creerValeurNode(formaterDateHeure(c.capture_date, false)));
+  entete.appendChild(dateEl);
+  if (c.translocation === true) {
+    const badge = document.createElement('span');
+    badge.className = 'capture-event-badge-translocation oui';
+    badge.textContent = 'Translocation';
+    entete.appendChild(badge);
+  }
 
   const corps = document.createElement('div');
   corps.className = 'capture-event-corps';
@@ -536,35 +624,161 @@ function creerCarteLegCapture(c) {
   corps.appendChild(creerChampCaptureRelache('Lieu-dit', c.capture_lieu_dit));
   corps.appendChild(creerChampCaptureRelache('Méthode', c.capture_methode));
   corps.appendChild(creerChampCaptureRelache('Objectif', c.capture_objectif));
+  corps.appendChild(creerChampCaptureRelache('Commentaire', c.capture_relache_commentaire));
+
+  posesPourCapture(c, capteurs).forEach(pose => corps.appendChild(creerSousBlocCollier(pose)));
+
+  if (c.translocation === true) {
+    corps.appendChild(creerSousBlocRelache(c));
+  }
 
   carte.append(entete, corps);
   return carte;
 }
 
-// Carte-evenement pour la colonne Relache — pas de methode/objectif (champs
-// propres au leg capture uniquement).
-function creerCarteLegRelache(c) {
-  const carte = document.createElement('div');
-  carte.className = 'capture-event-carte';
+// Remplace remplirListeCaptures/remplirListeRelaches — une seule liste d'evenements,
+// triee par capture_date desc (meme ordre que l'ancienne liste Captures).
+// Couleurs dynamiques carte Sites <-> bloc texte : une couleur par paire capture/relache
+// transloquee (index selon l'ordre d'apparition), une couleur par objectif distinct pour
+// les captures non transloquees (carres) — deux espaces d'index separes (decision Ludovic
+// 2026-07-29), tous deux issus de la palette Glasbey 32 partagee (cf. config.js). Calculee
+// une seule fois par affichage de fiche et partagee entre remplirEvenementsCaptureRelache
+// (pastille dans l'en-tete) et renderPointsSites (couleur de remplissage des marqueurs).
+// Decalage d'index pour couleurParObjectif — evite qu'un objectif de capture simple et
+// un evenement transloque partagent la meme couleur juste parce que les deux systemes
+// d'index demarrent independamment a 0 (constate le 2026-07-29 : les deux premiers
+// elements de chaque serie tombaient sur #0000FF, 1re couleur de GLASBEY_32). Palette de
+// 32 couleurs coupee en deux moities de 16 — au-dela de 16 objectifs ou 16 evenements
+// transloques pour un meme animal, les couleurs recommencent a se chevaucher (cas non
+// rencontre en pratique).
+// Sous-ensemble "clair" de GLASBEY_32 — un marqueur capture (bordure noire fixe, cf.
+// stylePointSite) avec un remplissage trop sombre devient illisible, fondu dans sa
+// propre bordure (constate le 2026-07-29 sur l'index 17, '#201A01', deja identifie comme
+// problematique dans map.js via CONTOUR_OVERRIDE_PAR_COULEUR — mais la bordure y est
+// adaptable, alors qu'ici elle est fixe par role : on ecarte donc les teintes sombres en
+// amont plutot que de faire varier la bordure). Seuil de luminance percue (ITU-R BT.601)
+// identique a celui deja utilise dans map.js.
+const SEUIL_LUMINANCE_SOMBRE = 58;
 
-  const entete = document.createElement('div');
-  entete.className = 'capture-event-entete';
-  const dateEl = document.createElement('span');
-  dateEl.className = 'capture-event-date-principale';
-  dateEl.appendChild(creerValeurNode(c.relache_date));
-  entete.append(dateEl);
-
-  const corps = document.createElement('div');
-  corps.className = 'capture-event-corps';
-  corps.appendChild(creerChampCaptureRelache('Zone', c.relache_zone));
-  corps.appendChild(creerChampCaptureRelache('Lieu-dit', c.relache_lieu_dit));
-
-  carte.append(entete, corps);
-  return carte;
+function luminancePercue(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
-function remplirListeCaptures(captures) {
-  const conteneur = document.getElementById('captureListe');
+const INDICES_GLASBEY_CLAIRS = GLASBEY_32
+  .map((couleur, index) => (luminancePercue(couleur) > SEUIL_LUMINANCE_SOMBRE ? index : null))
+  .filter(index => index !== null);
+
+// Decalage entre couleurParEvenement et couleurParObjectif — moitie de la palette claire
+// (calcule dynamiquement, plutot qu'une valeur fixe comme avant).
+const OFFSET_COULEUR_OBJECTIF = Math.floor(INDICES_GLASBEY_CLAIRS.length / 2);
+
+function getCouleurClaireParIndex(index) {
+  return getCouleurParIndex(INDICES_GLASBEY_CLAIRS[index % INDICES_GLASBEY_CLAIRS.length]);
+}
+
+function construireCouleursCaptureRelache(captures) {
+  const triees = [...(captures || [])].sort((a, b) => (dateReferenceEvenement(a) || '').localeCompare(dateReferenceEvenement(b) || ''));
+  const couleurParEvenement = new Map();
+  const couleurParObjectif = new Map();
+
+  triees.forEach(c => {
+    if (c.translocation === true) {
+      if (!couleurParEvenement.has(c.capture_relache_id)) {
+        couleurParEvenement.set(c.capture_relache_id, getCouleurClaireParIndex(couleurParEvenement.size));
+      }
+    } else if (c.capture_objectif) {
+      if (!couleurParObjectif.has(c.capture_objectif)) {
+        couleurParObjectif.set(c.capture_objectif, getCouleurClaireParIndex(OFFSET_COULEUR_OBJECTIF + couleurParObjectif.size));
+      }
+    }
+  });
+
+  return { couleurParEvenement, couleurParObjectif };
+}
+
+// Legende dynamique de la carte Sites — une entree par evenement transloque (couleur
+// couleurParEvenement, libelle date) et une par objectif distinct de capture simple
+// (couleur couleurParObjectif, libelle objectif), meme principe que mettreAJourLegende()
+// (app.js, page Carte) : conteneur peuple en JS, une pastille + un label par entree.
+// Zoom/centre la carte Sites sur un ou plusieurs points (Lambert93) — un seul point
+// (boundingExtent degenere en etendue 0x0) recoit une marge artificielle pour rester
+// utilisable par fit(); plusieurs points utilisent leur etendue combinee reelle. Meme
+// fonction pour les deux cas plutot que deux chemins separes (capture/relache seuls vs
+// tous les points d'un objectif partage).
+function zoomSurPointsSites(coordsLambert93) {
+  if (!_carteSites || !coordsLambert93 || coordsLambert93.length === 0) return;
+  const pointsEcran = coordsLambert93.map(lambert93VersEcran);
+  const extent = ol.extent.boundingExtent(pointsEcran);
+  const extentAvecMarge = pointsEcran.length === 1 ? ol.extent.buffer(extent, 500) : extent;
+  _carteSites.getView().fit(extentAvecMarge, { padding: [30, 30, 30, 30], maxZoom: 15, duration: 400 });
+}
+
+function creerLigneLegendeSite(couleur, forme, role, label, coordsLambert93) {
+  const ligne = document.createElement('div');
+  ligne.className = 'legende-item legende-site-ligne-cliquable';
+
+  const pastille = document.createElement('span');
+  pastille.className = `legende-site-pastille legende-site-pastille-${forme}${role === 'relache' ? ' legende-site-pastille-relache' : ''}`;
+  pastille.style.background = couleur;
+
+  const texte = document.createElement('span');
+  texte.className = 'legende-site-label';
+  texte.textContent = label;
+
+  ligne.append(pastille, texte);
+  ligne.addEventListener('click', () => zoomSurPointsSites(coordsLambert93));
+  return ligne;
+}
+
+function construireLegendeSites(captures, couleurs) {
+  const conteneur = document.getElementById('legendeSitesCouleurs');
+  if (!conteneur || !couleurs) return;
+  conteneur.innerHTML = '';
+
+  const triees = [...(captures || [])].sort((a, b) => (dateReferenceEvenement(a) || '').localeCompare(dateReferenceEvenement(b) || ''));
+
+  // Coordonnees regroupees par objectif — plusieurs evenements peuvent partager le meme
+  // objectif, la ligne de legende doit alors zoomer sur l'etendue de tous, pas juste le
+  // premier rencontre.
+  const coordsParObjectif = new Map();
+  triees.forEach(c => {
+    if (c.translocation !== true && c.capture_objectif) {
+      const coord = parseGeomPostGIS(c.capture_site_geom);
+      if (!coord) return;
+      if (!coordsParObjectif.has(c.capture_objectif)) coordsParObjectif.set(c.capture_objectif, []);
+      coordsParObjectif.get(c.capture_objectif).push(coord);
+    }
+  });
+
+  const objectifsAffiches = new Set();
+
+  triees.forEach(c => {
+    if (c.translocation === true) {
+      const couleur = couleurs.couleurParEvenement.get(c.capture_relache_id);
+      if (!couleur) return;
+      const coordCapture = parseGeomPostGIS(c.capture_site_geom);
+      const coordRelache = parseGeomPostGIS(c.relache_site_geom);
+      if (coordCapture) {
+        conteneur.appendChild(creerLigneLegendeSite(couleur, 'ronde', 'capture', 'Capture (Translocation)', [coordCapture]));
+      }
+      if (coordRelache) {
+        conteneur.appendChild(creerLigneLegendeSite(couleur, 'ronde', 'relache', 'Relâché', [coordRelache]));
+      }
+    } else if (c.capture_objectif && !objectifsAffiches.has(c.capture_objectif)) {
+      objectifsAffiches.add(c.capture_objectif);
+      const couleur = couleurs.couleurParObjectif.get(c.capture_objectif);
+      const coords = coordsParObjectif.get(c.capture_objectif);
+      if (!couleur || !coords || coords.length === 0) return;
+      conteneur.appendChild(creerLigneLegendeSite(couleur, 'carree', 'capture', `Capture - ${c.capture_objectif}`, coords));
+    }
+  });
+}
+
+function remplirEvenementsCaptureRelache(captures, capteurs, couleurs) {
+  const conteneur = document.getElementById('captureRelacheListe');
   if (!conteneur) return;
   conteneur.innerHTML = '';
 
@@ -576,25 +790,10 @@ function remplirListeCaptures(captures) {
     return;
   }
 
-  const triees = [...captures].sort((a, b) => (b.capture_date || '').localeCompare(a.capture_date || ''));
-  triees.forEach(c => conteneur.appendChild(creerCarteLegCapture(c)));
-}
+  const triees = [...captures].sort((a, b) => (dateReferenceEvenement(a) || '').localeCompare(dateReferenceEvenement(b) || ''));
+  triees.forEach(c => conteneur.appendChild(creerCarteEvenementCaptureRelache(c, capteurs, couleurs)));
 
-function remplirListeRelaches(captures) {
-  const conteneur = document.getElementById('relacheListe');
-  if (!conteneur) return;
-  conteneur.innerHTML = '';
-
-  if (!captures || captures.length === 0) {
-    const vide = document.createElement('p');
-    vide.className = 'fiche-placeholder';
-    vide.textContent = 'Aucun relâché enregistré';
-    conteneur.appendChild(vide);
-    return;
-  }
-
-  const triees = [...captures].sort((a, b) => (b.relache_date || '').localeCompare(a.relache_date || ''));
-  triees.forEach(c => conteneur.appendChild(creerCarteLegRelache(c)));
+  signalerPosesOrphelines(captures, capteurs);
 }
 
 /**
@@ -939,27 +1138,64 @@ if (window.flatpickr) {
 
 // --- Carte fusionnee sites de capture + sites de relache ---
 
-function creerCoucheSitesCaptureRelache(source, couleur) {
-  return new ol.layer.Vector({
-    source,
-    style: new ol.style.Style({
-      image: new ol.style.Circle({
-        radius: 6,
-        fill: new ol.style.Fill({ color: couleur }),
-        stroke: new ol.style.Stroke({ color: '#ffffff', width: 1.5 })
-      })
+// Style dynamique des points de la carte Sites : rond (evenement transloque, capture+
+// relache) ou carre (capture seule, non transloquee) — bordure fixe universelle (noire
+// pour toute capture, blanche pour tout relache, cf. decision Ludovic 2026-07-29),
+// couleur de remplissage dynamique (cf. construireCouleursCaptureRelache).
+function stylePointSite(feature) {
+  const role = feature.get('_role');
+  const forme = feature.get('_forme');
+  const couleur = feature.get('_couleur') || '#9e9e9e';
+  const stroke = new ol.style.Stroke({ color: role === 'capture' ? '#000000' : '#ffffff', width: 3 });
+  const fill = new ol.style.Fill({ color: couleur });
+
+  const image = forme === 'carre'
+    ? new ol.style.RegularShape({ points: 4, radius: 8, angle: Math.PI / 4, fill, stroke })
+    : new ol.style.Circle({ radius: 7, fill, stroke });
+
+  return new ol.style.Style({ image });
+}
+
+// Trait + fleche entre le point capture et le point relache d'un meme evenement
+// transloque — meme pattern que renderTrajectoire() (map.js), reimplemente ici pour ne
+// pas dependre de map.js (cf. decision architecturale documentee plus haut).
+function creerFeaturesLienSite(coordCaptureLambert93, coordRelacheLambert93, couleur) {
+  const pointA = lambert93VersEcran(coordCaptureLambert93);
+  const pointB = lambert93VersEcran(coordRelacheLambert93);
+
+  const ligne = new ol.Feature({ geometry: new ol.geom.LineString([pointA, pointB]) });
+  ligne.setStyle(new ol.style.Style({
+    stroke: new ol.style.Stroke({ color: couleur, width: 2, lineCap: 'round', lineJoin: 'round' })
+  }));
+
+  const dx = pointB[0] - pointA[0];
+  const dy = pointB[1] - pointA[1];
+  const rotation = Math.atan2(dy, dx) - Math.PI / 2;
+  const midpoint = [(pointA[0] + pointB[0]) / 2, (pointA[1] + pointB[1]) / 2];
+
+  const fleche = new ol.Feature({ geometry: new ol.geom.Point(midpoint) });
+  fleche.setStyle(new ol.style.Style({
+    image: new ol.style.RegularShape({
+      points: 3,
+      radius: 7,
+      rotation: -rotation,
+      fill: new ol.style.Fill({ color: couleur }),
+      stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 }),
+      rotateWithView: false
     })
-  });
+  }));
+
+  return [ligne, fleche];
 }
 
 function initCarteSites() {
   if (_carteSites) return;
   assurerProjectionLambert93();
 
-  _sourceSitesCapture = new ol.source.Vector();
-  _sourceSitesRelache = new ol.source.Vector();
-  const coucheSitesCapture = creerCoucheSitesCaptureRelache(_sourceSitesCapture, '#c0392b');
-  const coucheSitesRelache = creerCoucheSitesCaptureRelache(_sourceSitesRelache, '#2D6A4F');
+  _sourceSitesPoints = new ol.source.Vector();
+  _sourceSitesLiens = new ol.source.Vector();
+  const coucheSitesLiens = new ol.layer.Vector({ source: _sourceSitesLiens });
+  const coucheSitesPoints = new ol.layer.Vector({ source: _sourceSitesPoints, style: stylePointSite });
 
   const popupEl = document.getElementById('popupSites');
   _popupOverlaySites = new ol.Overlay({
@@ -973,29 +1209,31 @@ function initCarteSites() {
     controls: [],
     layers: [
       creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]),
-      coucheSitesCapture,
-      coucheSitesRelache
+      coucheSitesLiens,
+      coucheSitesPoints
     ],
     overlays: [_popupOverlaySites],
     view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
   });
 
   _carteSites.on('pointermove', evt => {
-    _carteSites.getViewport().style.cursor = _carteSites.hasFeatureAtPixel(evt.pixel) ? 'pointer' : '';
+    const survolPoint = _carteSites.hasFeatureAtPixel(evt.pixel, { layerFilter: layer => layer === coucheSitesPoints });
+    _carteSites.getViewport().style.cursor = survolPoint ? 'pointer' : '';
   });
 
-  // Clic sur un site — distinction capture/relache via le layer touche (coucheSitesCapture
-  // vs coucheSitesRelache), pas une propriete stockee sur la feature : les deux sources
-  // sont deja separees (cf. _sourceSitesCapture/_sourceSitesRelache). Methode/objectif
-  // affiches seulement pour un site de capture (champs propres au leg capture, cf.
-  // creerCarteLegCapture/creerCarteLegRelache).
+  // Clic sur un site — distinction capture/relache via la propriete _role de la feature
+  // (cf. creerFeaturePointSite/renderPointsSites), pas via l'identite du layer (source
+  // unique desormais, cf. _sourceSitesPoints). Methode/objectif affiches seulement pour
+  // un site de capture (champs propres au leg capture, cf. creerCarteEvenementCaptureRelache).
   _carteSites.on('singleclick', evt => {
     let hit = false;
-    _carteSites.forEachFeatureAtPixel(evt.pixel, (feature, layer) => {
+    _carteSites.forEachFeatureAtPixel(evt.pixel, feature => {
       if (hit) return;
+      const role = feature.get('_role');
+      if (!role) return; // trait/fleche — pas de popup dessus
       hit = true;
       const c = feature.getProperties();
-      const estCapture = layer === coucheSitesCapture;
+      const estCapture = role === 'capture';
 
       popupEl.innerHTML = '';
       const strong = document.createElement('strong');
@@ -1004,14 +1242,14 @@ function initCarteSites() {
 
       const lignes = estCapture
         ? [
-            ['Date', c.capture_date],
+            ['Date', formaterDateHeure(c.capture_date, false)],
             ['Zone', c.capture_zone],
             ['Lieu-dit', c.capture_lieu_dit],
             ['Méthode', c.capture_methode],
             ['Objectif', c.capture_objectif]
           ]
         : [
-            ['Date', c.relache_date],
+            ['Date', formaterDateHeure(c.relache_date, false)],
             ['Zone', c.relache_zone],
             ['Lieu-dit', c.relache_lieu_dit]
           ];
@@ -1040,10 +1278,8 @@ function initCarteSites() {
     view.animate({ zoom: view.getZoom() - 1, duration: 200 });
   });
   document.getElementById('btnZoomResetSites')?.addEventListener('click', () => {
-    const extent = ol.extent.createEmpty();
-    ol.extent.extend(extent, _sourceSitesCapture?.getExtent() || ol.extent.createEmpty());
-    ol.extent.extend(extent, _sourceSitesRelache?.getExtent() || ol.extent.createEmpty());
-    if (!ol.extent.isEmpty(extent)) {
+    const extent = _sourceSitesPoints?.getExtent();
+    if (extent && !ol.extent.isEmpty(extent)) {
       _carteSites.getView().fit(extent, { padding: [30, 30, 30, 30], maxZoom: 14, duration: 300 });
     } else {
       _carteSites.getView().animate({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM, duration: 300 });
@@ -1053,30 +1289,51 @@ function initCarteSites() {
   observerRedimensionnementCarte(_carteSites, 'ficheMapSites');
 }
 
-function creerFeaturePointSite(coordLambert93, c) {
-  return new ol.Feature({ ...c, geometry: new ol.geom.Point(lambert93VersEcran(coordLambert93)) });
+function creerFeaturePointSite(coordLambert93, c, role, forme, couleur) {
+  return new ol.Feature({
+    ...c,
+    _role: role,
+    _forme: forme,
+    _couleur: couleur,
+    geometry: new ol.geom.Point(lambert93VersEcran(coordLambert93))
+  });
 }
 
-// Fit sur l'etendue combinee des deux sources (capture + relache) — un individu
-// avec uniquement des relaches (ou uniquement des captures) reste bien cadre.
-function renderPointsSites(captures) {
-  if (!_sourceSitesCapture || !_sourceSitesRelache) return;
+// Un evenement transloque produit 2 points ronds (capture+relache, meme couleur) relies
+// par un trait fleche ; un evenement non transloque produit 1 seul carre (capture_site_geom
+// uniquement — relache_site_geom ignoree, cf. discussion 2026-07-29 : censee etre identique
+// quand translocation=false, donc redondante pour l'affichage carte).
+function renderPointsSites(captures, couleurs) {
+  if (!_sourceSitesPoints || !_sourceSitesLiens) return;
 
-  const capturesAvecGeomCapture = (captures || [])
-    .map(c => ({ c, coord: parseGeomPostGIS(c.capture_site_geom) }))
-    .filter(x => x.coord);
-  const capturesAvecGeomRelache = (captures || [])
-    .map(c => ({ c, coord: parseGeomPostGIS(c.relache_site_geom) }))
-    .filter(x => x.coord);
+  _sourceSitesPoints.clear();
+  _sourceSitesLiens.clear();
 
-  _sourceSitesCapture.clear();
-  _sourceSitesCapture.addFeatures(capturesAvecGeomCapture.map(x => creerFeaturePointSite(x.coord, x.c)));
-  _sourceSitesRelache.clear();
-  _sourceSitesRelache.addFeatures(capturesAvecGeomRelache.map(x => creerFeaturePointSite(x.coord, x.c)));
+  const features = [];
 
-  const extent = ol.extent.createEmpty();
-  ol.extent.extend(extent, _sourceSitesCapture.getExtent());
-  ol.extent.extend(extent, _sourceSitesRelache.getExtent());
+  (captures || []).forEach(c => {
+    const coordCapture = parseGeomPostGIS(c.capture_site_geom);
+
+    if (c.translocation === true) {
+      const coordRelache = parseGeomPostGIS(c.relache_site_geom);
+      const couleur = couleurs?.couleurParEvenement.get(c.capture_relache_id) || getCouleurParIndex(0);
+
+      if (coordCapture) features.push(creerFeaturePointSite(coordCapture, c, 'capture', 'rond', couleur));
+      if (coordRelache) features.push(creerFeaturePointSite(coordRelache, c, 'relache', 'rond', couleur));
+      if (coordCapture && coordRelache) {
+        _sourceSitesLiens.addFeatures(creerFeaturesLienSite(coordCapture, coordRelache, couleur));
+      }
+    } else if (coordCapture) {
+      const couleur = c.capture_objectif
+        ? (couleurs?.couleurParObjectif.get(c.capture_objectif) || getCouleurParIndex(0))
+        : '#9e9e9e';
+      features.push(creerFeaturePointSite(coordCapture, c, 'capture', 'carre', couleur));
+    }
+  });
+
+  _sourceSitesPoints.addFeatures(features);
+
+  const extent = _sourceSitesPoints.getExtent();
   if (!ol.extent.isEmpty(extent)) {
     _carteSites.getView().fit(extent, { padding: [30, 30, 30, 30], maxZoom: 14, duration: 300 });
   }
@@ -1119,7 +1376,7 @@ function comparerGeometriesCaptureRelache(geomCapture, geomRelache) {
 /**
  * Verification de coherence (avertissement uniquement, ne bloque/ne modifie jamais le
  * rendu) : quand translocation === false, la regle metier (cf. commentaire de
- * creerCarteLegCapture) veut que capture_zone/capture_lieu_dit/capture_site_geom soient
+ * creerCarteEvenementCaptureRelache) veut que capture_zone/capture_lieu_dit/capture_site_geom soient
  * identiques a relache_zone/relache_lieu_dit/relache_site_geom. Jamais verifie jusqu'ici —
  * confiance aveugle dans les donnees backend (cf. audit page Individus).
  */
@@ -1389,9 +1646,9 @@ async function afficherFiche(aniId) {
 
     remplirIdentite(detail);
     remplirPastilleStatutPhoto(detail);
-    remplirInformationsGPS(capteurs[0]);
-    remplirListeCaptures(captures);
-    remplirListeRelaches(captures);
+    const couleursCaptureRelache = construireCouleursCaptureRelache(captures);
+    remplirEvenementsCaptureRelache(captures, capteurs, couleursCaptureRelache);
+    construireLegendeSites(captures, couleursCaptureRelache);
     verifierCoherenceTranslocation(captures);
     // Collier actif = pose la plus recente (capteurs[0], deja trie cor_date_debut.desc)
     // sans date de fin — critere explicite de Ludovic (cor_date_fin IS NULL), distinct de
@@ -1400,7 +1657,7 @@ async function afficherFiche(aniId) {
     appliquerCouleursMarquage(detail, collierActif);
 
     initCarteSites();
-    renderPointsSites(captures);
+    renderPointsSites(captures, couleursCaptureRelache);
 
     initCarteLocalisations();
     const locations = await chargerEtRenderLocalisations(aniId);
