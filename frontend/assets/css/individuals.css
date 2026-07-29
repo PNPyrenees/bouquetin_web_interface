@@ -1103,15 +1103,6 @@ select.indiv-col-filtre {
   flex-shrink: 0;
 }
 
-.legende-pastille-collier-actif {
-  background: #2D6A4F;
-}
-
-.legende-pastille-collier-inactif {
-  background: #9e9e9e;
-}
-
-
 .fiche-carte-entete {
   margin-bottom: 16px;
   flex-shrink: 0;
