@@ -78,8 +78,8 @@
             <input type="text" id="filtreColNom" class="indiv-col-filtre" placeholder="Rechercher...">
           </div>
           <div class="indiv-col">
-            <span class="indiv-col-label">Code</span>
-            <input type="text" id="filtreColCode" class="indiv-col-filtre" placeholder="Rechercher...">
+            <span class="indiv-col-label">ID animal</span>
+            <input type="text" id="filtreColId" class="indiv-col-filtre" placeholder="Rechercher...">
           </div>
           <div class="indiv-col">
             <span class="indiv-col-label">Sexe</span>
@@ -208,15 +208,8 @@
             <div class="fiche-graphique-bloc" id="chartDistanceMoisWrapper">
               <canvas id="chartDistanceMois"></canvas>
             </div>
-            <div class="fiche-graphique-legende">
-              <div class="legende-item">
-                <div class="legende-pastille legende-pastille-collier-actif"></div>
-                <span>Collier actif</span>
-              </div>
-              <div class="legende-item">
-                <div class="legende-pastille legende-pastille-collier-inactif"></div>
-                <span>Pas de collier actif</span>
-              </div>
+            <div class="fiche-graphique-legende" id="legendeColliersDistance">
+              <!-- Peuplée en JS par construireLegendeColliers() -->
             </div>
           </div>
         </div>
