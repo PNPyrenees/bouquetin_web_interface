@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.85.0] - 2026-07-31
+
+### Graphique Distance - couleurs par collier et statut colliers actifs
+- Graphique Distance n'affiche plus que les mois avec collier actif - retrait du grisage, chaque pose de collier recoit sa propre couleur (palette Glasbey partagee)
+- Tooltip du graphique affiche desormais l'identifiant du collier concerne en plus de la distance
+- Legende dynamique ajoutee sous le graphique - une entree par collier avec sa couleur reelle
+- Statut de la liste des individus base desormais strictement sur cor_animal_capteur.cor_date_fin (fetchColliersActifs) - independant de la presence de positions GPS transmises, sur demande explicite de Ludovic
+- Colonne CODE de la liste des individus remplacee par ID animal
+
 ## [0.84.0] - 2026-07-30
 
 ### Disposition generale fiche individu (point 2.6)
