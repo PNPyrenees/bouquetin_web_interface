@@ -164,3 +164,19 @@ export const COULEURS_MARQUAGE = {
   violet: '#7b2d8e'
 };
 
+// Palette Glasbey 32 — concue pour maximiser la distance perceptuelle entre couleurs
+// (Glasbey et al., 2007). Partagee entre map.js (couleur par individu, carte principale)
+// et individuals.js (couleur par evenement/objectif, carte Sites de la fiche individu) —
+// centralisee ici pour que individuals.js n'ait jamais a importer map.js (singleton de
+// la page Carte, decision architecturale documentee dans individuals.js).
+export const GLASBEY_32 = [
+  '#0000FF', '#FF0000', '#00FF00', '#000033', '#FF00B6', '#005300', '#FFD300', '#009FFF',
+  '#9A4D42', '#00FFBE', '#783FC1', '#1F9698', '#FFACFD', '#B1CC71', '#F1085C', '#FE8F42',
+  '#DD00FF', '#201A01', '#720055', '#766C95', '#02AD24', '#C8FF00', '#886C00', '#FFB79F',
+  '#858567', '#A10300', '#14F9FF', '#00478E', '#96F1FA', '#65FF00', '#FF937E', '#CB0076'
+];
+
+export function getCouleurParIndex(index) {
+  return GLASBEY_32[index % GLASBEY_32.length];
+}
+
