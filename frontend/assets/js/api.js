@@ -158,6 +158,29 @@ export async function fetchAnimauxSuivis(token) {
 }
 
 /**
+ * Recupere les ani_id ayant au moins une pose de collier active (cor_date_fin IS NULL),
+ * au sens strict demande par Ludovic pour le statut de la page Individus — independant
+ * de la presence de positions GPS transmises, contrairement a fetchAnimauxSuivis() (qui
+ * reste la source de verite pour la page Carte, non modifiee). Requete directe sur
+ * cor_animal_capteur, utilisee uniquement par computeStatut() sur la page Individus.
+ */
+export async function fetchColliersActifs(token) {
+  const res = await fetch(
+    `${API_URL}/cor_animal_capteur?select=ani_id&cor_date_fin=is.null`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchColliersActifs error: ${res.status}`);
+  const data = await res.json();
+  return new Set(data.map(r => r.ani_id));
+}
+
+/**
  * Récupère les ani_id ayant au moins une translocation (t_capture_relache.translocation = true).
  * Utilisé pour le filtre Translocation côté frontend.
  */
