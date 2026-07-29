@@ -1,10 +1,10 @@
-import { login, fetchAnimals, fetchAnimauxSuivis, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal } from './api.js';
+import { login, fetchAnimals, fetchColliersActifs, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal } from './api.js';
 import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, COULEURS_MARQUAGE, GLASBEY_32, getCouleurParIndex } from './config.js';
 
 let currentToken = null;
 let currentAniId = null;
 let animals = [];
-let idsSuivis = new Set();
+let colliersActifs = new Set();
 let loginEnCours = false;
 
 // Cartes de la fiche individu — instances OpenLayers autonomes, independantes du
@@ -117,11 +117,13 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
  * VUE LISTE
  */
 
-// Statut — priorite : mort (ani_date_mort renseignee) > actif (collier avec
-// cor_date_fin IS NULL, cf. fetchAnimauxSuivis) > non_suivi par defaut.
-function computeStatut(ani, idsSuivisSet) {
+// Statut — priorite : mort (ani_date_mort renseignee) > actif (collier actif au sens
+// strict de Ludovic : cor_date_fin IS NULL, cf. fetchColliersActifs) > non_suivi par
+// defaut. Independant de la presence de positions GPS transmises (contrairement a
+// fetchAnimauxSuivis(), utilisee par la page Carte, non modifiee).
+function computeStatut(ani, colliersActifsSet) {
   if (ani.ani_date_mort) return 'mort';
-  if (idsSuivisSet.has(ani.ani_id)) return 'actif';
+  if (colliersActifsSet.has(ani.ani_id)) return 'actif';
   return 'non_suivi';
 }
 
@@ -172,7 +174,7 @@ const PASTILLE_ICONES = {
 function remplirPastilleStatutPhoto(detail) {
   const pastille = document.getElementById('ficheIllustrationStatut');
   if (!pastille) return;
-  const statutKey = computeStatut(detail || {}, idsSuivis);
+  const statutKey = computeStatut(detail || {}, colliersActifs);
   pastille.className = `fiche-illustration-statut ${STATUT_CLASSES[statutKey] || STATUT_CLASSES.non_suivi}`;
   pastille.innerHTML = PASTILLE_ICONES[statutKey] || PASTILLE_ICONES.non_suivi;
   pastille.title = STATUT_LABELS[statutKey] || STATUT_LABELS.non_suivi;
@@ -214,7 +216,7 @@ function peuplerFiltresDynamiques() {
  */
 function appliquerFiltresListe() {
   const filtreNom = (document.getElementById('filtreColNom')?.value || '').trim().toLowerCase();
-  const filtreCode = (document.getElementById('filtreColCode')?.value || '').trim().toLowerCase();
+  const filtreId = (document.getElementById('filtreColId')?.value || '').trim().toLowerCase();
   const filtreSexe = document.getElementById('filtreColSexe')?.value || '';
   const filtreAnnee = (document.getElementById('filtreColAnnee')?.value || '').trim();
   const filtrePopulation = document.getElementById('filtreColPopulation')?.value || '';
@@ -226,26 +228,26 @@ function appliquerFiltresListe() {
     if (!ani) return;
 
     const nom = (ani.ani_nom || '').toLowerCase();
-    const code = String(ani.ani_code || '').toLowerCase();
+    const idAnimal = String(ani.ani_id || '').toLowerCase();
     const population = ani.ani_pop_rattach || '';
     const gestionnaire = ani.ani_gestionnaire || '';
     const annee = String(ani.ani_annee_naissance ?? '');
 
     const matchNom = !filtreNom || nom.includes(filtreNom);
-    const matchCode = !filtreCode || code.includes(filtreCode);
+    const matchId = !filtreId || idAnimal.includes(filtreId);
     const matchSexe = !filtreSexe || ani.ani_sexe === filtreSexe;
     const matchAnnee = !filtreAnnee || annee.includes(filtreAnnee);
     const matchPopulation = !filtrePopulation || population === filtrePopulation;
     const matchGestionnaire = !filtreGestionnaire || gestionnaire === filtreGestionnaire;
     const matchStatut = !filtreStatut || row.dataset.statut === filtreStatut;
 
-    const visible = matchNom && matchCode && matchSexe &&
+    const visible = matchNom && matchId && matchSexe &&
       matchAnnee && matchPopulation && matchGestionnaire && matchStatut;
     row.style.display = visible ? '' : 'none';
   });
 }
 
-['filtreColNom', 'filtreColCode', 'filtreColAnnee'].forEach(id => {
+['filtreColNom', 'filtreColId', 'filtreColAnnee'].forEach(id => {
   document.getElementById(id)?.addEventListener('input', appliquerFiltresListe);
 });
 ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'].forEach(id => {
@@ -277,16 +279,16 @@ function peuplerTableauListe() {
     const row = document.createElement('div');
     row.className = 'indiv-row';
     row.dataset.aniId = ani.ani_id;
-    const statutKey = computeStatut(ani, idsSuivis);
+    const statutKey = computeStatut(ani, colliersActifs);
     row.dataset.statut = statutKey;
 
     const celluleNom = document.createElement('div');
     celluleNom.className = 'indiv-cell';
     celluleNom.appendChild(creerValeurNode(ani.ani_nom));
 
-    const celluleCode = document.createElement('div');
-    celluleCode.className = 'indiv-cell';
-    celluleCode.appendChild(creerValeurNode(ani.ani_code));
+    const celluleId = document.createElement('div');
+    celluleId.className = 'indiv-cell';
+    celluleId.appendChild(creerValeurNode(ani.ani_id));
 
     const celluleSexe = document.createElement('div');
     celluleSexe.className = 'indiv-cell';
@@ -308,7 +310,7 @@ function peuplerTableauListe() {
     celluleStatut.className = 'indiv-cell';
     celluleStatut.appendChild(creerPastilleStatut(statutKey));
 
-    row.append(celluleNom, celluleCode, celluleSexe, celluleAnnee, cellulePopulation, celluleGestionnaire, celluleStatut);
+    row.append(celluleNom, celluleId, celluleSexe, celluleAnnee, cellulePopulation, celluleGestionnaire, celluleStatut);
 
     row.addEventListener('click', () => afficherFiche(ani.ani_id));
     corps.appendChild(row);
@@ -1443,10 +1445,11 @@ function verifierCoherenceTranslocation(captures) {
 
 /**
  * GRAPHIQUE DISTANCE (Chart.js).
- * Couvre toute la periode de suivi de l'animal (plus de fenetre glissante 12 mois) —
- * sous-titre de periode affiche sous le titre (#periodeDistanceMois). Distinction
- * visuelle des mois sans collier actif (barre grisee, cf. collierActifPourMois) pour
- * ne pas confondre avec un "0 km reellement immobile".
+ * N'affiche que les mois avec un collier actif — les mois sans collier sont retires
+ * completement de l'axe (pas de grisage, pas de trou), pour eviter un axe demesurement
+ * long sur un animal avec un grand vide entre deux poses (cf. cas Tilda, ~7 ans entre
+ * 2 colliers, 2026-07-31). Une couleur differente par cor_id (palette Glasbey claire
+ * partagee, cf. construireCouleursColliers).
  */
 
 // Au-dela de cet ecart entre deux positions consecutives, la distance euclidienne entre
@@ -1456,11 +1459,37 @@ function verifierCoherenceTranslocation(captures) {
 // PNP ont un pas de transmission tres different de quelques heures (cf. prog_frequence).
 const GAP_MAX_HEURES = 48;
 
+// Mois avec collier actif (au moins un jour du mois), associes au cor_id de la pose
+// responsable — remplace le parcours calendaire continu de l'ancienne version : n'inclut
+// plus du tout les mois sans collier. Si deux poses se chevauchent sur un meme mois (cas
+// non rencontre en pratique), la premiere pose rencontree (ordre du tableau capteurs)
+// l'emporte.
+function moisAvecColliersActifs(capteurs) {
+  const corIdParMois = new Map();
+
+  (capteurs || []).forEach(c => {
+    if (!c.cor_date_debut) return;
+    const debutPose = new Date(c.cor_date_debut);
+    const finPose = c.cor_date_fin ? new Date(c.cor_date_fin) : new Date();
+
+    const curseur = new Date(debutPose.getFullYear(), debutPose.getMonth(), 1);
+    const finMoisPose = new Date(finPose.getFullYear(), finPose.getMonth(), 1);
+    while (curseur <= finMoisPose) {
+      const cle = `${curseur.getFullYear()}-${String(curseur.getMonth() + 1).padStart(2, '0')}`;
+      if (!corIdParMois.has(cle)) corIdParMois.set(cle, c.cor_id);
+      curseur.setMonth(curseur.getMonth() + 1);
+    }
+  });
+
+  return corIdParMois;
+}
+
 // Distance = somme des segments euclidiens entre positions GPS consecutives (triees), sur
 // coordonnees Lambert-93/EPSG:2154 (geom.coordinates, cf. lambert93VersEcran plus haut) —
-// projection en metres, donc pas de reprojection necessaire pour ce calcul. Couvre toute
-// la periode de suivi (plus de fenetre glissante 12 mois).
-function agregerDistanceParMois(locations) {
+// projection en metres, donc pas de reprojection necessaire pour ce calcul. Le calcul de
+// segment reste identique a avant ; seul l'axe affiche change (limite aux mois avec collier
+// actif, cf. moisAvecColliersActifs).
+function agregerDistanceParMois(locations, capteurs) {
   const positionsValides = (locations || [])
     .filter(l => l.geom?.coordinates && (l.loc_datetime_local || l.loc_date_local))
     .map(l => ({
@@ -1489,43 +1518,80 @@ function agregerDistanceParMois(locations) {
     distanceParMois.set(cle, (distanceParMois.get(cle) || 0) + distanceMetres);
   }
 
-  if (distanceParMois.size === 0) return { categories: [], valeurs: [] };
+  const corIdParMois = moisAvecColliersActifs(capteurs);
+  const categories = [...corIdParMois.keys()].sort();
+  const valeurs = categories.map(cle => Math.round(((distanceParMois.get(cle) || 0) / 1000) * 10) / 10);
+  const corIds = categories.map(cle => corIdParMois.get(cle));
 
-  const premiereCleDonnees = [...distanceParMois.keys()].sort()[0];
-  const [anneeDonnees, moisDonnees] = premiereCleDonnees.split('-').map(Number);
-  const debut = new Date(anneeDonnees, moisDonnees - 1, 1);
-
-  const maintenant = new Date();
-  const finFenetre = new Date(maintenant.getFullYear(), maintenant.getMonth(), 1);
-
-  const categories = [];
-  const valeurs = [];
-  const curseur = new Date(debut);
-  while (curseur <= finFenetre) {
-    const cle = `${curseur.getFullYear()}-${String(curseur.getMonth() + 1).padStart(2, '0')}`;
-    categories.push(cle);
-    const metres = distanceParMois.get(cle) || 0;
-    valeurs.push(Math.round((metres / 1000) * 10) / 10); // km, 1 decimale
-    curseur.setMonth(curseur.getMonth() + 1);
-  }
-
-  return { categories, valeurs };
+  return { categories, valeurs, corIds };
 }
 
-// Determine si l'animal avait un collier actif au moins un jour du mois "cle" (YYYY-MM) —
-// croise avec les poses de cor_animal_capteur (cor_date_debut/cor_date_fin, deja
-// recuperees via fetchCapteurParAnimal dans afficherFiche, transmises en parametre).
-// cor_date_fin null = pose toujours active (collier actif jusqu'a aujourd'hui).
-function collierActifPourMois(cle, capteurs) {
-  const [annee, mois] = cle.split('-').map(Number);
-  const debutMois = new Date(annee, mois - 1, 1);
-  const finMois = new Date(annee, mois, 1);
+// Couleur par pose de collier (cor_id distinct) — meme principe que
+// construireCouleursCaptureRelache() (palette Glasbey claire partagee, cf. config.js) :
+// index independant par cor_id, dans l'ordre chronologique des poses.
+function construireCouleursColliers(capteurs) {
+  const triees = [...(capteurs || [])]
+    .filter(c => c.cor_date_debut)
+    .sort((a, b) => a.cor_date_debut.localeCompare(b.cor_date_debut));
 
-  return (capteurs || []).some(c => {
-    if (!c.cor_date_debut) return false;
-    const debutPose = new Date(c.cor_date_debut);
-    const finPose = c.cor_date_fin ? new Date(c.cor_date_fin) : new Date();
-    return debutPose < finMois && finPose >= debutMois;
+  const couleurParCorId = new Map();
+  triees.forEach(c => {
+    if (!couleurParCorId.has(c.cor_id)) {
+      couleurParCorId.set(c.cor_id, getCouleurClaireParIndex(couleurParCorId.size));
+    }
+  });
+  return couleurParCorId;
+}
+
+// Identifiant lisible par cor_id, pour le tooltip et la legende — capt_id_constructeur si
+// disponible (embedding t_capteur, cf. fetchCapteurParAnimal), sinon repli sur le cor_id brut.
+function identifiantsColliersParCorId(capteurs) {
+  const map = new Map();
+  (capteurs || []).forEach(c => {
+    map.set(c.cor_id, c.t_capteur?.capt_id_constructeur || `Collier ${c.cor_id}`);
+  });
+  return map;
+}
+
+// Legende dynamique du graphique Distance — une entree par collier (cor_id), couleur +
+// identifiant, meme principe que construireLegendeSites() (carte Sites) : conteneur peuple
+// en JS, une pastille + un label par entree, dans l'ordre chronologique des poses.
+function construireLegendeColliers(capteurs, couleurParCorId, identifiants) {
+  const conteneur = document.getElementById('legendeColliersDistance');
+  if (!conteneur) return;
+  conteneur.innerHTML = '';
+
+  const triees = [...(capteurs || [])]
+    .filter(c => c.cor_date_debut)
+    .sort((a, b) => a.cor_date_debut.localeCompare(b.cor_date_debut));
+
+  if (triees.length === 0) return;
+
+  const titre = document.createElement('span');
+  titre.textContent = 'Colliers :';
+  titre.style.fontWeight = '600';
+  conteneur.appendChild(titre);
+
+  const corIdsAffiches = new Set();
+  triees.forEach(c => {
+    if (corIdsAffiches.has(c.cor_id)) return;
+    corIdsAffiches.add(c.cor_id);
+
+    const couleur = couleurParCorId.get(c.cor_id);
+    if (!couleur) return;
+
+    const ligne = document.createElement('div');
+    ligne.className = 'legende-item';
+
+    const pastille = document.createElement('span');
+    pastille.className = 'legende-pastille';
+    pastille.style.background = couleur;
+
+    const texte = document.createElement('span');
+    texte.textContent = identifiants.get(c.cor_id) || `Collier ${c.cor_id}`;
+
+    ligne.append(pastille, texte);
+    conteneur.appendChild(ligne);
   });
 }
 
@@ -1584,7 +1650,7 @@ async function initGraphiquesSynthese(aniId, capteurs) {
   // pas de graphique pour un individu qui n'est plus celui affiché a l'ecran.
   if (String(currentAniId) !== String(aniId)) return;
 
-  const { categories, valeurs } = agregerDistanceParMois(locations);
+  const { categories, valeurs, corIds } = agregerDistanceParMois(locations, capteurs);
 
   // Sous-titre de periode — periode complete desormais (plus de fenetre glissante 12 mois).
   const elPeriodeDistance = document.getElementById('periodeDistanceMois');
@@ -1596,28 +1662,9 @@ async function initGraphiquesSynthese(aniId, capteurs) {
 
   const ctx = document.getElementById('chartDistanceMois');
   if (ctx) {
-    const couleurs = categories.map(cle => collierActifPourMois(cle, capteurs) ? '#2D6A4F' : '#9e9e9e');
-
-    // Plugin custom (pas de dependance externe type chartjs-plugin-annotation) — dessine
-    // une bande grisee en fond, sur toute la hauteur du graphique, pour chaque mois sans
-    // collier actif. Necessaire car une barre a valeur 0 a une hauteur de 0px (rien a voir,
-    // meme avec backgroundColor gris) — le probleme n'est pas la couleur, c'est l'absence
-    // de hauteur. La bande de fond rend le mois visible independamment de la valeur de la barre.
-    const fondCollierInactif = {
-      id: 'fondCollierInactif',
-      beforeDraw(chart) {
-        const { ctx: c, chartArea, scales: { x } } = chart;
-        const largeur = chartArea.width / categories.length;
-        c.save();
-        c.fillStyle = 'rgba(158, 158, 158, 0.18)';
-        categories.forEach((cle, index) => {
-          if (collierActifPourMois(cle, capteurs)) return;
-          const centre = x.getPixelForValue(index);
-          c.fillRect(centre - largeur / 2, chartArea.top, largeur, chartArea.height);
-        });
-        c.restore();
-      }
-    };
+    const couleurParCorId = construireCouleursColliers(capteurs);
+    const identifiants = identifiantsColliersParCorId(capteurs);
+    const couleurs = corIds.map(corId => couleurParCorId.get(corId) || '#9e9e9e');
 
     _chartDistanceMois = new Chart(ctx, {
       type: 'bar',
@@ -1636,23 +1683,16 @@ async function initGraphiquesSynthese(aniId, capteurs) {
         maintainAspectRatio: false,
         animation: false,
         plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              afterLabel: (context) => collierActifPourMois(categories[context.dataIndex], capteurs)
-                ? ''
-                : 'Pas de collier actif ce mois'
-            }
-          }
+          legend: { display: false }
         },
         scales: {
           x: { grid: { display: false }, ticks: { font: { size: 11 } } },
           y: { beginAtZero: true, ticks: { font: { size: 11 } } }
         }
-      },
-      plugins: [fondCollierInactif]
+      }
     });
     observerRedimensionnementGraphique('chartDistanceMoisWrapper');
+    construireLegendeColliers(capteurs, couleurParCorId, identifiants);
   }
 }
 
@@ -1679,8 +1719,9 @@ async function afficherFiche(aniId) {
     construireLegendeSites(captures, couleursCaptureRelache);
     verifierCoherenceTranslocation(captures);
     // Collier actif = pose la plus recente (capteurs[0], deja trie cor_date_debut.desc)
-    // sans date de fin — critere explicite de Ludovic (cor_date_fin IS NULL), distinct de
-    // idsSuivis/computeStatut qui exige en plus au moins une position GPS transmise.
+    // sans date de fin — critere explicite de Ludovic (cor_date_fin IS NULL). Coherent
+    // avec colliersActifs/computeStatut (liste Individus) depuis le 2026-07-30 — meme
+    // critere strict, independant des positions GPS transmises, sur les deux pages.
     const collierActif = capteurs.length > 0 && capteurs[0].cor_date_fin == null;
     appliquerCouleursMarquage(detail, collierActif);
 
@@ -1719,9 +1760,9 @@ async function initPage(token) {
   afficherSession(token);
 
   try {
-    [animals, idsSuivis] = await Promise.all([
+    [animals, colliersActifs] = await Promise.all([
       fetchAnimals(token),
-      fetchAnimauxSuivis(token)
+      fetchColliersActifs(token)
     ]);
     peuplerTableauListe();
   } catch (err) {
