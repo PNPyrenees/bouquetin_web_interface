@@ -160,7 +160,11 @@ select.indiv-col-filtre {
   flex: 1 1 0;
 }
 
-#indivScreen .ts-wrapper.indiv-col-filtre .ts-dropdown {
+/* Le dropdown est deplace vers <body> par dropdownParent:'body' (individuals.js,
+   initTomSelectFiltresColonnes) — plus un descendant de #indivScreen/.ts-wrapper une
+   fois ouvert, d'ou le ciblage par classe dediee (ts.dropdown.classList.add) plutot
+   que par selecteur imbrique comme le reste des regles TomSelect de ce fichier. */
+.indiv-col-filtre-dropdown {
   border: 1px solid var(--color-border);
   font-family: var(--font-family);
   font-size: 12px;
@@ -1156,7 +1160,8 @@ select.indiv-col-filtre {
 #indivScreen button,
 #indivScreen .ts-wrapper,
 #indivScreen .ts-control,
-#indivScreen .ts-dropdown {
+#indivScreen .ts-dropdown,
+.indiv-col-filtre-dropdown {
   border-radius: 0 !important;
   box-shadow: none !important;
 }
