@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.86.0] - 2026-07-30
+
+### Correction bug selects invisibles liste Individus
+- Correction du bug : les options des selects d'en-tete (Sexe, Population, Gestionnaire, Statut) devenaient invisibles quand un filtre combine ne retournait aucun animal
+- Cause : le dropdown TomSelect etait clippe par le overflow:hidden du conteneur .indiv-liste, qui s'effondrait a hauteur 0 sans ligne visible
+- Correctif : dropdownParent 'body' sur les 4 TomSelect, avec classe dediee pour conserver le style visuel sobre malgre le changement de position dans le DOM
+
 ## [0.85.0] - 2026-07-28
 
 ### Graphique Distance - couleurs par collier et statut colliers actifs
