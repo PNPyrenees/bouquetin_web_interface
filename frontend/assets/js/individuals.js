@@ -256,17 +256,27 @@ function appliquerFiltresListe() {
 
 // TomSelect — remplace le rendu natif de ces 4 selects, dont le popup ouvert
 // (coins arrondis + ombre sur Chrome/Windows) ignore border-radius/box-shadow en CSS.
+// dropdownParent: 'body' (chaine litterale, pas document.body — TomSelect ne recalcule
+// la position du dropdown au scroll/resize que si ce reglage vaut exactement la chaine
+// 'body', cf. positionDropdown() dans tom-select) evite que le panneau d'options soit
+// coupe par overflow:hidden sur .indiv-liste quand la liste est vide (aucune ligne
+// visible => .indiv-liste s'effondre a la hauteur de la seule entete, cf. bug signale
+// par Ludovic 2026-07-30 : filtres Population+Gestionnaire combines sans resultat).
+// classList.add ci-dessous recree le ciblage CSS perdu par ce deplacement hors de
+// #indivScreen (cf. .indiv-col-filtre-dropdown, individuals.css).
 function initTomSelectFiltresColonnes() {
   ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'].forEach(id => {
     const el = document.getElementById(id);
     if (!el || el.tomselect) return;
-    new TomSelect(el, {
+    const ts = new TomSelect(el, {
       create: false,
       allowEmptyOption: true,
+      dropdownParent: 'body',
       onChange() {
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
     });
+    ts.dropdown.classList.add('indiv-col-filtre-dropdown');
   });
 }
 
