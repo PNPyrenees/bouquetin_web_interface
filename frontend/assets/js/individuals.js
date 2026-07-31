@@ -280,6 +280,17 @@ function initTomSelectFiltresColonnes() {
   });
 }
 
+// Ferme les dropdowns TomSelect ouverts au scroll de la liste — dropdownParent:'body'
+// (ci-dessus) ne recalcule la position du dropdown qu'au scroll/resize de la fenetre
+// (cf. positionDropdown() dans tom-select), jamais au scroll interne de #indivScreen
+// (overflow-y:auto, un evenement scroll sur un conteneur ne remonte pas jusqu'a window).
+// Sans ca, le dropdown reste fige a l'ecran pendant que le select defile en dessous.
+document.getElementById('indivScreen')?.addEventListener('scroll', () => {
+  ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'].forEach(id => {
+    document.getElementById(id)?.tomselect?.close();
+  });
+}, { passive: true });
+
 function peuplerTableauListe() {
   const corps = document.getElementById('indivTableBody');
   if (!corps) return;
