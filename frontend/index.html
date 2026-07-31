@@ -247,7 +247,12 @@
   <div id="mapScreen">
     <div id="mapLoading" style="display:none">
       <div class="map-loading-spinner"></div>
-      <span>Chargement des données...</span>
+      <div class="map-loading-text-row">
+        <span>Chargement des données...</span>
+        <button id="btnAnnulerChargement" style="display:none" title="Arrêter le chargement">
+          <svg width="12" height="12"><use href="assets/img/sprite.svg#icon-fermer"/></svg>
+        </button>
+      </div>
       <div id="mapLoadingProgress" style="display:none">
         <div class="map-loading-track">
           <div id="mapLoadingBar" style="width:0%"></div>
