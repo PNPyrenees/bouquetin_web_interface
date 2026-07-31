@@ -39,6 +39,16 @@ let _cachePositions = [];
 // "Toutes les positions"). Cf. peutReutiliser()/deriverPourBesoin().
 let _dernierChargement = null;
 
+// AbortController du chargement applyFilters() en cours — permet au bouton Annuler
+// (#btnAnnulerChargement, cf. index.html) d'interrompre une requete f_get_localisation
+// en vol ou d'arreter la pagination entre deux lots. Recree a chaque appel a
+// applyFilters(), remis a null dans son bloc finally.
+let _controllerChargementActuel = null;
+
+document.getElementById('btnAnnulerChargement')?.addEventListener('click', () => {
+  _controllerChargementActuel?.abort();
+});
+
 /**
  * Assemble l'objet de portee de filtres compare pour decider d'une reutilisation client —
  * meme perimetre que window._derniersFiltresAppliques, plus include_outliers (absent de ce
@@ -90,7 +100,7 @@ export function enregistrerChargementInitial(locations, n) {
   );
 
   _cachePositions = locations;
-  _dernierChargement = { portee, limitParAnimal: n };
+  _dernierChargement = { portee, limitParAnimal: n, partiel: false };
 }
 
 /**
@@ -104,6 +114,13 @@ export function enregistrerChargementInitial(locations, n) {
  */
 function peutReutiliser(porteeActuelle, besoinLimitParAnimal) {
   if (!_dernierChargement) return false;
+  // Un cache marque partiel (chargement interrompu par le bouton Annuler, cf. applyFilters)
+  // n'est jamais reutilise — on ne peut pas garantir que les positions recues avant
+  // l'annulation soient bien les plus recentes de chaque animal (ordre de pagination
+  // cote f_get_localisation non verifiable depuis ce depot), donc aucune reutilisation,
+  // meme pour un besoin numerique plus petit. Il sert uniquement a conserver l'affichage
+  // deja rendu a l'ecran, jamais de base a un futur chargement.
+  if (_dernierChargement.partiel) return false;
   if (JSON.stringify(_dernierChargement.portee) !== JSON.stringify(porteeActuelle)) return false;
   if (_dernierChargement.limitParAnimal === null) return true;
   if (besoinLimitParAnimal === null) return false;
@@ -458,6 +475,11 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
   const progEl = document.getElementById('mapLoadingProgress');
   if (progEl) progEl.style.display = 'none';
 
+  const controller = new AbortController();
+  _controllerChargementActuel = controller;
+  const btnAnnuler = document.getElementById('btnAnnulerChargement');
+  if (btnAnnuler) btnAnnuler.style.display = 'inline-flex';
+
   // Collecte des filtres
   const filters = {
     ani_id: Array.from(document.querySelectorAll('#listeIndividus input:checked'))
@@ -579,10 +601,10 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
             if (progEl) progEl.style.display = 'block';
             if (bar) bar.style.width = '100%';
             if (pctEl) pctEl.textContent = '100%';
-          });
+          }, controller.signal);
         } else {
           // Chemin B — Toutes positions, avec modal volume + pagination RPC
-          const totalPositions = await fetchCountLocations(token, rpcFilters);
+          const totalPositions = await fetchCountLocations(token, rpcFilters, controller.signal);
 
           let confirmed = true;
           if (totalPositions > SEUIL_ALERTE_VOLUME) {
@@ -629,13 +651,30 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
               const pctEl = document.getElementById('mapLoadingPct');
               if (bar) bar.style.width = pct + '%';
               if (pctEl) pctEl.textContent = pct + '%';
-            }
+            },
+            controller.signal
           );
+        }
+
+        if (controller.signal.aborted && locations.length === 0) {
+          // Annulation avant tout premier lot recu (pendant le comptage ou l'attente du
+          // modal volume) — rien de nouveau n'a ete rendu, on garde la carte/le cache
+          // precedents tels quels, meme comportement que l'annulation du modal volume.
+          hideMapLoading();
+          unlockSidebar();
+          if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+          mettreAJourBoutonAppliquer();
+          showToast('Chargement annulé');
+          return false;
         }
 
         locations = enrichirLocations(locations);
         _cachePositions = locations;
-        _dernierChargement = { portee: porteeActuelle, limitParAnimal: limitParAnimalCharge };
+        _dernierChargement = {
+          portee: porteeActuelle,
+          limitParAnimal: limitParAnimalCharge,
+          partiel: controller.signal.aborted
+        };
         if (besoinLimitParAnimal !== null && limitParAnimalCharge > besoinLimitParAnimal) {
           // Sur-charge : ce qui est affiche reste limite au besoin reellement demande
           locations = deriverNDernieresPositionsParAnimal(locations, besoinLimitParAnimal);
@@ -785,10 +824,10 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
             if (progEl) progEl.style.display = 'block';
             if (bar) bar.style.width = '100%';
             if (pctEl) pctEl.textContent = '100%';
-          });
+          }, controller.signal);
         } else {
           // Chemin D — Toutes positions, avec modal volume + pagination RPC
-          const totalTrajPositions = await fetchCountLocations(token, rpcFiltersTraj);
+          const totalTrajPositions = await fetchCountLocations(token, rpcFiltersTraj, controller.signal);
 
           let confirmedTraj = true;
 
@@ -843,13 +882,30 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
               const pctEl = document.getElementById('mapLoadingPct');
               if (bar) bar.style.width = pct + '%';
               if (pctEl) pctEl.textContent = pct + '%';
-            }
+            },
+            controller.signal
           );
+        }
+
+        if (controller.signal.aborted && locations.length === 0) {
+          // Annulation avant tout premier lot recu (pendant le comptage ou l'attente du
+          // modal volume) — rien de nouveau n'a ete rendu, on garde la carte/le cache
+          // precedents tels quels, meme comportement que l'annulation du modal volume.
+          hideMapLoading();
+          unlockSidebar();
+          if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
+          mettreAJourBoutonAppliquer();
+          showToast('Chargement annulé');
+          return false;
         }
 
         locations = enrichirLocations(locations);
         _cachePositions = locations;
-        _dernierChargement = { portee: porteeActuelleTraj, limitParAnimal: limitParAnimalChargeTraj };
+        _dernierChargement = {
+          portee: porteeActuelleTraj,
+          limitParAnimal: limitParAnimalChargeTraj,
+          partiel: controller.signal.aborted
+        };
         if (besoinLimitParAnimalTraj !== null && limitParAnimalChargeTraj > besoinLimitParAnimalTraj) {
           locations = deriverNDernieresPositionsParAnimal(locations, besoinLimitParAnimalTraj);
         }
@@ -911,8 +967,12 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
     }
 
   } catch (err) {
-    console.error('Erreur filtrage:', err);
-    alert('Erreur lors du chargement des données');
+    if (err.name === 'AbortError') {
+      showToast('Chargement annulé');
+    } else {
+      console.error('Erreur filtrage:', err);
+      alert('Erreur lors du chargement des données');
+    }
   } finally {
     hideMapLoading();
     if (progEl) progEl.style.display = 'none';
@@ -923,6 +983,10 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
       btnApply.textContent = 'Appliquer les filtres';
     }
     mettreAJourBoutonAppliquer();
+    mettreAJourFiltresActifs();
+    _controllerChargementActuel = null;
+    const btnAnnulerFin = document.getElementById('btnAnnulerChargement');
+    if (btnAnnulerFin) btnAnnulerFin.style.display = 'none';
   }
 
 }
