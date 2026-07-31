@@ -130,6 +130,36 @@
   color: #2D6A4F;
 }
 
+.map-loading-text-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#btnAnnulerChargement {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+#btnAnnulerChargement:hover {
+  opacity: 1;
+}
+
+#btnAnnulerChargement:active {
+  transform: scale(0.85);
+  opacity: 1;
+}
+
 @keyframes spin {
   0% {
     transform: rotate(0deg);
