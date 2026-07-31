@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.87.0] - 2026-07-31
+
+### Annulation de chargement en cours
+- Ajout d'une icone croix permettant d'interrompre un chargement de donnees en cours sur la carte principale
+- Utilise AbortController - interrompt une requete en vol ou empeche le lancement du lot suivant
+- Les donnees deja recues au moment de l'annulation restent affichees sur la carte
+- Le cache issu d'une annulation est marque comme partiel et n'est jamais reutilise automatiquement, par securite sur la fraicheur des positions affichees
+- Correction : le bandeau de filtres actifs et le bouton Reinitialiser se remettent desormais correctement a jour apres une annulation
+
 ## [0.86.0] - 2026-07-30
 
 ### Correction bug selects invisibles liste Individus
