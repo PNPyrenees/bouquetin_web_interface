@@ -101,7 +101,7 @@ export async function fetchAnimalIdsParPeriode(token, filters = {}) {
  * le COUNT cote SQL, donc sans ce parametre le comptage serait plafonne a la valeur par
  * defaut de la fonction (10000), confirme en base le 2026-07-15.
  */
-export async function fetchCountLocations(token, rpcFilters = {}) {
+export async function fetchCountLocations(token, rpcFilters = {}, signal = null) {
   const body = construireBodyRPC(rpcFilters);
   body.var_limit = 1000000;
 
@@ -112,7 +112,8 @@ export async function fetchCountLocations(token, rpcFilters = {}) {
       'Authorization': `Bearer ${token}`,
       'Content-Profile': 'bouquetin'
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    signal
   });
 
   if (!res.ok) throw new Error('Échec comptage positions');
@@ -389,29 +390,43 @@ function construireBodyRPC(filters) {
  * @param {string} token - Jeton JWT
  * @param {Object} filters - Filtres au format interne (date_from, date_to, saisonFrom...)
  * @param {Function} onBatch - Callback(batch, premierBatch) pour rendu progressif
+ * @param {AbortSignal} signal - Permet d'interrompre le chargement en cours (bouton Annuler,
+ *   cf. filters.js applyFilters) — verifie a la fois entre deux lots (evite de demarrer un
+ *   nouveau lot inutile) et transmis a fetch() pour interrompre une requete deja en vol.
  */
-export async function fetchLocalisationsRPC(token, filters = {}, onBatch = null) {
+export async function fetchLocalisationsRPC(token, filters = {}, onBatch = null, signal = null) {
   const BATCH_SIZE = 10000;
   let offset = 0;
   let premierBatch = true;
   let totalLocations = [];
 
   while (true) {
+    if (signal?.aborted) break;
+
     const body = construireBodyRPC(filters);
     if (filters.limit_par_animal) body.var_limit_par_animal = filters.limit_par_animal;
     body.var_limit  = BATCH_SIZE;
     body.var_offset = offset;
 
-    const res = await fetch(`${API_URL}/rpc/f_get_localisation`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'Content-Profile': 'bouquetin',
-        'Prefer': 'count=none'
-      },
-      body: JSON.stringify(body)
-    });
+    let res;
+    try {
+      res = await fetch(`${API_URL}/rpc/f_get_localisation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'Content-Profile': 'bouquetin',
+          'Prefer': 'count=none'
+        },
+        body: JSON.stringify(body),
+        signal
+      });
+    } catch (err) {
+      // Annulation en vol — on garde ce qui a deja ete accumule plutot que de propager
+      // l'erreur (cf. AbortError, comportement volontaire du bouton Annuler)
+      if (err.name === 'AbortError') break;
+      throw err;
+    }
 
     if (!res.ok) throw new Error(`fetchLocalisationsRPC error: ${res.status}`);
     const batch = await res.json();
