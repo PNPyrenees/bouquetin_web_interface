@@ -515,7 +515,7 @@
   <div id="modalExport" style="display:none">
     <div class="modal-export-card">
       <div class="modal-export-header">
-        <h3 class="modal-export-titre">Exporter les données</h3>
+        <h3 class="header-title">Exporter les données</h3>
         <button class="modal-export-close" id="modalExportClose">×</button>
       </div>
 
@@ -523,13 +523,19 @@
         <div class="modal-export-section">
           <div class="modal-export-section-titre">Format</div>
           <div class="modal-export-formats">
-            <button type="button" class="modal-export-format-btn active" data-format="csv">CSV</button>
-            <button type="button" class="modal-export-format-btn" disabled title="Disponible prochainement">PDF</button>
-            <button type="button" class="modal-export-format-btn" disabled title="Disponible prochainement">JPG</button>
+            <button type="button" class="modal-export-format-btn active" data-format="csv" aria-label="CSV" title="CSV">
+              <img src="assets/img/csv-file-format-extension-svgrepo-com.svg" width="28" height="28" alt="" aria-hidden="true">
+            </button>
+            <button type="button" class="modal-export-format-btn" disabled aria-label="PDF" title="Disponible prochainement">
+              <img src="assets/img/pdf-file-format-symbol-svgrepo-com.svg" width="28" height="28" alt="" aria-hidden="true">
+            </button>
+            <button type="button" class="modal-export-format-btn" data-format="jpg" aria-label="JPG" title="JPG">
+              <img src="assets/img/jpg-format-svgrepo-com.svg" width="28" height="28" alt="" aria-hidden="true">
+            </button>
           </div>
         </div>
 
-        <div class="modal-export-section">
+        <div class="modal-export-section modal-export-only-csv">
           <div class="modal-export-section-titre">Projection</div>
           <select id="exportProjection" class="modal-export-select">
             <option value="wgs84" selected>WGS84 (latitude/longitude)</option>
@@ -537,7 +543,7 @@
           </select>
         </div>
 
-        <div class="modal-export-section">
+        <div class="modal-export-section modal-export-only-csv">
           <div class="modal-export-section-titre">Colonnes à exporter</div>
           <div id="exportColonnesItems" class="modal-export-colonnes"></div>
         </div>
