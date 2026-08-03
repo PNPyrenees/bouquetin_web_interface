@@ -296,6 +296,14 @@ export function getColonnesActives() {
 }
 
 /**
+ * Expose colonnesDisponibles (cles + labels) pour la construction de la liste de
+ * cocher independante de la modal d'export (cf. app.js ouvrirModalExport()).
+ */
+export function getColonnesDisponibles() {
+  return colonnesDisponibles;
+}
+
+/**
  * Reçoit les locations depuis app.js et met à jour le tableau
  */
 export function mettreAJourPanneau(locations) {
@@ -540,11 +548,14 @@ function appliquerFiltresColonnes() {
 }
 
 /**
- * Exporte en CSV les localisations des animaux donnes — memes colonnes que le
- * tableau attributaire (colonnesDisponibles), via f_get_localisation (RPC paginee
- * par batches de 10 000 positions), coherent avec le reste des filtres carte.
+ * Exporte en CSV les localisations des animaux donnes — colonnes issues du tableau
+ * attributaire (colonnesDisponibles, ou sous-ensemble choisi via options.colonnes),
+ * via f_get_localisation (RPC paginee par batches de 10 000 positions), coherent avec
+ * le reste des filtres carte.
+ * @param {Object} options - projection ('wgs84'|'lambert93'), nomFichier (sans extension),
+ *   colonnes (tableau de cles colonnesDisponibles, repli sur toutes si absent/vide).
  */
-export async function exporterCSV(token, filters = {}) {
+export async function exporterCSV(token, filters = {}, options = {}) {
   const aniIds = filters.ani_id || [];
   const hasAniIds = Array.isArray(aniIds) && aniIds.length > 0;
   const isFollowedOnly = !!(filters.ani_is_followed || filters.suivisSeulement);
@@ -552,6 +563,11 @@ export async function exporterCSV(token, filters = {}) {
   if (!hasAniIds && !isFollowedOnly) {
     return;
   }
+
+  const projection = options.projection === 'lambert93' ? 'lambert93' : 'wgs84';
+  const colonnesExport = Array.isArray(options.colonnes) && options.colonnes.length > 0
+    ? options.colonnes
+    : colonnesDisponibles.map(c => c.key);
 
   const progressEl = document.getElementById('exportProgress');
   const progressText = document.getElementById('exportProgressText');
@@ -610,10 +626,15 @@ export async function exporterCSV(token, filters = {}) {
       return;
     }
 
-    // Generer le CSV — memes colonnes que le tableau attributaire (colonnesDisponibles),
-    // plus loc_longitude/loc_latitude (WGS84) derivees de loc.geom.coordinates (Lambert-93)
-    const colonnesExport = colonnesDisponibles.map(c => c.key);
-    const header = [...colonnesExport, 'loc_longitude', 'loc_latitude'].join(';');
+    // Generer le CSV — colonnes choisies dans la modal (options.colonnes, repli sur
+    // colonnesDisponibles complet si absent), plus 2 colonnes de coordonnees dont le
+    // libelle et le contenu dependent de la projection choisie (options.projection) :
+    // WGS84 (conversion proj4, comme avant) ou Lambert-93 (coordonnees brutes de
+    // loc.geom.coordinates, deja dans ce systeme en base — aucune conversion).
+    const colonnesCoord = projection === 'lambert93'
+      ? ['loc_x_lambert93', 'loc_y_lambert93']
+      : ['loc_longitude', 'loc_latitude'];
+    const header = [...colonnesExport, ...colonnesCoord].join(';');
     const lignes = locs.map(loc => {
       const cellules = colonnesExport.map(col => {
         const val = loc[col];
@@ -626,15 +647,21 @@ export async function exporterCSV(token, filters = {}) {
         return str;
       });
 
-      let longitude = '';
-      let latitude = '';
+      let coord1 = '';
+      let coord2 = '';
       if (loc?.geom?.coordinates) {
-        const [lon, lat] = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
-        longitude = lon.toFixed(6);
-        latitude = lat.toFixed(6);
+        if (projection === 'lambert93') {
+          const [x, y] = loc.geom.coordinates;
+          coord1 = x.toFixed(2);
+          coord2 = y.toFixed(2);
+        } else {
+          const [lon, lat] = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
+          coord1 = lon.toFixed(6);
+          coord2 = lat.toFixed(6);
+        }
       }
 
-      return [...cellules, longitude, latitude].join(';');
+      return [...cellules, coord1, coord2].join(';');
     });
 
     const csvContent = '\ufeff' + [header, ...lignes].join('\n'); // BOM UTF-8 pour Excel
@@ -642,9 +669,15 @@ export async function exporterCSV(token, filters = {}) {
     const url = URL.createObjectURL(blob);
 
     const date = new Date().toISOString().slice(0, 10);
+    // Nom fourni par la modal, assaini des caracteres interdits dans un nom de fichier —
+    // repli sur le nom par defaut si vide/absent.
+    const nomBrut = (options.nomFichier || '').trim();
+    const nomSanitise = nomBrut.replace(/[\\/:*?"<>|]/g, '').trim();
+    const nomFinal = nomSanitise ? `${nomSanitise}.csv` : `bouquetins_localisations_${date}.csv`;
+
     const a = document.createElement('a');
     a.href = url;
-    a.download = `bouquetins_localisations_${date}.csv`;
+    a.download = nomFinal;
     a.click();
     URL.revokeObjectURL(url);
   } catch (err) {
