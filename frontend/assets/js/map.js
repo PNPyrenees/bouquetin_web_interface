@@ -166,20 +166,22 @@ export function initMap(targetId, popupId) {
   basemaps = BASEMAPS_CONFIG.map(bm => {
     let source;
     if (bm.type === 'osm') {
-      source = new ol.source.OSM();
+      source = new ol.source.OSM({ crossOrigin: 'anonymous' });
     } else if (bm.type === 'wms') {
       source = new ol.source.TileWMS({
         url: bm.url,
         params: bm.wmsParams || {},
         serverType: 'geoserver',
-        attributions: bm.attributions
+        attributions: bm.attributions,
+        crossOrigin: 'anonymous'
       });
     } else {
       source = new ol.source.XYZ({
         url: bm.url.includes('IGN_API_KEY')
           ? bm.url.replace('${IGN_API_KEY}', IGN_API_KEY)
           : bm.url,
-        attributions: bm.attributions
+        attributions: bm.attributions,
+        crossOrigin: 'anonymous'
       });
     }
     return new ol.layer.Tile({ source, visible: bm.visible });
@@ -860,4 +862,79 @@ export function desactiverDessinSpatial() {
 
 export function effacerDessinSpatial() {
   _drawSource.clear();
+}
+
+/**
+ * Capture toutes les couches rendues de la carte dans un blob JPEG.
+ * @returns {Promise<Blob>}
+ */
+export function capturerCarteEnBlob() {
+  return new Promise((resolve, reject) => {
+    if (!map) {
+      reject(new Error('Carte non initialisee'));
+      return;
+    }
+
+    map.once('rendercomplete', () => {
+      try {
+        const size = map.getSize();
+        if (!size) throw new Error('Taille de carte indisponible');
+
+        const mapCanvas = document.createElement('canvas');
+        mapCanvas.width = size[0];
+        mapCanvas.height = size[1];
+        const mapContext = mapCanvas.getContext('2d');
+        if (!mapContext) throw new Error('Contexte canvas indisponible');
+
+        map.getViewport().querySelectorAll('.ol-layer canvas, canvas.ol-layer').forEach(canvas => {
+          if (!canvas.width) return;
+
+          const opacity = canvas.parentNode?.style.opacity || canvas.style.opacity;
+          mapContext.globalAlpha = opacity === '' ? 1 : Number(opacity);
+
+          const transform = canvas.style.transform;
+          const match = transform?.match(/^matrix\(([^()]*)\)$/);
+          if (match) {
+            const matrix = match[1].split(',').map(Number);
+            mapContext.setTransform(...matrix);
+          } else {
+            mapContext.setTransform(1, 0, 0, 1, 0, 0);
+          }
+
+          mapContext.drawImage(canvas, 0, 0);
+        });
+
+        mapContext.globalAlpha = 1;
+        mapContext.setTransform(1, 0, 0, 1, 0, 0);
+        mapCanvas.toBlob(blob => {
+          if (blob) resolve(blob);
+          else reject(new Error('Echec de generation du blob JPEG'));
+        }, 'image/jpeg', 0.92);
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    map.renderSync();
+  });
+}
+
+/** Exporte la vue actuelle de la carte en JPEG. */
+export async function exporterCarteJPG(nomFichier) {
+  const blob = await capturerCarteEnBlob();
+  const url = URL.createObjectURL(blob);
+
+  try {
+    const date = new Date().toISOString().slice(0, 10);
+    const nomBrut = (nomFichier || '').trim();
+    const nomSanitise = nomBrut.replace(/[\\/:*?"<>|]/g, '').trim();
+    const nomFinal = nomSanitise ? `${nomSanitise}.jpg` : `bouquetins_carte_${date}.jpg`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomFinal;
+    a.click();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
