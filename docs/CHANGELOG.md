@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.89.0] - 2026-08-03
+
+### Migration couleur collier vers t_capteur
+- Couleur du collier desormais lue depuis t_capteur.capt_couleur_collier (rattachee au capteur/pose) au lieu de t_animal.ani_marquage_couleur_collier (rattachee a l'animal, sans lien avec les poses successives)
+- Resout structurellement le risque de couleur obsolete/fausse pour un animal ayant porte plusieurs colliers au fil du temps
+- Ajout d'un champ texte Couleur du collier dans le bloc Marquage de l'en-tete, coherent avec l'illustration - affiche N/A si le collier n'est pas actif ou si la couleur n'est pas renseignee
+
 ## [0.88.0] - 2026-08-03
 
 ### Correction contours et synchronisation symbologie
