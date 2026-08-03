@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## [0.88.0] - 2026-08-03
+
+### Correction contours et synchronisation symbologie
+- Contour des points uniformise en blanc pour les modes de coloration Sexe et Gestionnaire - le cycle de contours (blanc/noir/jaune/cyan) reste reserve au mode Individu
+- Correction desynchronisation du radio de symbologie apres Reinitialiser les filtres - le radio Individu est desormais recoche explicitement, coherent avec le rendu reel de la carte
+- Meme correction appliquee au chargement initial de la page - le radio de symbologie restaure par le navigateur (Ctrl+R) est desormais resynchronise avec le mode Individu reellement affiche
+
 ## [0.87.0] - 2026-07-31
 
 ### Annulation de chargement en cours
