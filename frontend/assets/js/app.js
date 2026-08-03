@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 
@@ -16,6 +16,7 @@ let currentToken = null;
 // colonnesActives (panel.js), initialisee a l'ouverture depuis getColonnesActives()
 // mais modifiable ici sans repercussion sur le tableau attributaire.
 let _colonnesExportActives = [];
+let _formatExportActif = 'csv';
 const programmationsMap = new Map(); // ani_id → prog_id
 let _aniCalendrier = new Map(); // ani_id -> Set(mois_jour 'MM-JJ') — index leger pour filtrage saison instantane
 
@@ -1642,11 +1643,37 @@ function initToolbarCarte() {
     }
   });
 
+  document.querySelectorAll('.modal-export-format-btn:not([disabled])').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.modal-export-format-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _formatExportActif = btn.dataset.format;
+      document.querySelectorAll('.modal-export-only-csv').forEach(section => {
+        section.style.display = _formatExportActif === 'csv' ? '' : 'none';
+      });
+    });
+  });
+
   document.getElementById('modalExportBtnExporter')?.addEventListener('click', async () => {
+    const nomFichier = document.getElementById('exportNomFichier')?.value || '';
+
+    if (_formatExportActif === 'jpg') {
+      try {
+        await exporterCarteJPG(nomFichier);
+      } catch (err) {
+        console.error('Erreur export JPG:', err);
+        if (err?.name === 'SecurityError') {
+          showToast('Export impossible avec ce fond de carte, essayez un autre fond');
+        } else {
+          showToast('Impossible d’exporter la carte en JPG');
+        }
+      }
+      return;
+    }
+
     const { exporterCSV } = await import('./panel.js');
     const filtresExport = window._derniersFiltresAppliques || { ani_is_followed: true };
     const projection = document.getElementById('exportProjection')?.value || 'wgs84';
-    const nomFichier = document.getElementById('exportNomFichier')?.value || '';
     await exporterCSV(currentToken, filtresExport, {
       projection,
       nomFichier,
@@ -1664,6 +1691,14 @@ function initToolbarCarte() {
 async function ouvrirModalExport() {
   const modal = document.getElementById('modalExport');
   if (!modal) return;
+
+  _formatExportActif = 'csv';
+  document.querySelectorAll('.modal-export-format-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.format === 'csv');
+  });
+  document.querySelectorAll('.modal-export-only-csv').forEach(section => {
+    section.style.display = '';
+  });
 
   const totalExpected = parseInt(document.getElementById('positionsCount')?.textContent?.replace(/\s/g, '') || '0') || 0;
   const resumeCount = document.getElementById('exportResumeCount');
