@@ -424,8 +424,12 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
       premiereParIndividu[loc.ani_id]?.date === (loc.loc_datetime_local || loc.loc_date_local);
     const estDepart = modeTrajectoire && estPremier && !estDernier;
 
+    // Contour uniforme Blanc en modes Sexe/Gestionnaire — le cycle par index
+    // (getContourParIndex) n a de sens qu en mode Individu, ou il differencie
+    // les couleurs Glasbey proches ; applique aux autres modes il produit un
+    // contour Noir/Blanc incoherent au sein d une meme categorie (cf. audit).
     const idx = indicesIndividus.get(loc.ani_id) ?? 0;
-    const contour = getContourParIndex(idx);
+    const contour = modeCouleur === 'individu' ? getContourParIndex(idx) : CONTOURS[0];
 
     let radius, strokeWidth;
     if (estDepart) {
@@ -509,8 +513,9 @@ export function changerModeCouleur(modeCouleur) {
       ani_gestionnaire: f.get('ani_gestionnaire')
     };
     const [cR, cG, cB] = cssToRgba(getCouleur(loc, modeCouleur));
+    // Meme regle qu en renderPoints() : contour uniforme Blanc hors mode Individu.
     const idx = indicesIndividus.get(loc.ani_id) ?? 0;
-    const contour = getContourParIndex(idx);
+    const contour = modeCouleur === 'individu' ? getContourParIndex(idx) : CONTOURS[0];
 
     // Point de depart (trajectoire) : fond blanc, contour colore — identifie par strokeA != fillA
     // heuristique : on detecte le "depart" par le fait que fillR/G/B valent 255/255/255
