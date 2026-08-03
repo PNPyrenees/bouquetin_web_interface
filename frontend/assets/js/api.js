@@ -298,7 +298,7 @@ export async function fetchAniIdsAvecGeom(token) {
  */
 export async function fetchAnimalDetail(token, aniId) {
   const res = await fetch(
-    `${API_URL}/t_animal?ani_id=eq.${aniId}&select=ani_id,ani_nom,ani_code,ani_sexe,ani_annee_naissance,ani_date_mort,ani_gestionnaire,ani_pop_rattach,ani_marquage_oreille_droite,ani_marquage_oreille_gauche,ani_marquage_couleur_collier,ani_marquage_code_collier,ani_marquage_bande_laterale_collier,ani_commentaire`,
+    `${API_URL}/t_animal?ani_id=eq.${aniId}&select=ani_id,ani_nom,ani_code,ani_sexe,ani_annee_naissance,ani_date_mort,ani_gestionnaire,ani_pop_rattach,ani_marquage_oreille_droite,ani_marquage_oreille_gauche,ani_marquage_code_collier,ani_marquage_bande_laterale_collier,ani_commentaire`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -318,7 +318,7 @@ export async function fetchAnimalDetail(token, aniId) {
  */
 export async function fetchCapteurParAnimal(token, aniId) {
   const res = await fetch(
-    `${API_URL}/cor_animal_capteur?ani_id=eq.${aniId}&select=cor_id,cor_date_debut,cor_date_fin,capt_id,prog_id,t_capteur(capt_id,capt_id_constructeur,capt_constructeur,capt_type,capt_frequence,capt_actif),bib_programmation(prog_libelle,prog_desciption,prog_frequence,prog_duree_acquisition)&order=cor_date_debut.desc`,
+    `${API_URL}/cor_animal_capteur?ani_id=eq.${aniId}&select=cor_id,cor_date_debut,cor_date_fin,capt_id,prog_id,t_capteur(capt_id,capt_id_constructeur,capt_constructeur,capt_type,capt_frequence,capt_actif,capt_couleur_collier),bib_programmation(prog_libelle,prog_desciption,prog_frequence,prog_duree_acquisition)&order=cor_date_debut.desc`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
