@@ -197,7 +197,7 @@
   pointer-events: auto;
   width: 100%;
   background: var(--map-ui-bg);
-  border-radius: 12px 12px 0 0;
+  border-radius: none;
   box-shadow: 0 -3px 15px rgba(0,0,0,0.08);
   padding: 12px 20px 20px 20px;
   display: flex;
@@ -399,6 +399,12 @@
 
 #mapScreen:has(.sidebar-right.visible) #toolbarZoom {
   right: 10px;
+}
+
+/* Bloc export — separe de #toolbarOutils, empile juste en dessous (evite de melanger
+   les actions d'export avec les actions de filtrage/affichage, cf. discussion chantier) */
+#toolbarExport {
+  top: 190px;
 }
 
 .toolbar-btn {
