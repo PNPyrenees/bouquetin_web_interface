@@ -12,6 +12,10 @@ import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquer
 let animals = [];
 let activeIds = new Set();
 let currentToken = null;
+// Etat des colonnes cochees dans la modal d'export — copie independante de
+// colonnesActives (panel.js), initialisee a l'ouverture depuis getColonnesActives()
+// mais modifiable ici sans repercussion sur le tableau attributaire.
+let _colonnesExportActives = [];
 const programmationsMap = new Map(); // ani_id → prog_id
 let _aniCalendrier = new Map(); // ani_id -> Set(mois_jour 'MM-JJ') — index leger pour filtrage saison instantane
 
@@ -530,12 +534,6 @@ async function startApp(token) {
     // Export CSV — colonnes du tableau attributaire, via f_get_localisation (RPC paginee)
     // Reflete les derniers filtres reellement appliques sur la carte (_derniersFiltresAppliques),
     // pas l etat courant des champs UI (qui peut differer si l utilisateur n a pas encore reapplique)
-    document.getElementById('btnExportCSV')?.addEventListener('click', async () => {
-      const { exporterCSV } = await import('./panel.js');
-      const filtresExport = window._derniersFiltresAppliques || { ani_is_followed: true };
-      await exporterCSV(currentToken, filtresExport);
-    });
-
     // Calendrier en arrière-plan — ne bloque pas le rendu carte. Sert aussi a deriver les
     // animaux avec au moins une position valide (memes filtres WHERE que l'ancien
     // fetchAniIdsAvecGeom sur v_localisation : loc_anomalie/loc_outlier/geom, cf. api.js) —
@@ -1625,6 +1623,92 @@ function initToolbarCarte() {
       btn?.classList.remove('active');
     }
   });
+
+  // --- Modal export ---
+  document.getElementById('btnExportModal')?.addEventListener('click', () => {
+    ouvrirModalExport();
+  });
+
+  document.getElementById('modalExportClose')?.addEventListener('click', fermerModalExport);
+  document.getElementById('modalExportBtnAnnuler')?.addEventListener('click', fermerModalExport);
+
+  document.getElementById('exportColonnesItems')?.addEventListener('change', (e) => {
+    const key = e.target.value;
+    if (!key) return;
+    if (e.target.checked) {
+      if (!_colonnesExportActives.includes(key)) _colonnesExportActives.push(key);
+    } else {
+      _colonnesExportActives = _colonnesExportActives.filter(k => k !== key);
+    }
+  });
+
+  document.getElementById('modalExportBtnExporter')?.addEventListener('click', async () => {
+    const { exporterCSV } = await import('./panel.js');
+    const filtresExport = window._derniersFiltresAppliques || { ani_is_followed: true };
+    const projection = document.getElementById('exportProjection')?.value || 'wgs84';
+    const nomFichier = document.getElementById('exportNomFichier')?.value || '';
+    await exporterCSV(currentToken, filtresExport, {
+      projection,
+      nomFichier,
+      colonnes: _colonnesExportActives
+    });
+  });
+}
+
+/**
+ * Ouvre la modal d'export — pre-remplit resume (positions + filtres actifs), nom de
+ * fichier par defaut, et la liste des colonnes (etat independant _colonnesExportActives,
+ * initialise depuis getColonnesActives() mais modifiable dans la modal sans repercussion
+ * sur le tableau attributaire).
+ */
+async function ouvrirModalExport() {
+  const modal = document.getElementById('modalExport');
+  if (!modal) return;
+
+  const totalExpected = parseInt(document.getElementById('positionsCount')?.textContent?.replace(/\s/g, '') || '0') || 0;
+  const resumeCount = document.getElementById('exportResumeCount');
+  if (resumeCount) resumeCount.textContent = totalExpected.toLocaleString('fr-FR');
+
+  const resumeFiltres = document.getElementById('exportResumeFiltres');
+  if (resumeFiltres) {
+    const f = window._derniersFiltresAppliques || {};
+    const labels = [];
+    if (f.date_from || f.date_to) labels.push(`Période : ${f.date_from || '...'} → ${f.date_to || '...'}`);
+    if (f.saisonFrom || f.saisonTo) labels.push(`Saison : ${f.saisonFrom || '...'} → ${f.saisonTo || '...'}`);
+    if (f.annees?.length) labels.push(`Années : ${f.annees.join(', ')}`);
+    if (f.sexe) labels.push(`Sexe : ${f.sexe}`);
+    if (f.gestionnaire) labels.push(`Gestionnaire : ${f.gestionnaire}`);
+    if (f.population) labels.push(`Population : ${f.population}`);
+    if (f.programmation) labels.push(`Programmation : ${f.programmation}`);
+    if (f.was_translocated != null) labels.push(`Translocation : ${f.was_translocated ? 'oui' : 'non'}`);
+    if (f.geom) labels.push('Filtre spatial actif');
+    resumeFiltres.textContent = labels.length > 0 ? labels.join(' · ') : 'Aucun filtre actif';
+  }
+
+  const nomInput = document.getElementById('exportNomFichier');
+  if (nomInput) {
+    const date = new Date().toISOString().slice(0, 10);
+    nomInput.value = `bouquetins_localisations_${date}`;
+  }
+
+  const { getColonnesActives, getColonnesDisponibles } = await import('./panel.js');
+  _colonnesExportActives = [...getColonnesActives()];
+  const itemsEl = document.getElementById('exportColonnesItems');
+  if (itemsEl) {
+    itemsEl.innerHTML = getColonnesDisponibles().map(c => `
+      <label class="modal-export-colonne-item">
+        <input type="checkbox" value="${c.key}" ${_colonnesExportActives.includes(c.key) ? 'checked' : ''}>
+        ${c.label}
+      </label>
+    `).join('');
+  }
+
+  modal.style.display = 'flex';
+}
+
+function fermerModalExport() {
+  const modal = document.getElementById('modalExport');
+  if (modal) modal.style.display = 'none';
 }
 
 export function supprimerBadgeById(id) {
