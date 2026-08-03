@@ -299,6 +299,11 @@
           <svg width="16" height="16" class="icon-svg-map"><use href="assets/img/sprite.svg#icon-recentrer"/></svg>
         </button>
       </div>
+      <div id="toolbarExport" class="map-toolbar">
+        <button id="btnExportModal" class="toolbar-btn" title="Exporter les données">
+          <img src="assets/img/download-solid-full.svg" class="icon-svg-map" alt="Export">
+        </button>
+      </div>
     </div>
     <div id="basemapSelector">
       <div id="basemapPanel">
@@ -386,18 +391,6 @@
         </div>
         <div class="panel-tab-content" id="panelContentDonnees" style="display:flex">
           <div class="panel-toolbar">
-            <button id="btnExportCSV" class="panel-btn-filtres" title="Exporter toutes les localisations en CSV">
-              <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><use href="assets/img/sprite.svg#icon-export-csv"/></svg>
-              Exporter CSV
-            </button>
-            <div id="exportProgress" style="display:none">
-              <svg width="28" height="28" viewBox="0 0 28 28" id="exportCircle">
-                <circle cx="14" cy="14" r="11" fill="none" stroke-width="2.5" class="export-circle-bg"/>
-                <circle id="exportArc" cx="14" cy="14" r="11" fill="none" stroke-width="2.5"
-                  stroke-dasharray="69.1" stroke-dashoffset="69.1" stroke-linecap="round" class="export-circle-arc"/>
-              </svg>
-              <span id="exportProgressText"></span>
-            </div>
             <div class="panel-filtre-wrapper">
               <button class="panel-btn-filtres" id="panelBtnFiltres">
                 <img src="assets/img/filtre_horizontal.png" alt="" class="panel-btn-filtres-icon"> Filtres colonnes
@@ -516,6 +509,62 @@
       <div class="modal-volume-actions">
         <button id="modalVolumeBtnAnnuler">Annuler</button>
         <button id="modalVolumeBtnConfirmer">Afficher tout</button>
+      </div>
+    </div>
+  </div>
+  <div id="modalExport" style="display:none">
+    <div class="modal-export-card">
+      <div class="modal-export-header">
+        <h3 class="modal-export-titre">Exporter les données</h3>
+        <button class="modal-export-close" id="modalExportClose">×</button>
+      </div>
+
+      <div class="modal-export-body">
+        <div class="modal-export-section">
+          <div class="modal-export-section-titre">Format</div>
+          <div class="modal-export-formats">
+            <button type="button" class="modal-export-format-btn active" data-format="csv">CSV</button>
+            <button type="button" class="modal-export-format-btn" disabled title="Disponible prochainement">PDF</button>
+            <button type="button" class="modal-export-format-btn" disabled title="Disponible prochainement">JPG</button>
+          </div>
+        </div>
+
+        <div class="modal-export-section">
+          <div class="modal-export-section-titre">Projection</div>
+          <select id="exportProjection" class="modal-export-select">
+            <option value="wgs84" selected>WGS84 (latitude/longitude)</option>
+            <option value="lambert93">Lambert-93</option>
+          </select>
+        </div>
+
+        <div class="modal-export-section">
+          <div class="modal-export-section-titre">Colonnes à exporter</div>
+          <div id="exportColonnesItems" class="modal-export-colonnes"></div>
+        </div>
+
+        <div class="modal-export-section modal-export-resume">
+          <div class="modal-export-resume-ligne"><strong id="exportResumeCount">0</strong> positions à exporter</div>
+          <div class="modal-export-resume-ligne" id="exportResumeFiltres"></div>
+        </div>
+
+        <div class="modal-export-section">
+          <div class="modal-export-section-titre">Nom du fichier</div>
+          <input type="text" id="exportNomFichier" class="modal-export-input">
+        </div>
+
+        <div id="exportProgress" style="display:none">
+          <svg width="28" height="28" viewBox="0 0 28 28" id="exportCircle">
+            <circle cx="14" cy="14" r="11" fill="none" stroke-width="2.5" class="export-circle-bg"/>
+            <circle id="exportArc" cx="14" cy="14" r="11" fill="none" stroke-width="2.5"
+              stroke-dasharray="69.1" stroke-dashoffset="69.1" stroke-linecap="round" class="export-circle-arc"/>
+          </svg>
+          <span id="exportProgressText"></span>
+        </div>
+      </div>
+
+      <div class="modal-export-actions">
+        <button id="modalExportBtnAnnuler">Annuler</button>
+        <button id="modalExportBtnExporter">Exporter</button>
       </div>
     </div>
   </div>
