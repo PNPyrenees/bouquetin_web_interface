@@ -396,7 +396,7 @@ header {
 .modal-export-card {
   background: white;
   border-radius: 4px;
-  width: 90%;
+  width: 27%;
   max-width: 780px;
   max-height: 90vh;
   display: flex;
@@ -455,22 +455,30 @@ header {
 }
 
 .modal-export-format-btn {
-  padding: 8px 20px;
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  background: white;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border: 0;
+  background: transparent;
   font-family: var(--font-family);
   font-size: 13px;
   color: var(--color-text);
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.modal-export-format-btn.active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: white;
-  font-weight: 600;
+.modal-export-format-btn svg,
+.modal-export-format-btn img {
+  display: block;
+  flex: 0 0 auto;
+  filter: grayscale(1);
+  opacity: 0.65;
+  transition: filter 0.15s, opacity 0.15s;
+}
+
+.modal-export-format-btn.active img {
+  filter: brightness(0) saturate(100%) invert(43%) sepia(35%) saturate(1408%) hue-rotate(113deg) brightness(92%) contrast(93%);
+  opacity: 1;
 }
 
 .modal-export-format-btn:disabled {
