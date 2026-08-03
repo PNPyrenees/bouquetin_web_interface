@@ -392,7 +392,7 @@ function ligneInfo(label, valeur) {
   return p;
 }
 
-function remplirIdentite(detail) {
+function remplirIdentite(detail, collierActif, capteurs) {
   const corpsPrincipal = document.getElementById('carteIdentitePrincipale');
   if (corpsPrincipal) {
     corpsPrincipal.innerHTML = '';
@@ -408,6 +408,11 @@ function remplirIdentite(detail) {
     corpsMarquage.innerHTML = '';
     corpsMarquage.appendChild(ligneInfo('Oreille droite', detail?.ani_marquage_oreille_droite));
     corpsMarquage.appendChild(ligneInfo('Oreille gauche', detail?.ani_marquage_oreille_gauche));
+    // Meme donnee et meme logique conditionnelle que l'illustration (cf.
+    // appliquerCouleursMarquage) — N/A si pas de collier actif, coherent avec le
+    // masquage du SVG collier/badge capteur dans ce cas.
+    const couleurCollierAffichee = collierActif ? capteurs?.[0]?.t_capteur?.capt_couleur_collier : null;
+    corpsMarquage.appendChild(ligneInfo('Couleur du collier', couleurCollierAffichee));
     corpsMarquage.appendChild(ligneInfo('Commentaire', detail?.ani_commentaire));
   }
 }
@@ -441,10 +446,12 @@ function remplirDatesCles(captures, locations) {
  * Collier + badge capteur visibles seulement si collierActif (cor_date_fin IS NULL sur
  * la pose la plus recente) ET couleur renseignee/reconnue — masques sinon
  * (.fiche-illustration-masque, cf. individuals.css), meme logique que les oreilles :
- * jamais de couleur grisee/incertaine affichee (cf. analyse fiche individu, decision
- * Ludovic sur la fiabilite structurelle de ani_marquage_couleur_collier toujours en
- * attente, mais devenue moins critique cote affichage).
- * Couleurs texte libres en base (t_animal) — variantes de casse/accents/genre a normaliser.
+ * jamais de couleur grisee/incertaine affichee. Couleur du collier lue sur
+ * capt_couleur_collier (t_capteur, embedding de fetchCapteurParAnimal) — rattachee
+ * a la pose elle-meme depuis la migration Ludovic (ancien champ t_animal.
+ * ani_marquage_couleur_collier n'avait structurellement aucun lien avec les poses
+ * successives de collier, cf. historique docs/CHANGELOG.md).
+ * Couleurs texte libres en base — variantes de casse/accents/genre a normaliser.
  * Mapping COULEURS_MARQUAGE centralise dans config.js.
  */
 
@@ -465,7 +472,7 @@ function normaliserCouleur(valeur) {
   return couleur || null;
 }
 
-function appliquerCouleursMarquage(detail, collierActif) {
+function appliquerCouleursMarquage(detail, collierActif, capteurs) {
   // Photo de profil generique — variante femelle (cornes plus petites) si ani_sexe = 'F',
   // sinon photo par defaut (couvre aussi M/N/A). Classe --femelle sur le conteneur pilote
   // aussi les positions collier/oreilles/capteur specifiques (cf. individuals.css) — les
@@ -489,7 +496,7 @@ function appliquerCouleursMarquage(detail, collierActif) {
   const svgCollier = document.querySelector('.fiche-illustration-collier');
   const badgeCapteur = document.querySelector('.fiche-illustration-capteur');
   const useCollier = document.getElementById('useCollier');
-  const couleurCollier = normaliserCouleur(detail?.ani_marquage_couleur_collier);
+  const couleurCollier = normaliserCouleur(capteurs?.[0]?.t_capteur?.capt_couleur_collier);
   const collierVisible = collierActif && !!couleurCollier;
   svgCollier?.classList.toggle('fiche-illustration-masque', !collierVisible);
   badgeCapteur?.classList.toggle('fiche-illustration-masque', !collierVisible);
@@ -1733,18 +1740,21 @@ async function afficherFiche(aniId) {
       fetchCaptureRelacheParAnimal(currentToken, aniId)
     ]);
 
-    remplirIdentite(detail);
+    // Collier actif = pose la plus recente (capteurs[0], deja trie cor_date_debut.desc)
+    // sans date de fin — critere explicite de Ludovic (cor_date_fin IS NULL). Coherent
+    // avec colliersActifs/computeStatut (liste Individus) depuis le 2026-07-30 — meme
+    // critere strict, independant des positions GPS transmises, sur les deux pages.
+    // Calcule ici (avant remplirIdentite()) pour rester la source unique partagee
+    // avec appliquerCouleursMarquage() plus bas.
+    const collierActif = capteurs.length > 0 && capteurs[0].cor_date_fin == null;
+
+    remplirIdentite(detail, collierActif, capteurs);
     remplirPastilleStatutPhoto(detail);
     const couleursCaptureRelache = construireCouleursCaptureRelache(captures);
     remplirEvenementsCaptureRelache(captures, capteurs, couleursCaptureRelache);
     construireLegendeSites(captures, couleursCaptureRelache);
     verifierCoherenceTranslocation(captures);
-    // Collier actif = pose la plus recente (capteurs[0], deja trie cor_date_debut.desc)
-    // sans date de fin — critere explicite de Ludovic (cor_date_fin IS NULL). Coherent
-    // avec colliersActifs/computeStatut (liste Individus) depuis le 2026-07-30 — meme
-    // critere strict, independant des positions GPS transmises, sur les deux pages.
-    const collierActif = capteurs.length > 0 && capteurs[0].cor_date_fin == null;
-    appliquerCouleursMarquage(detail, collierActif);
+    appliquerCouleursMarquage(detail, collierActif, capteurs);
 
     initCarteSites();
     renderPointsSites(captures, couleursCaptureRelache);
