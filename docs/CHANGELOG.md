@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.91.0] - 2026-08-03
+
+### Refonte export - modal centralisee (etape 2 : JPG)
+- Format JPG active dans la modal d'export - capture de la carte actuellement affichee (toutes les couches, y compris les points GPS en WebGL)
+- Ajout de crossOrigin anonymous sur toutes les sources de fonds de carte, necessaire pour permettre l'export sans erreur de securite navigateur
+- Les sections Projection et Colonnes sont masquees automatiquement quand le format JPG est selectionne, non pertinentes pour une capture d'image
+- Icones dediees pour chaque format dans la modal (CSV, PDF a venir, JPG)
+- Gestion d'erreur dediee si l'export echoue pour raison de securite (fond de carte incompatible)
+
 ## [0.90.0] - 2026-08-03
 
 ### Refonte export - modal centralisee (etape 1 : CSV)
