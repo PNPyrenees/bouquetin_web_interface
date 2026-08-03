@@ -649,6 +649,15 @@ async function startApp(token) {
       mettreAJourIndividus(animauxEnrichis);
     }, 0);
 
+    // Mode couleur (symbologie) par défaut — Individu, coherent avec renderPoints()
+    // appele plus haut sans 4e argument (donc modeCouleur='individu' par defaut, cf. map.js).
+    // Necessaire ici car le navigateur peut restaurer un radio Sexe/Gestionnaire coche
+    // apres un rechargement de page (Ctrl+R), sans declencher l evenement 'change' —
+    // desynchro sinon avec les points reellement colores et avec mettreAJourLegende() ci-dessous.
+    document.querySelectorAll('input[name="modeCouleur"]').forEach(radio => {
+      radio.checked = radio.value === 'individu';
+    });
+
     mettreAJourLegende();
     setLabelDatetime('Date de localisation');
 
@@ -1761,6 +1770,14 @@ async function reinitialiserTousLesFiltres() {
       btnTraj.classList.remove('active');
       clearTrajectoire();
     }
+
+    // 3bis. Mode couleur (symbologie) par défaut — Individu, coherent avec renderPoints()
+    // appele plus bas sans 4e argument (donc modeCouleur='individu' par defaut, cf. map.js).
+    // Fait avant l'appel a mettreAJourLegende() plus bas pour que la legende (qui lit ce
+    // radio) soit coherente avec les points reellement colores.
+    document.querySelectorAll('input[name="modeCouleur"]').forEach(radio => {
+      radio.checked = radio.value === 'individu';
+    });
 
     // 4. Recherche textuelle
     const searchIndividu = document.getElementById('searchIndividu');
