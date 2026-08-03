@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## [0.90.0] - 2026-08-03
+
+### Refonte export - modal centralisee (etape 1 : CSV)
+- Remplacement du bouton Exporter CSV du panneau attributaire par une modal centralisee accessible depuis un nouveau bouton dans la toolbar carte
+- La modal permet de choisir le format (CSV disponible, PDF et JPG a venir), la projection des coordonnees (WGS84 ou Lambert-93), les colonnes a exporter (etat independant du tableau attributaire) et le nom du fichier
+- Resume dynamique affichant le nombre de positions et les filtres actuellement appliques avant export
+- Nom de fichier assaini des caracteres interdits avant telechargement
+
 ## [0.89.0] - 2026-08-03
 
 ### Migration couleur collier vers t_capteur
