@@ -666,7 +666,6 @@ export async function exporterCSV(token, filters = {}, options = {}) {
 
     const csvContent = '\ufeff' + [header, ...lignes].join('\n'); // BOM UTF-8 pour Excel
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
 
     const date = new Date().toISOString().slice(0, 10);
     // Nom fourni par la modal, assaini des caracteres interdits dans un nom de fichier —
@@ -675,11 +674,21 @@ export async function exporterCSV(token, filters = {}, options = {}) {
     const nomSanitise = nomBrut.replace(/[\\/:*?"<>|]/g, '').trim();
     const nomFinal = nomSanitise ? `${nomSanitise}.csv` : `bouquetins_localisations_${date}.csv`;
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomFinal;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (options.fileHandle) {
+      const writable = await options.fileHandle.createWritable();
+      try {
+        await writable.write(blob);
+      } finally {
+        await writable.close();
+      }
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nomFinal;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   } catch (err) {
     console.error('Erreur export CSV:', err);
   } finally {
