@@ -1,5 +1,14 @@
 # CHANGELOG
 
+### Refonte export - modal centralisee (etape 3 : PDF, echelle et finitions)
+- Format PDF active dans la modal d'export - rapport avec logo, titre, date, resume des filtres, capture de la carte et legende des couleurs (pagination sur plusieurs pages si necessaire, checkbox pour l'inclure ou non)
+- Ajout d'une barre d'echelle graphique sur les exports JPG et PDF, calculee independamment du controle d'interface pour rester fiable
+- Ajout d'une legende Point de depart / Direction sur l'export quand le mode Trajectoire est actif
+- Suppression du bouton Annuler texte au profit d'une icone croix plus discrete (chantier annulation de chargement, precedemment)
+- Ajout du choix "Enregistrer sous" (boite de dialogue systeme) pour les 3 formats d'export CSV, JPG et PDF, avec repli automatique sur le telechargement classique si le navigateur ne supporte pas cette fonctionnalite
+- Ameliorations de resolution des exports image (surechantillonnage x2, gestion du ratio d'ecran) et correction d'un decalage de rendu selon les ecrans
+- Rendu visuel des exports encore perfectible (echelle/legende) - travail a poursuivre
+
 ## [0.91.0] - 2026-08-03
 
 ### Refonte export - modal centralisee (etape 2 : JPG)
