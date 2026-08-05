@@ -5,6 +5,7 @@ let gpsLayer;
 let trajectoireSource;
 let popupOverlay;
 let basemaps = [];
+let overlaysWmts = new Map();
 let isAnimating = false;
 
 const couleursIndividus = new Map();
@@ -129,6 +130,87 @@ function formatMouseCoordinates(coordonnee) {
   return `${ligneL93}<br>${ligneWgs84}`;
 }
 
+// Cache du GetCapabilities WMTS IGN — un seul fetch reel partage par toutes les
+// couches WMTS (fonds + overlays), meme si plusieurs sont construites en parallele
+// au chargement de la carte (promesse memoisee, jamais re-fetchee par couche).
+let _wmtsCapabilitiesPromise = null;
+function chargerCapacitesWMTS() {
+  if (!_wmtsCapabilitiesPromise) {
+    _wmtsCapabilitiesPromise = fetch('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetCapabilities')
+      .then(res => {
+        if (!res.ok) throw new Error(`GetCapabilities IGN : HTTP ${res.status}`);
+        return res.text();
+      })
+      .then(texte => new ol.format.WMTSCapabilities().read(texte));
+  }
+  return _wmtsCapabilitiesPromise;
+}
+
+/**
+ * Cree une couche ol.layer.Tile pour un fond ou overlay WMTS IGN. La couche existe
+ * immediatement (necessaire pour l'ordre des layers dans new ol.Map(), construit de
+ * facon synchrone), mais sa source est affectee de facon asynchrone (setSource) une
+ * fois le GetCapabilities resolu et la couche/matrixSet/style valides.
+ * Isolation des pannes : un echec (reseau, ou layer/matrixSet/style introuvable dans
+ * le GetCapabilities) est capture ici et n'affecte que CETTE couche — jamais
+ * initMap() ni les autres fonds/overlays, qui restent utilisables normalement.
+ */
+function creerCoucheWMTS(bm) {
+  const layer = new ol.layer.Tile({ visible: bm.visible, opacity: bm.opacity ?? 1 });
+  chargerCapacitesWMTS()
+    .then(capacites => {
+      const options = ol.source.WMTS.optionsFromCapabilities(capacites, {
+        layer: bm.layer,
+        matrixSet: bm.matrixSet,
+        style: bm.style,
+        format: bm.format,
+        crossOrigin: 'anonymous'
+      });
+      if (!options) {
+        throw new Error(`Couche introuvable dans le GetCapabilities IGN : layer="${bm.layer}" matrixSet="${bm.matrixSet}" style="${bm.style}"`);
+      }
+      layer.setSource(new ol.source.WMTS(options));
+    })
+    .catch(err => {
+      console.error(`Fond/overlay WMTS "${bm.nom}" indisponible :`, err.message);
+      if (window._showToast) window._showToast(`"${bm.nom}" n'a pas pu être chargé.`);
+    });
+  return layer;
+}
+
+/**
+ * Cree une couche ol.layer.Tile a partir d'une entree BASEMAPS_CONFIG, quel que soit
+ * son type (xyz/osm/wms/wmts) — factorise la logique auparavant inline dans initMap(),
+ * reutilisee a la fois pour les fonds exclusifs et les overlays.
+ */
+function creerCoucheFond(bm) {
+  if (bm.type === 'wmts') {
+    return creerCoucheWMTS(bm);
+  }
+
+  let source;
+  if (bm.type === 'osm') {
+    source = new ol.source.OSM({ crossOrigin: 'anonymous' });
+  } else if (bm.type === 'wms') {
+    source = new ol.source.TileWMS({
+      url: bm.url,
+      params: bm.wmsParams || {},
+      serverType: 'geoserver',
+      attributions: bm.attributions,
+      crossOrigin: 'anonymous'
+    });
+  } else {
+    source = new ol.source.XYZ({
+      url: bm.url.includes('IGN_API_KEY')
+        ? bm.url.replace('${IGN_API_KEY}', IGN_API_KEY)
+        : bm.url,
+      attributions: bm.attributions,
+      crossOrigin: 'anonymous'
+    });
+  }
+  return new ol.layer.Tile({ source, visible: bm.visible, opacity: bm.opacity ?? 1 });
+}
+
 /**
  * Initialise la carte et ses couches de base.
  * @param {string} targetId - ID de l'élément HTML contenant la carte
@@ -162,30 +244,16 @@ export function initMap(targetId, popupId) {
     source: trajectoireSource
   });
 
-  // Définition des fonds de carte (générés depuis BASEMAPS_CONFIG)
-  basemaps = BASEMAPS_CONFIG.map(bm => {
-    let source;
-    if (bm.type === 'osm') {
-      source = new ol.source.OSM({ crossOrigin: 'anonymous' });
-    } else if (bm.type === 'wms') {
-      source = new ol.source.TileWMS({
-        url: bm.url,
-        params: bm.wmsParams || {},
-        serverType: 'geoserver',
-        attributions: bm.attributions,
-        crossOrigin: 'anonymous'
-      });
-    } else {
-      source = new ol.source.XYZ({
-        url: bm.url.includes('IGN_API_KEY')
-          ? bm.url.replace('${IGN_API_KEY}', IGN_API_KEY)
-          : bm.url,
-        attributions: bm.attributions,
-        crossOrigin: 'anonymous'
-      });
-    }
-    return new ol.layer.Tile({ source, visible: bm.visible });
-  });
+  // Definition des fonds de carte exclusifs et des overlays superposables, generes
+  // depuis BASEMAPS_CONFIG — category absente ou 'basemap' => fond exclusif
+  // (retrocompatibilite avec les entrees existantes sans ce champ), 'overlay' =>
+  // superposable independamment (cf. toggleOverlay()). basemaps reste un tableau
+  // parallele aux entrees 'basemap' de BASEMAPS_CONFIG, dans le meme ordre — c'est
+  // ce sur quoi switchBasemap(index) s'appuie, inchange.
+  const basemapConfigs = BASEMAPS_CONFIG.filter(bm => (bm.category || 'basemap') === 'basemap');
+  const overlayConfigs = BASEMAPS_CONFIG.filter(bm => bm.category === 'overlay');
+  basemaps = basemapConfigs.map(creerCoucheFond);
+  overlaysWmts = new Map(overlayConfigs.map(bm => [bm.id, creerCoucheFond(bm)]));
 
   // Préparation du popup (Overlay)
   const popupEl = document.getElementById(popupId);
@@ -200,6 +268,7 @@ export function initMap(targetId, popupId) {
     target: targetId,
     layers: [
       ...basemaps,
+      ...overlaysWmts.values(),
       trajectoireLayer,
       gpsLayer
     ],
@@ -694,6 +763,19 @@ export function switchBasemap(index) {
   basemaps.forEach((layer, i) => {
     layer.setVisible(i === index);
   });
+}
+
+/**
+ * Active/desactive un overlay WMTS par id (courbes de niveau, pentes, hydrographie,
+ * routes) — independant de switchBasemap(), plusieurs overlays actifs simultanement.
+ */
+export function toggleOverlay(id, visible) {
+  overlaysWmts.get(id)?.setVisible(visible);
+}
+
+/** Ajuste l'opacite d'un overlay WMTS par id (0 a 1). */
+export function setOverlayOpacity(id, opacity) {
+  overlaysWmts.get(id)?.setOpacity(opacity);
 }
 
 export function getMap() { return map; }
