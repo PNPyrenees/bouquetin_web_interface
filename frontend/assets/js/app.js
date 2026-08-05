@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG, capturerCarteEnBlob } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG, capturerCarteEnBlob } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 
@@ -1440,26 +1440,38 @@ function initBasemapSelector() {
   if (basemapInitialized) return;
   basemapInitialized = true;
 
-  const basemapSelector = document.getElementById('basemapSelector');
+  const sidebar = document.getElementById('sidebar');
+  const sidebarContent = document.getElementById('sidebarContent');
   const basemapOptions = document.getElementById('basemapOptions');
+  const overlayOptions = document.getElementById('overlayOptions');
   const btnFondsCarte = document.getElementById('btnFondsCarte');
 
-  // Generer dynamiquement les cartes depuis BASEMAPS_CONFIG
+  // Fonds exclusifs vs overlays superposables — cf. category dans BASEMAPS_CONFIG
+  // (absente ou 'basemap' => fond exclusif, retrocompatibilite ; 'overlay' => case
+  // a cocher independante). L'index passe a switchBasemap() porte sur basemapConfigs
+  // uniquement, coherent avec le tableau basemaps de map.js (meme filtrage cote la).
+  const basemapConfigs = BASEMAPS_CONFIG.filter(bm => (bm.category || 'basemap') === 'basemap');
+  const overlayConfigs = BASEMAPS_CONFIG.filter(bm => bm.category === 'overlay');
+
+  // Generer dynamiquement les vignettes de fonds exclusifs — grille 3 colonnes, vignette
+  // carree + libelle sous l'image (cf. .sidebar-fonds-card dans main.css), selection
+  // "facon Figma" (bordure + fond vert leger + texte vert, pas de coche).
   if (basemapOptions) {
     basemapOptions.innerHTML = '';
-    BASEMAPS_CONFIG.forEach((bm, index) => {
+    basemapConfigs.forEach((bm, index) => {
       const card = document.createElement('div');
-      card.className = `basemap-card${bm.visible ? ' active' : ''}`;
+      card.className = `sidebar-fonds-card${bm.visible ? ' active' : ''}`;
       card.dataset.index = index;
+      card.title = bm.nom; // infobulle native — la bande tronque les noms longs (ellipsis)
       card.innerHTML = `
-        <div class="basemap-card-img">
+        <div class="sidebar-fonds-card-img">
           <img src='${bm.apercu}' alt='${bm.nom}' onerror="this.style.display='none'">
+          <div class="sidebar-fonds-card-bande">${bm.nom}</div>
         </div>
-        <span>${bm.nom}</span>
       `;
       card.addEventListener('click', (e) => {
         e.stopPropagation();
-        document.querySelectorAll('.basemap-card').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.sidebar-fonds-card').forEach(c => c.classList.remove('active'));
         card.classList.add('active');
         switchBasemap(index);
       });
@@ -1467,50 +1479,82 @@ function initBasemapSelector() {
     });
   }
 
+  // Generer dynamiquement les blocs d'overlays — chaque overlay est un bloc empile
+  // (checkbox+nom, puis curseur d'opacite en ligne a droite) plutot qu'une ligne de
+  // grille dense. Slider d'opacite sur tous les overlays sauf limites administratives
+  // et parcs nationaux (traits/aplats de contour fins, l'opacite n'y apporte rien).
+  // Le mot "Opacité" n'est plus affiche (le slider est explicite par lui-meme) — la
+  // valeur en % reste affichee (info utile).
+  const OVERLAYS_SANS_OPACITE = new Set(['ign_limites_admin', 'ign_parcs_nationaux']);
+  if (overlayOptions) {
+    overlayOptions.innerHTML = '';
+    overlayConfigs.forEach(bm => {
+      const item = document.createElement('div');
+      item.className = 'sidebar-fonds-overlay-item';
+
+      const label = document.createElement('label');
+      label.className = 'sidebar-fonds-overlay-label';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = !!bm.visible;
+      const span = document.createElement('span');
+      span.textContent = bm.nom;
+      span.title = bm.nom; // infobulle si le nom est tronque (ellipsis) faute de place
+      label.appendChild(checkbox);
+      label.appendChild(span);
+      item.appendChild(label);
+
+      if (!OVERLAYS_SANS_OPACITE.has(bm.id)) {
+        const opacityRow = document.createElement('div');
+        opacityRow.className = 'sidebar-fonds-overlay-opacity-row';
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = '0';
+        slider.max = '1';
+        slider.step = '0.05';
+        slider.value = String(bm.opacity ?? 1);
+        slider.title = 'Opacité';
+        const valeurOpacite = document.createElement('span');
+        valeurOpacite.className = 'sidebar-fonds-overlay-opacity-value';
+        valeurOpacite.textContent = `${Math.round(Number(slider.value) * 100)} %`;
+        slider.addEventListener('input', () => {
+          const opacite = Number(slider.value);
+          setOverlayOpacity(bm.id, opacite);
+          valeurOpacite.textContent = `${Math.round(opacite * 100)} %`;
+        });
+        opacityRow.appendChild(slider);
+        opacityRow.appendChild(valeurOpacite);
+        // Toujours visible (comme decide precedemment) — permet de regler l'opacite
+        // avant meme d'activer la couche, pas de masquage conditionnel sur la case.
+        item.appendChild(opacityRow);
+      }
+
+      checkbox.addEventListener('change', () => {
+        toggleOverlay(bm.id, checkbox.checked);
+      });
+
+      overlayOptions.appendChild(item);
+    });
+  }
+
+  // Bascule glissante vers/depuis la vue "Fonds de carte" — meme espace que la sidebar
+  // filtres (cf. .sidebar-vue dans main.css), la carte ne change jamais de largeur.
+  const afficherVueFonds = () => {
+    sidebar?.classList.remove('collapsed');
+    sidebarContent?.classList.add('vue-fonds-active');
+    btnFondsCarte?.classList.add('active');
+  };
+  const afficherVueFiltres = () => {
+    sidebarContent?.classList.remove('vue-fonds-active');
+    btnFondsCarte?.classList.remove('active');
+  };
+
   btnFondsCarte?.addEventListener('click', (e) => {
     e.stopPropagation();
-    basemapSelector?.classList.toggle('open');
-    basemapOptions?.classList.toggle('open', basemapSelector?.classList.contains('open'));
-    btnFondsCarte.classList.toggle('active', basemapSelector?.classList.contains('open'));
+    afficherVueFonds();
   });
-
-  // Gestion du défilement avec les boutons
-  const scrollLeftBtn = document.getElementById('basemapScrollLeft');
-  const scrollRightBtn = document.getElementById('basemapScrollRight');
-  
-  function updateScrollButtons() {
-    if (!basemapOptions || !scrollLeftBtn || !scrollRightBtn) return;
-    const scrollLeft = basemapOptions.scrollLeft;
-    const maxScroll = basemapOptions.scrollWidth - basemapOptions.clientWidth;
-    
-    scrollLeftBtn.disabled = (scrollLeft <= 1);
-    scrollRightBtn.disabled = (scrollLeft >= maxScroll - 1);
-  }
-
-  if (scrollLeftBtn && scrollRightBtn && basemapOptions) {
-    scrollLeftBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      basemapOptions.scrollBy({ left: -350, behavior: 'smooth' });
-    });
-    scrollRightBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      basemapOptions.scrollBy({ left: 350, behavior: 'smooth' });
-    });
-
-    basemapOptions.addEventListener('scroll', updateScrollButtons);
-    window.addEventListener('resize', updateScrollButtons);
-    
-    // Initialiser les boutons après le chargement des vignettes
-    setTimeout(updateScrollButtons, 100);
-  }
-
-  document.addEventListener('click', (e) => {
-    if (basemapSelector && !basemapSelector.contains(e.target) && !btnFondsCarte?.contains(e.target)) {
-      basemapOptions?.classList.remove('open');
-      basemapSelector?.classList.remove('open');
-      btnFondsCarte?.classList.remove('active');
-    }
-  });
+  document.getElementById('btnFermerFondsCarte')?.addEventListener('click', afficherVueFiltres);
+  document.getElementById('btnRetourFiltres')?.addEventListener('click', afficherVueFiltres);
 }
 
 /**
