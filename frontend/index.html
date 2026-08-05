@@ -67,7 +67,8 @@
     </div>
   </header>
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-content">
+    <div class="sidebar-content" id="sidebarContent">
+    <div class="sidebar-vue sidebar-vue-filtres" id="vueFiltres">
       <div class="sidebar-header">FILTRES DE RECHERCHES</div>
       <div class="accordion">
 
@@ -240,6 +241,33 @@
         <button class="btn-apply" id="btnApplyFilters">Appliquer les filtres</button>
       </div>
     </div>
+
+    <div class="sidebar-vue sidebar-vue-fonds" id="vueFondsCarte">
+      <div class="sidebar-header sidebar-header-fonds">
+        <svg width="16" height="16" class="icon-svg-sidebar"><use href="assets/img/sprite.svg#icon-couches"/></svg>
+        <span>Fonds de carte</span>
+        <button class="sidebar-fonds-close" id="btnFermerFondsCarte">×</button>
+      </div>
+
+      <div class="sidebar-fonds-body">
+        <div class="sidebar-fonds-section-titre">Fond principal</div>
+        <div id="basemapOptions" class="sidebar-fonds-grid">
+          <!-- Dynamically populated cards -->
+        </div>
+
+        <div class="sidebar-fonds-separateur"></div>
+
+        <div class="sidebar-fonds-section-titre">Superpositions</div>
+        <div id="overlayOptions" class="sidebar-fonds-overlays">
+          <!-- Dynamically populated blocks -->
+        </div>
+      </div>
+
+      <div class="sidebar-fonds-footer">
+        <button id="btnRetourFiltres" class="btn-apply">Retour aux filtres</button>
+      </div>
+    </div>
+    </div>
     <button class="sidebar-toggle" id="sidebarToggle" title="Masquer/Afficher les filtres">
       <!-- <span class="toggle-text">Panneau filtres</span> -->
       <span class="toggle-icon">‹</span>
@@ -304,20 +332,6 @@
         <button id="btnExportModal" class="toolbar-btn" title="Exporter les données">
           <img src="assets/img/download-solid-full.svg" class="icon-svg-map" alt="Export">
         </button>
-      </div>
-    </div>
-    <div id="basemapSelector">
-      <div id="basemapPanel">
-        <div class="basemap-panel-header">
-          <span class="basemap-panel-title">FONDS DE CARTE</span>
-        </div>
-        <div class="basemap-carousel-container">
-          <button class="basemap-scroll-btn scroll-left" id="basemapScrollLeft" type="button">‹</button>
-          <div id="basemapOptions">
-            <!-- Dynamically populated cards -->
-          </div>
-          <button class="basemap-scroll-btn scroll-right" id="basemapScrollRight" type="button">›</button>
-        </div>
       </div>
     </div>
     <div id="popup"></div>
