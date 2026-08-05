@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG, capturerCarteEnBlob } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 
@@ -1651,15 +1651,21 @@ function initToolbarCarte() {
       document.querySelectorAll('.modal-export-only-csv').forEach(section => {
         section.style.display = _formatExportActif === 'csv' ? '' : 'none';
       });
+      document.querySelectorAll('.modal-export-only-pdf').forEach(section => {
+        section.style.display = _formatExportActif === 'pdf' ? '' : 'none';
+      });
     });
   });
 
   document.getElementById('modalExportBtnExporter')?.addEventListener('click', async () => {
     const nomFichier = document.getElementById('exportNomFichier')?.value || '';
+    const date = new Date().toISOString().slice(0, 10);
 
     if (_formatExportActif === 'jpg') {
       try {
-        await exporterCarteJPG(nomFichier);
+        const nomSuggere = nomFichierSuggere(nomFichier, `bouquetins_carte_${date}`, 'jpg');
+        const fileHandle = await obtenirFileHandleExport(nomSuggere, 'jpg', 'image/jpeg', 'Image JPEG');
+        await exporterCarteJPG(nomFichier, fileHandle);
       } catch (err) {
         console.error('Erreur export JPG:', err);
         if (err?.name === 'SecurityError') {
@@ -1671,14 +1677,43 @@ function initToolbarCarte() {
       return;
     }
 
-    const { exporterCSV } = await import('./panel.js');
-    const filtresExport = window._derniersFiltresAppliques || { ani_is_followed: true };
-    const projection = document.getElementById('exportProjection')?.value || 'wgs84';
-    await exporterCSV(currentToken, filtresExport, {
-      projection,
-      nomFichier,
-      colonnes: _colonnesExportActives
-    });
+    if (_formatExportActif === 'pdf') {
+      try {
+        const inclureLegende = document.getElementById('exportInclureLegende')?.checked ?? true;
+        const nomSuggere = nomFichierSuggere(nomFichier, `bouquetins_rapport_${date}`, 'pdf');
+        const fileHandle = await obtenirFileHandleExport(nomSuggere, 'pdf', 'application/pdf', 'Document PDF');
+        await exporterCarteRapportPDF(nomFichier, inclureLegende, fileHandle);
+      } catch (err) {
+        console.error('Erreur export PDF:', err);
+        if (err?.name === 'SecurityError') {
+          showToast('Export impossible avec ce fond de carte, essayez un autre fond');
+        } else {
+          showToast('Impossible de générer le rapport PDF');
+        }
+      }
+      return;
+    }
+
+    try {
+      const { exporterCSV } = await import('./panel.js');
+      const filtresExport = window._derniersFiltresAppliques || { ani_is_followed: true };
+      const projection = document.getElementById('exportProjection')?.value || 'wgs84';
+      const nomSuggere = nomFichierSuggere(nomFichier, `bouquetins_localisations_${date}`, 'csv');
+      const fileHandle = await obtenirFileHandleExport(nomSuggere, 'csv', 'text/csv', 'Fichier CSV');
+      await exporterCSV(currentToken, filtresExport, {
+        projection,
+        nomFichier,
+        colonnes: _colonnesExportActives,
+        fileHandle
+      });
+    } catch (err) {
+      console.error('Erreur export CSV:', err);
+      if (err?.name === 'SecurityError') {
+        showToast('Export impossible, veuillez réessayer');
+      } else {
+        showToast('Impossible d’exporter le CSV');
+      }
+    }
   });
 }
 
@@ -1699,6 +1734,11 @@ async function ouvrirModalExport() {
   document.querySelectorAll('.modal-export-only-csv').forEach(section => {
     section.style.display = '';
   });
+  document.querySelectorAll('.modal-export-only-pdf').forEach(section => {
+    section.style.display = 'none';
+  });
+  const inclureLegende = document.getElementById('exportInclureLegende');
+  if (inclureLegende) inclureLegende.checked = true;
 
   const totalExpected = parseInt(document.getElementById('positionsCount')?.textContent?.replace(/\s/g, '') || '0') || 0;
   const resumeCount = document.getElementById('exportResumeCount');
@@ -1744,6 +1784,269 @@ async function ouvrirModalExport() {
 function fermerModalExport() {
   const modal = document.getElementById('modalExport');
   if (modal) modal.style.display = 'none';
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Charge un SVG local et le convertit en PNG utilisable par jsPDF. */
+function svgVersPngDataURL(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = image.naturalWidth || 601;
+        canvas.height = image.naturalHeight || 301;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Contexte canvas indisponible pour le logo');
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    image.onerror = () => reject(new Error(`Impossible de charger le logo : ${url}`));
+    image.src = url;
+  });
+}
+
+// Conversion CSS (hex ou rgb()) -> [r,g,b] entiers pour setFillColor/setDrawColor de
+// jsPDF, qui n'acceptent pas les chaines CSS directement. Meme technique (canvas 1x1)
+// que cssToRgba() dans map.js, non exportee — duplication volontaire plutot que de
+// coupler ce module a un detail interne de map.js pour 6 lignes.
+function cssToRgbArray(css) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = css;
+  ctx.fillRect(0, 0, 1, 1);
+  const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+  return [r, g, b];
+}
+
+/**
+ * Normalise les donnees de legende (individu/sexe/gestionnaire) en entrees
+ * {label, fill, stroke} — meme source de donnees que mettreAJourLegende() (DOM),
+ * mais sans effet de bord DOM, pour alimenter le dessin vectoriel dans le PDF.
+ */
+function construireEntreesLegende(modeCouleur) {
+  const entries = [];
+  if (modeCouleur === 'individu') {
+    const couleursMap = getCouleursIndividus();
+    const animalsData = getAnimals();
+    couleursMap.forEach((couleur, aniId) => {
+      const animal = animalsData.find(a => String(a.ani_id) === String(aniId));
+      const idx = getIndicesIndividus().get(aniId) ?? 0;
+      const contour = getContourParIndex(idx);
+      entries.push({
+        label: animal?.ani_nom || `ID ${aniId}`,
+        fill: couleur,
+        stroke: `rgb(${contour.strokeR}, ${contour.strokeG}, ${contour.strokeB})`
+      });
+    });
+  } else if (modeCouleur === 'sexe') {
+    entries.push({ label: 'Mâle', fill: getCouleur({ ani_sexe: 'M' }, 'sexe'), stroke: '#cccccc' });
+    entries.push({ label: 'Femelle', fill: getCouleur({ ani_sexe: 'F' }, 'sexe'), stroke: '#cccccc' });
+  } else if (modeCouleur === 'gestionnaire') {
+    entries.push({ label: 'PNP', fill: getCouleur({ ani_gestionnaire: 'PNP' }, 'gestionnaire'), stroke: '#cccccc' });
+    entries.push({ label: 'PNRPA', fill: getCouleur({ ani_gestionnaire: 'PNRPA' }, 'gestionnaire'), stroke: '#cccccc' });
+  }
+  return entries;
+}
+
+function calculerDispositionLegendePDF(entries, largeurDisponible, lignesMax = 6) {
+  const ligneHauteur = 4;
+  const lignesParColonne = Math.max(1, Math.min(lignesMax, entries.length));
+  const nombreColonnes = Math.max(1, Math.ceil(entries.length / lignesParColonne));
+  const colonneLargeur = Math.min(24, largeurDisponible / nombreColonnes);
+  return {
+    lignesParColonne,
+    ligneHauteur,
+    colonneLargeur,
+    hauteur: lignesParColonne * ligneHauteur
+  };
+}
+
+const MAX_ENTREES_LEGENDE_PREMIERE_PAGE = 72;
+
+/** Dessine la legende verticalement : une colonne est remplie avant la suivante. */
+function dessinerLegendePDF(doc, entries, x, startY, disposition) {
+  const rayon = 1;
+  const { lignesParColonne, ligneHauteur, colonneLargeur } = disposition;
+
+  doc.setFontSize(7);
+  doc.setFont(undefined, 'normal');
+
+  entries.forEach((entry, index) => {
+    const col = Math.floor(index / lignesParColonne);
+    const ligne = index % lignesParColonne;
+    const debutColonne = x + col * colonneLargeur;
+    const y = startY + ligne * ligneHauteur + rayon;
+    const cx = debutColonne + rayon;
+
+    const [r, g, b] = cssToRgbArray(entry.fill);
+    doc.setFillColor(r, g, b);
+    const [sr, sg, sb] = cssToRgbArray(entry.stroke);
+    doc.setDrawColor(sr, sg, sb);
+    doc.circle(cx, y, rayon, 'FD');
+
+    doc.setTextColor(40, 40, 40);
+    const texteX = cx + rayon + 1;
+    const largeurTexteMax = colonneLargeur - (texteX - debutColonne) - 0.5;
+    let label = String(entry.label);
+    while (label.length > 1 && doc.getTextWidth(label) > largeurTexteMax) {
+      label = `${label.slice(0, -2)}…`;
+    }
+    doc.text(label, texteX, y + 0.8);
+  });
+}
+
+/**
+ * Nom de fichier suggere pour le selecteur systeme — meme regle de nettoyage que celle
+ * appliquee en interne par chaque fonction d'export au moment du telechargement classique,
+ * dupliquee ici car necessaire AVANT la generation du blob (le picker doit s'ouvrir tout
+ * de suite dans le geste utilisateur, cf. obtenirFileHandleExport).
+ */
+function nomFichierSuggere(nomFichier, defaut, extension) {
+  const nomSanitise = (nomFichier || '').trim().replace(/[\\/:*?"<>|]/g, '').trim();
+  return `${nomSanitise || defaut}.${extension}`;
+}
+
+/**
+ * Ouvre le selecteur systeme "Enregistrer sous" (API File System Access) si disponible —
+ * Chrome/Edge uniquement a ce jour, pas Firefox/Safari. Doit etre appele directement dans
+ * le gestionnaire d'evenement utilisateur (sans await bloquant avant), sous peine d'echec
+ * faute d'activation transitoire. Renvoie null si l'API est indisponible OU si l'utilisateur
+ * annule (AbortError) — dans les deux cas, chaque fonction d'export retombe proprement sur
+ * son telechargement automatique classique quand fileHandle est falsy.
+ */
+async function obtenirFileHandleExport(nomSuggere, extension, mimeType, description) {
+  if (typeof window.showSaveFilePicker !== 'function') return null;
+  try {
+    return await window.showSaveFilePicker({
+      suggestedName: nomSuggere,
+      types: [{ description, accept: { [mimeType]: [`.${extension}`] } }]
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') return null;
+    throw err;
+  }
+}
+
+/**
+ * Genere un rapport PDF (titre, date, resume des filtres actifs deja affiche dans la
+ * modal, capture de la carte via capturerCarteEnBlob(), legende du mode de symbologie
+ * actif) et declenche le telechargement.
+ */
+async function exporterCarteRapportPDF(nomFichier, inclureLegende = true, fileHandle = null) {
+  const [blob, logoDataUrl] = await Promise.all([
+    capturerCarteEnBlob(),
+    svgVersPngDataURL('assets/img/logo-parc.svg')
+  ]);
+  const dataUrl = await blobToDataURL(blob);
+
+  const [imgW, imgH] = getMap()?.getSize() || [800, 600];
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 15;
+  const headerY = 8;
+
+  const logoLargeur = 22;
+  const logoHauteur = logoLargeur * (301 / 601);
+  doc.addImage(logoDataUrl, 'PNG', margin, headerY - 5, logoLargeur, logoHauteur);
+
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(14);
+  doc.text('Cartographique - Suivi GPS bouquetins', margin + logoLargeur + 4, headerY);
+
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(100);
+  let metaY = headerY;
+  doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`, pageW - margin, metaY, { align: 'right' });
+  metaY += 5;
+
+  doc.setTextColor(40);
+  const resumeCount = (document.getElementById('exportResumeCount')?.textContent || '0')
+    .replace(/[\u00a0\u202f]/g, ' ');
+  doc.text(`${resumeCount} positions affichées`, pageW - margin, metaY, { align: 'right' });
+  metaY += 4.5;
+
+  const resumeFiltresTexte = document.getElementById('exportResumeFiltres')?.textContent || 'Aucun filtre actif';
+  const largeurMeta = 90;
+  const lignesFiltres = doc.splitTextToSize(`Filtres : ${resumeFiltresTexte}`, largeurMeta);
+  doc.text(lignesFiltres, pageW - margin, metaY, { align: 'right' });
+  metaY += lignesFiltres.length * 4;
+
+  const basLogo = headerY - 5 + logoHauteur;
+  const yCarte = Math.max(basLogo, metaY) + 3;
+  const margeCarte = 5;
+  const largeurImageMax = pageW - margeCarte * 2;
+
+  const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+  const entriesLegende = inclureLegende ? construireEntreesLegende(modeCouleur) : [];
+  const entriesPremierePage = entriesLegende.slice(0, MAX_ENTREES_LEGENDE_PREMIERE_PAGE);
+  const entriesDeuxiemePage = entriesLegende.slice(MAX_ENTREES_LEGENDE_PREMIERE_PAGE);
+  const dispositionPremierePage = entriesPremierePage.length
+    ? calculerDispositionLegendePDF(entriesPremierePage, largeurImageMax, 6)
+    : null;
+  const espaceCarteLegende = dispositionPremierePage ? 2 : 0;
+  const hauteurLegendePremierePage = dispositionPremierePage?.hauteur || 0;
+  const hauteurImageMax = pageH - margeCarte - yCarte - espaceCarteLegende - hauteurLegendePremierePage;
+  const echelleImage = Math.min(largeurImageMax / imgW, hauteurImageMax / imgH);
+  const largeurImage = imgW * echelleImage;
+  const hauteurImage = imgH * echelleImage;
+  const xCarte = (pageW - largeurImage) / 2;
+
+  doc.addImage(dataUrl, 'JPEG', xCarte, yCarte, largeurImage, hauteurImage);
+
+  if (dispositionPremierePage) {
+    dessinerLegendePDF(
+      doc,
+      entriesPremierePage,
+      margeCarte,
+      yCarte + hauteurImage + espaceCarteLegende,
+      dispositionPremierePage
+    );
+  }
+
+  if (entriesDeuxiemePage.length > 0) {
+    doc.addPage();
+    const largeurLegende = pageW - margin * 2;
+    const lignesMaxDeuxiemePage = Math.max(1, Math.floor((pageH - margin * 2) / 4));
+    const dispositionDeuxiemePage = calculerDispositionLegendePDF(
+      entriesDeuxiemePage,
+      largeurLegende,
+      lignesMaxDeuxiemePage
+    );
+    dessinerLegendePDF(doc, entriesDeuxiemePage, margin, margin, dispositionDeuxiemePage);
+  }
+
+  const date = new Date().toISOString().slice(0, 10);
+  const nomBrut = (nomFichier || '').trim();
+  const nomSanitise = nomBrut.replace(/[\\/:*?"<>|]/g, '').trim();
+  const nomFinal = nomSanitise ? `${nomSanitise}.pdf` : `bouquetins_rapport_${date}.pdf`;
+
+  if (fileHandle) {
+    const writable = await fileHandle.createWritable();
+    try {
+      await writable.write(doc.output('blob'));
+    } finally {
+      await writable.close();
+    }
+  } else {
+    doc.save(nomFinal);
+  }
 }
 
 export function supprimerBadgeById(id) {
