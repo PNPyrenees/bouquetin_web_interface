@@ -1,5 +1,14 @@
 # CHANGELOG
 
+### Refonte des fonds de carte - couches IGN natives et sidebar dediee
+- Ajout de couches IGN natives via le service WMTS Geoplateforme : Plan IGN, Relief/altitude, Carte historique 1950 (fonds), Courbes de niveau, Carte des pentes, Hydrographie, Reseau routier, Occupation du sol (CORINE Land Cover), Limites administratives, Parcs nationaux, Estompage LiDAR HD (superpositions)
+- Mise a jour des fonds Orthophotos et Plan IGN existants vers le service WMTS natif (grille de tuiles exacte au lieu d'un calque XYZ approxime)
+- Suppression des fonds redondants OpenTopoMap et Topo ESRI, devenus obsoletes avec l'arrivee des couches IGN natives
+- Cache partage du GetCapabilities IGN - un seul telechargement reutilise par toutes les couches WMTS
+- Isolation des pannes - l'echec du chargement d'une couche WMTS n'affecte jamais les autres fonds ni la disponibilite de l'application
+- Reglages d'opacite pour les superpositions Pentes, Courbes de niveau, Occupation du sol et LiDAR HD
+- Remplacement de l'ancienne modal de selection des fonds par une seconde vue de la sidebar de filtres (bascule animee, sans jamais masquer la carte)
+
 ### Refonte export - modal centralisee (etape 3 : PDF, echelle et finitions)
 - Format PDF active dans la modal d'export - rapport avec logo, titre, date, resume des filtres, capture de la carte et legende des couleurs (pagination sur plusieurs pages si necessaire, checkbox pour l'inclure ou non)
 - Ajout d'une barre d'echelle graphique sur les exports JPG et PDF, calculee independamment du controle d'interface pour rester fiable
