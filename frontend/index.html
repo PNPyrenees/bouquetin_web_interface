@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/fr.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 
 <body>
@@ -526,7 +527,7 @@
             <button type="button" class="modal-export-format-btn active" data-format="csv" aria-label="CSV" title="CSV">
               <img src="assets/img/csv-file-format-extension-svgrepo-com.svg" width="28" height="28" alt="" aria-hidden="true">
             </button>
-            <button type="button" class="modal-export-format-btn" disabled aria-label="PDF" title="Disponible prochainement">
+            <button type="button" class="modal-export-format-btn" data-format="pdf" aria-label="PDF" title="PDF">
               <img src="assets/img/pdf-file-format-symbol-svgrepo-com.svg" width="28" height="28" alt="" aria-hidden="true">
             </button>
             <button type="button" class="modal-export-format-btn" data-format="jpg" aria-label="JPG" title="JPG">
@@ -546,6 +547,13 @@
         <div class="modal-export-section modal-export-only-csv">
           <div class="modal-export-section-titre">Colonnes à exporter</div>
           <div id="exportColonnesItems" class="modal-export-colonnes"></div>
+        </div>
+
+        <div class="modal-export-section modal-export-only-pdf" style="display:none">
+          <label class="checkbox-label">
+            <input type="checkbox" id="exportInclureLegende" checked>
+            Inclure la légende
+          </label>
         </div>
 
         <div class="modal-export-section modal-export-resume">
