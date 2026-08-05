@@ -69,6 +69,15 @@ export const SAISONS_CONFIG = {
   rut:       { label: 'Rut',       from: '16/10', to: '31/12' }
 };
 
+// Types pris en charge : 'xyz' | 'osm' | 'wms' | 'wmts'. Les entrees 'wmts' utilisent
+// layer/matrixSet/style/format (identifiants IGN Geoplateforme exacts) au lieu de url —
+// la source est construite via ol.source.WMTS.optionsFromCapabilities() a partir du
+// GetCapabilities IGN mis en cache (cf. chargerCapacitesWMTS() dans map.js), jamais
+// reconstruite manuellement (resolutions/matrices/origines/limites de tuiles).
+// category : 'basemap' (fond exclusif, defaut si absent — retrocompatibilite) |
+// 'overlay' (superposable independamment, plusieurs actifs simultanement, cf.
+// toggleOverlay() dans map.js). opacity (overlays uniquement) : opacite initiale,
+// ajustable ensuite via setOverlayOpacity().
 export const BASEMAPS_CONFIG = [
   {
     id: 'ign_scan25',
@@ -77,15 +86,6 @@ export const BASEMAPS_CONFIG = [
     type: 'xyz',
     url: `https://data.geopf.fr/private/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&apikey=${IGN_API_KEY}&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN25TOUR&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}`,
     attributions: '©IGN',
-    visible: false
-  },
-  {
-    id: 'opentopomap',
-    nom: 'OpenTopoMap',
-    apercu: 'assets/img/opentopomap.png',
-    type: 'xyz',
-    url: 'https://{a-c}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    attributions: '© OpenTopoMap contributors',
     visible: false
   },
   {
@@ -104,35 +104,34 @@ export const BASEMAPS_CONFIG = [
     type: 'xyz',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attributions: '© Esri, Maxar, Earthstar Geographics',
-    visible: true
-  },
-  {
-    id: 'esri_topo',
-    nom: 'Topo ESRI',
-    apercu: 'assets/img/esri_topo.png',
-    type: 'xyz',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
-    attributions: '© Esri, HERE, DeLorme',
     visible: false
   },
-  
+
+  // Fonds IGN WMTS (Geoplateforme) — upgrade en place de ign_ortho/ign_topo (memes id,
+  // meme visible par defaut) plutot que des entrees dupliquees.
   {
     id: 'ign_ortho',
     nom: 'Photos aériennes IGN',
     apercu: 'assets/img/ign_ortho.png',
-    type: 'xyz',
-    url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
+    type: 'wmts',
+    layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
+    matrixSet: 'PM_6_19',
+    style: 'normal',
+    format: 'image/jpeg',
     attributions: '© IGN Géoportail',
-    visible: false
+    visible: true
   },
   {
-  id: 'ign_topo',
-  nom: 'Carte topo IGN',
-  apercu: 'assets/img/ign_topo.png',
-  type: 'xyz',
-  url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
-  attributions: '© IGN Géoportail',
-  visible: false
+    id: 'ign_topo',
+    nom: 'Plan IGN',
+    apercu: 'assets/img/ign_plan.png',
+    type: 'wmts',
+    layer: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
+    matrixSet: 'PM_0_19',
+    style: 'normal',
+    format: 'image/png',
+    attributions: '© IGN Géoportail',
+    visible: false
   },
   {
     id: 'ign_relief',
@@ -143,8 +142,161 @@ export const BASEMAPS_CONFIG = [
     attributions: '© IGN Géoportail',
     visible: false
   },
+  {
+    id: 'ign_relief_slopes',
+    nom: 'Relief altitude',
+    apercu: 'assets/img/ign_relief_slopes.png',
+    type: 'wmts',
+    layer: 'ELEVATION.SLOPES',
+    matrixSet: 'PM_6_14',
+    style: 'normal',
+    format: 'image/jpeg',
+    attributions: '© IGN Géoportail',
+    visible: false
+  },
+  {
+    id: 'ign_scan50_1950',
+    nom: 'Carte historique 1950',
+    apercu: 'assets/img/ign_scan50_1950.png',
+    type: 'wmts',
+    layer: 'GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN50.1950',
+    matrixSet: 'PM_3_15',
+    style: 'SCAN50_1950',
+    format: 'image/jpeg',
+    attributions: '© IGN Géoportail',
+    visible: false
+  },
 
-
+  // Overlays IGN WMTS — superposables independamment des fonds ci-dessus (category
+  // 'overlay'), plusieurs actifs simultanement via toggleOverlay().
+  {
+    id: 'ign_contours',
+    nom: 'Courbes de niveau',
+    apercu: 'assets/img/ign_contours.png',
+    type: 'wmts',
+    category: 'overlay',
+    layer: 'ELEVATION.CONTOUR.LINE',
+    matrixSet: 'PM_6_18',
+    style: 'normal',
+    format: 'image/png',
+    attributions: '© IGN Géoportail',
+    visible: false,
+    opacity: 1
+  },
+  {
+    id: 'ign_pentes',
+    nom: 'Carte des pentes',
+    apercu: 'assets/img/ign_pentes.png',
+    type: 'wmts',
+    category: 'overlay',
+    layer: 'GEOGRAPHICALGRIDSYSTEMS.SLOPES.MOUNTAIN',
+    matrixSet: 'PM_0_17',
+    style: 'normal',
+    format: 'image/png',
+    attributions: '© IGN Géoportail',
+    visible: false,
+    opacity: 0.7
+  },
+  {
+    id: 'ign_hydro',
+    nom: 'Hydrographie',
+    apercu: 'assets/img/ign_hydro.png',
+    type: 'wmts',
+    category: 'overlay',
+    layer: 'HYDROGRAPHY.HYDROGRAPHY',
+    matrixSet: 'PM_6_18',
+    style: 'normal',
+    format: 'image/png',
+    attributions: '© IGN Géoportail',
+    visible: false
+  },
+  {
+    id: 'ign_routes',
+    nom: 'Réseau routier',
+    apercu: 'assets/img/ign_routes.png',
+    type: 'wmts',
+    category: 'overlay',
+    layer: 'TRANSPORTNETWORKS.ROADS',
+    matrixSet: 'PM_6_18',
+    style: 'normal',
+    format: 'image/png',
+    attributions: '© IGN Géoportail',
+    visible: false
+  },
+  {
+    id: 'ign_occupation_sol',
+    nom: 'Occupation du sol',
+    apercu: 'assets/img/ign_occupation_sol.png',
+    type: 'wmts',
+    category: 'overlay',
+    layer: 'LANDCOVER.CLC18_FR',
+    matrixSet: 'PM_0_16',
+    style: 'CORINE Land Cover - France métropolitaine',
+    format: 'image/png',
+    attributions: '© IGN Géoportail',
+    visible: false,
+    opacity: 0.7
+  },
+  {
+    id: 'ign_limites_admin',
+    nom: 'Limites administratives',
+    apercu: 'assets/img/ign_limites_admin.png',
+    type: 'wmts',
+    category: 'overlay',
+    layer: 'ADMINEXPRESS-COG-CARTO.LATEST',
+    matrixSet: 'PM_6_16',
+    style: 'normal',
+    format: 'image/png',
+    attributions: '© IGN Géoportail',
+    visible: false
+  },
+  // Couverture "tous parcs nationaux de France" — pas de couche IGN specifique au Parc
+  // national des Pyrenees (verifie dans le GetCapabilities, aucun identifiant dedie).
+  // Patrinat_PN affiche l'ensemble des parcs nationaux francais simultanement, sans
+  // filtrage possible en WMTS — a valider a l'usage.
+  {
+    id: 'ign_parcs_nationaux',
+    nom: 'Parcs nationaux (France)',
+    apercu: 'assets/img/ign_parcs_nationaux.png',
+    type: 'wmts',
+    category: 'overlay',
+    layer: 'Patrinat_PN',
+    matrixSet: 'PM_6_16',
+    style: 'normal',
+    format: 'image/png',
+    attributions: '© IGN Géoportail / Patrinat',
+    visible: false
+  },
+  {
+    id: 'ign_forets',
+    nom: 'Forêts (BD Forêt)',
+    apercu: 'assets/img/ign_forets.png',
+    type: 'wmts',
+    category: 'overlay',
+    layer: 'LANDCOVER.FORESTINVENTORY.V2',
+    matrixSet: 'PM_6_16',
+    style: 'normal',
+    format: 'image/png',
+    attributions: '© IGN Géoportail',
+    visible: false
+  },
+  // Couverture LiDAR HD potentiellement partielle sur les Pyrenees a la date de cet
+  // ajout (campagne nationale progressive) — a valider visuellement, retirer si la
+  // zone du parc n'est pas encore couverte.
+  {
+    id: 'ign_lidar_hd',
+    nom: 'Estompage LiDAR HD',
+    apercu: 'assets/img/ign_lidar_hd.png',
+    type: 'wmts',
+    category: 'overlay',
+    layer: 'IGNF_LIDAR-HD_MNT_ELEVATION.ELEVATIONGRIDCOVERAGE.SHADOW',
+    matrixSet: 'PM_0_18',
+    style: 'normal',
+    format: 'image/png',
+    attributions: '© IGN Géoportail',
+    visible: false,
+    opacity: 0.6
+  }
 ];
 
 // Couleurs de marquage (collier/oreilles) — mapping temporaire cote client : le texte
