@@ -880,11 +880,29 @@ export function capturerCarteEnBlob() {
         const size = map.getSize();
         if (!size) throw new Error('Taille de carte indisponible');
 
+        // Ratio reel utilise par OpenLayers pour dimensionner physiquement les canvas
+        // sources (option Map.pixelRatio, par defaut window.devicePixelRatio). Sans ce
+        // facteur, le canvas de sortie (size = pixels CSS) et les canvas sources
+        // (pixels physiques = CSS x dpr) sont a des echelles differentes des que
+        // dpr > 1 (ecran avec mise a l'echelle OS) -> points/traits mal places.
+        const pixelRatio = window.devicePixelRatio || 1;
+
+        // Surechantillonnage supplementaire au-dela du devicePixelRatio ecran — sur un
+        // ecran dpr=1 (projecteur), la sortie serait sinon limitee a la taille d'affichage
+        // CSS et paraitrait floue/pixelisee au zoom. Limite reelle : ne peut pas ajouter
+        // de detail au-dela de ce que le navigateur a deja rendu (tuiles de fond plafonnees
+        // par la resolution chargee au zoom courant) — le gain porte sur le lissage des
+        // traits/points vectoriels et la marge de zoom avant pixellisation visible.
+        const SURECHANTILLONNAGE = 2;
+        const scale = pixelRatio * SURECHANTILLONNAGE;
+
         const mapCanvas = document.createElement('canvas');
-        mapCanvas.width = size[0];
-        mapCanvas.height = size[1];
+        mapCanvas.width = size[0] * scale;
+        mapCanvas.height = size[1] * scale;
         const mapContext = mapCanvas.getContext('2d');
         if (!mapContext) throw new Error('Contexte canvas indisponible');
+        mapContext.imageSmoothingEnabled = true;
+        mapContext.imageSmoothingQuality = 'high';
 
         map.getViewport().querySelectorAll('.ol-layer canvas, canvas.ol-layer').forEach(canvas => {
           if (!canvas.width) return;
@@ -892,19 +910,152 @@ export function capturerCarteEnBlob() {
           const opacity = canvas.parentNode?.style.opacity || canvas.style.opacity;
           mapContext.globalAlpha = opacity === '' ? 1 : Number(opacity);
 
+          // Taille CSS reelle affichee de ce canvas precis (independante de sa resolution
+          // interne, qui peut differer d'une couche a l'autre — ex. le canvas des tuiles
+          // de fond n'a pas forcement exactement size*pixelRatio en physique). offsetWidth/
+          // offsetHeight ignorent le transform CSS (contrairement a getBoundingClientRect),
+          // donnant la taille "avant transform" voulue ici.
+          const cssWidth = canvas.offsetWidth || canvas.width;
+          const cssHeight = canvas.offsetHeight || canvas.height;
+
           const transform = canvas.style.transform;
           const match = transform?.match(/^matrix\(([^()]*)\)$/);
-          if (match) {
-            const matrix = match[1].split(',').map(Number);
-            mapContext.setTransform(...matrix);
-          } else {
-            mapContext.setTransform(1, 0, 0, 1, 0, 0);
-          }
+          const [a, b, c, d, e, f] = match ? match[1].split(',').map(Number) : [1, 0, 0, 1, 0, 0];
 
-          mapContext.drawImage(canvas, 0, 0);
+          // scale s applique a toute la matrice (echelle ET translation) : il fait
+          // passer du repere CSS px (ou vivent a,b,c,d,e,f et cssWidth/cssHeight) au
+          // repere physique (suréchantillonné) du canvas de sortie.
+          mapContext.setTransform(a * scale, b * scale, c * scale, d * scale, e * scale, f * scale);
+
+          mapContext.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, cssWidth, cssHeight);
         });
 
         mapContext.globalAlpha = 1;
+
+        // Barre d'echelle — absente par construction de la capture (ol.control.ScaleLine
+        // est un element DOM hors du viewport carte, cf. target: scaleTarget dans
+        // initMap()). Calcul independant de ScaleLine (pas de lecture DOM) pour rester
+        // fiable quelle que soit sa config — meme API (getPointResolution) que celle
+        // utilisee en interne par ScaleLine pour corriger la distorsion Web Mercator
+        // selon la latitude du centre.
+        const view = map.getView();
+        const resolutionSol = ol.proj.getPointResolution(
+          view.getProjection(), view.getResolution(), view.getCenter(), 'm'
+        );
+
+        // Meme algorithme que ol.control.ScaleLine.updateElement_ (verifie dans le bundle
+        // OL charge par l'app — UP=[1,2,5], boucle ascendante). minWidthCss (100, meme
+        // valeur que minWidth dans la config ScaleLine d'initMap) est un PLANCHER : on
+        // cherche le plus PETIT nombre rond dont la largeur resultante atteint ou depasse
+        // minWidthCss, pas le plus grand qui reste en dessous (bug precedent = un cran
+        // systematique sous la valeur reellement affichee par ScaleLine).
+        const minWidthCss = 100;
+        const paliers = [1, 2, 5];
+        let resolutionUnite = resolutionSol;
+        let suffixe = 'm';
+        if (minWidthCss * resolutionSol >= 1000) {
+          suffixe = 'km';
+          resolutionUnite = resolutionSol / 1000;
+        }
+
+        let p = 3 * Math.floor(Math.log10(minWidthCss * resolutionUnite));
+        let distanceEchelle, largeurBarreCss, exposant;
+        for (;;) {
+          exposant = Math.floor(p / 3);
+          distanceEchelle = paliers[((p % 3) + 3) % 3] * Math.pow(10, exposant);
+          largeurBarreCss = Math.round(distanceEchelle / resolutionUnite);
+          if (largeurBarreCss >= minWidthCss) break;
+          p++;
+        }
+        const labelEchelle = `${distanceEchelle.toFixed(exposant < 0 ? -exposant : 0)} ${suffixe}`;
+
+        const margeCss = 12;
+        const hauteurBarreCss = 4;
+        const xCss = margeCss;
+        const yCss = size[1] - margeCss;
+
+        mapContext.setTransform(scale, 0, 0, scale, 0, 0);
+        // Halo blanc dessine AVANT le noir (legerement plus grand que la barre) plutot
+        // qu'un strokeRect a cheval sur les bords — un contour de 1px a cheval sur une
+        // barre de 4px de haut mangeait 50% de sa hauteur (25% par bord), donnant une
+        // barre a majorite blanche plutot que noire avec liseré (cf. bug precedent).
+        mapContext.fillStyle = '#ffffff';
+        mapContext.fillRect(xCss - 1, yCss - hauteurBarreCss - 1, largeurBarreCss + 2, hauteurBarreCss + 2);
+        mapContext.fillStyle = '#000000';
+        mapContext.fillRect(xCss, yCss - hauteurBarreCss, largeurBarreCss, hauteurBarreCss);
+
+        // Fond semi-transparent derriere le texte — espacement de 4px avec la barre
+        // defini explicitement (independant du padding), pour eviter que le fond ne
+        // vienne toucher la barre (cf. bug precedent : le padding mangeait l'espace).
+        const espacementBarreTexte = 4;
+        const paddingFond = 3;
+        mapContext.font = '12px sans-serif';
+        mapContext.textBaseline = 'bottom';
+        const largeurTexte = mapContext.measureText(labelEchelle).width;
+        const boiteBas = yCss - hauteurBarreCss - espacementBarreTexte;
+        const boiteHaut = boiteBas - 12 - paddingFond * 2;
+        mapContext.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        mapContext.fillRect(xCss - paddingFond, boiteHaut, largeurTexte + paddingFond * 2, boiteBas - boiteHaut);
+        mapContext.fillStyle = '#000000';
+        mapContext.fillText(labelEchelle, xCss, boiteBas - paddingFond);
+
+        // Legende depart/direction — comme #scaleTarget, #legendePanel est un <div> HTML
+        // hors du viewport carte (cf. .legende-wrapper dans index.html), donc absent de
+        // la capture. Dessinee UNIQUEMENT si le mode Trajectoire est actif (ces notions
+        // n'existent pas en mode Positions) — meme lecture d'etat que showPopup() (map.js)
+        // et mettreAJourLegende() (app.js), pas de nouveau parametre a propager dans toute
+        // la chaine d'export. Reproduit fidelement la legende ecran (map.css : en mode
+        // Trajectoire, seuls depart et direction sont visibles — "Derniere position" y
+        // est masquee).
+        const modeTrajectoireActif = document.getElementById('btnTrajectoire')?.classList.contains('active');
+
+        if (modeTrajectoireActif) {
+          mapContext.font = '11px sans-serif';
+          const itemsLegende = [
+            { type: 'depart', label: 'Point de départ' },
+            { type: 'direction', label: 'Direction' }
+          ];
+          const rayonPastille = 5;
+          const ligneHauteurLegende = 16;
+          const largeurLegende = Math.max(
+            ...itemsLegende.map(item => rayonPastille * 2 + 6 + mapContext.measureText(item.label).width)
+          ) + paddingFond * 2;
+          const hauteurLegende = itemsLegende.length * ligneHauteurLegende + paddingFond * 2;
+
+          const legendeBas = boiteHaut - espacementBarreTexte;
+          const legendeHaut = legendeBas - hauteurLegende;
+
+          mapContext.fillStyle = 'rgba(255, 255, 255, 0.75)';
+          mapContext.fillRect(xCss - paddingFond, legendeHaut, largeurLegende, hauteurLegende);
+
+          mapContext.textBaseline = 'middle';
+          itemsLegende.forEach((item, i) => {
+            const cy = legendeHaut + paddingFond + ligneHauteurLegende * i + ligneHauteurLegende / 2;
+            const cx = xCss + rayonPastille;
+
+            if (item.type === 'depart') {
+              mapContext.beginPath();
+              mapContext.arc(cx, cy, rayonPastille, 0, Math.PI * 2);
+              mapContext.fillStyle = '#ffffff';
+              mapContext.fill();
+              mapContext.strokeStyle = '#2D6A4F';
+              mapContext.lineWidth = 2;
+              mapContext.stroke();
+            } else {
+              mapContext.fillStyle = '#000000';
+              mapContext.font = 'bold 12px sans-serif';
+              mapContext.textAlign = 'center';
+              mapContext.fillText('→', cx, cy);
+              mapContext.textAlign = 'left';
+              mapContext.font = '11px sans-serif';
+            }
+
+            mapContext.fillStyle = '#000000';
+            mapContext.fillText(item.label, xCss + rayonPastille * 2 + 6, cy);
+          });
+          mapContext.textBaseline = 'bottom';
+        }
+
         mapContext.setTransform(1, 0, 0, 1, 0, 0);
         mapCanvas.toBlob(blob => {
           if (blob) resolve(blob);
@@ -920,10 +1071,20 @@ export function capturerCarteEnBlob() {
 }
 
 /** Exporte la vue actuelle de la carte en JPEG. */
-export async function exporterCarteJPG(nomFichier) {
+export async function exporterCarteJPG(nomFichier, fileHandle = null) {
   const blob = await capturerCarteEnBlob();
-  const url = URL.createObjectURL(blob);
 
+  if (fileHandle) {
+    const writable = await fileHandle.createWritable();
+    try {
+      await writable.write(blob);
+    } finally {
+      await writable.close();
+    }
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
   try {
     const date = new Date().toISOString().slice(0, 10);
     const nomBrut = (nomFichier || '').trim();
