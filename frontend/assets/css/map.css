@@ -627,14 +627,13 @@
 /* ========================================
    COORDONNÉES SOURIS
    ======================================== */
+/* background/border-radius/box-shadow/font-family/pointer-events fournis par la classe
+   partagee .legende-panel (cf. index.html) — meme rendu que la legende et les autres
+   panneaux flottants de la carte, pas de duplication de valeurs qui pourraient diverger. */
 #mouseCoordsTarget {
   display: flex;
   align-items: center;
-  background: var(--map-ui-bg);
   padding: 4px 8px;
-  border-radius: 4px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-  font-family: var(--font-family);
   font-size: 11px;
   line-height: 1.4;
   white-space: nowrap;
@@ -654,6 +653,29 @@
   position: static !important;
   top: auto !important;
   right: auto !important;
+}
+
+/* Selecteur de projection (Lambert-93/WGS84/ETRS89) — enfant statique de
+   #mouseCoordsTarget, place avant la div de coordonnees injectee par OL (cf. index.html). */
+.select-projection-coords {
+  font-family: var(--font-family);
+  font-size: 11px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 4px;
+}
+
+/* Le menu deroulant ouvert est rendu nativement par le navigateur (fond blanc, hors de
+   portee du reste du style app) — le texte blanc force par le filet de securite
+   #mouseCoordsTarget * plus haut y serait invisible hors survol. Specificite plus
+   elevee (id + 2 selecteurs) pour l'emporter sur ce !important. */
+#mouseCoordsTarget .select-projection-coords option {
+  color: #1a1a1a !important;
+  background: #ffffff;
 }
 
 /* ========================================
