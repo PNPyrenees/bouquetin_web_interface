@@ -1339,10 +1339,6 @@ input[type="checkbox"] {
   letter-spacing: .08em;
 }
 
-#checkTousIndividus {
-  display: none;
-}
-
 #listeIndividus {
   max-height: 200px;
   overflow-y: auto;
