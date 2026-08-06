@@ -1,5 +1,10 @@
 # CHANGELOG
 
+### Selecteur de systeme de projection pour les coordonnees
+- Ajout d'un selecteur permettant de choisir le systeme de projection affiche sous le curseur sur la carte principale : Lambert-93, WGS84, ETRS89 (EPSG:3035, ETRS89-LAEA Europe)
+- Liste des projections disponibles centralisee dans la configuration, generee dynamiquement dans l'interface - ajouter une nouvelle projection ne necessite plus de modification du code d'affichage
+- Correction de l'export CSV : la colonne ETRS89 utilisait par erreur une projection geographique (degres) plutot que la projection metrique EPSG:3035 demandee initialement - colonnes renommees en consequence (coordonnees en metres, coherent avec Lambert-93)
+
 ### Nouveaux modes de symbologie Annee et Population
 - Ajout de 2 nouveaux modes de coloration des points : par annee de la position et par population de rattachement de l'animal, en complement des modes existants Individu/Sexe/Gestionnaire
 - Filtre de plausibilite sur les annees pour ecarter les valeurs aberrantes presentes en base (coquilles de saisie)
