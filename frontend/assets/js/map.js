@@ -1,4 +1,4 @@
-import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, LAMBERT93, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG, GLASBEY_32, getCouleurParIndex } from './config.js';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, PROJECTIONS_COORDONNEES_CONFIG, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG, GLASBEY_32, getCouleurParIndex } from './config.js';
 let map;
 let gpsSource;
 let gpsLayer;
@@ -144,20 +144,39 @@ export function getCouleur(loc, mode) {
   }
 }
 
+// Acces O(1) par code EPSG a une entree de PROJECTIONS_COORDONNEES_CONFIG (config.js).
+const PROJECTIONS_PAR_CODE = new Map(PROJECTIONS_COORDONNEES_CONFIG.map(p => [p.code, p]));
+
+let _projectionCoordonnees = PROJECTIONS_COORDONNEES_CONFIG.find(p => p.parDefaut)?.code
+  ?? PROJECTIONS_COORDONNEES_CONFIG[0]?.code;
+let _derniereCoordonneeSouris = null; // derniere coordonnee brute (EPSG:3857) recue
+
 /**
- * Formate la position du curseur pour ol.control.MousePosition — Lambert-93 (systeme
- * natif du stockage/API, cf. LAMBERT93) en 1ere ligne, WGS84 (repere universel, deja
- * manipule pour le filtre spatial cf. activerDessinSpatial) en 2eme ligne. La vue est
- * nativement en EPSG:3857 (Web Mercator, cf. ol.proj.fromLonLat dans renderPoints) —
- * la coordonnee recue ici est donc deja en EPSG:3857, memes transformations proj4 que
- * le reste du fichier mais en sens inverse (3857 -> 2154 / 3857 -> 4326).
+ * Change la projection d'affichage des coordonnees curseur et rafraichit immediatement
+ * le texte affiche - coordinateFormat n'etant invoque par ol.control.MousePosition que
+ * sur mouvement de souris, un changement de selection a souris immobile resterait sinon
+ * affiche dans l'ancienne projection jusqu'au prochain pointermove.
+ */
+export function setProjectionCoordonnees(code) {
+  if (!PROJECTIONS_PAR_CODE.has(code)) return;
+  _projectionCoordonnees = code;
+  if (_derniereCoordonneeSouris) {
+    const el = document.querySelector('#mouseCoordsTarget .ol-mouse-position-custom');
+    if (el) el.innerHTML = formatMouseCoordinates(_derniereCoordonneeSouris);
+  }
+}
+
+/**
+ * Formate la position du curseur pour ol.control.MousePosition, dans la projection
+ * actuellement selectionnee (_projectionCoordonnees, cf. setProjectionCoordonnees()).
+ * La vue est nativement en EPSG:3857 (Web Mercator, cf. ol.proj.fromLonLat dans
+ * renderPoints) — la coordonnee recue ici est donc deja en EPSG:3857.
  */
 function formatMouseCoordinates(coordonnee) {
-  const lambert93 = proj4('EPSG:3857', 'EPSG:2154', coordonnee);
-  const wgs84 = proj4('EPSG:3857', 'EPSG:4326', coordonnee);
-  const ligneL93 = `X : ${Math.round(lambert93[0])}&nbsp;&nbsp;Y : ${Math.round(lambert93[1])} (Lambert-93)`;
-  const ligneWgs84 = `Lat : ${wgs84[1].toFixed(5)}&nbsp;&nbsp;Lon : ${wgs84[0].toFixed(5)} (WGS84)`;
-  return `${ligneL93}<br>${ligneWgs84}`;
+  _derniereCoordonneeSouris = coordonnee;
+  const projection = PROJECTIONS_PAR_CODE.get(_projectionCoordonnees);
+  const coord = proj4('EPSG:3857', projection.code, coordonnee);
+  return projection.format(coord);
 }
 
 // Cache du GetCapabilities WMTS IGN — un seul fetch reel partage par toutes les
@@ -247,8 +266,12 @@ function creerCoucheFond(bm) {
  * @param {string} popupId - ID de l'élément HTML servant de popup
  */
 export function initMap(targetId, popupId) {
-  // Définition de la projection Lambert-93 (France) via Proj4
-  proj4.defs('EPSG:2154', LAMBERT93);
+  // Enregistrement dynamique de chaque projection de PROJECTIONS_COORDONNEES_CONFIG dont
+  // proj4def n'est pas null (config.js) — EPSG:4326/EPSG:3857 sont deja connus nativement
+  // par proj4js, jamais besoin de les enregistrer.
+  PROJECTIONS_COORDONNEES_CONFIG.forEach(p => {
+    if (p.proj4def) proj4.defs(p.code, p.proj4def);
+  });
   ol.proj.proj4.register(proj4);
 
   // Initialisation des sources vectorielles (données géométriques)
