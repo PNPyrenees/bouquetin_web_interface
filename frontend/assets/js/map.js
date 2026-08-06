@@ -10,6 +10,8 @@ let isAnimating = false;
 
 const couleursIndividus = new Map();
 const indicesIndividus = new Map();
+const couleursPopulations = new Map();
+const couleursAnnees = new Map();
 
 // Drapeau de perte de contexte WebGL — positionne a true par le handler
 // webglcontextlost, repasse a false sur webglcontextrestored.
@@ -34,6 +36,23 @@ const CONTOURS = [
 // et changerModeCouleur() (injection des nouvelles couleurs a la volee).
 const MODES_COULEUR_SUFFIXES = { individu: 'Individu', sexe: 'Sexe', gestionnaire: 'Gestionnaire' };
 
+// Styles de ligne de trajectoire, mis en cache par couleur — evite de recreer un
+// ol.style.Style/ol.style.Stroke par run partage entre plusieurs individus/annees
+// (cf. renderTrajectoire, regroupement MultiLineString par couleur). Cardinalite
+// bornee (palette GLASBEY_32 + quelques couleurs fixes Sexe/Gestionnaire) — jamais
+// videe, comme _rgbaCache plus bas.
+const _stylesLigneParCouleur = new Map();
+function getStyleLigne(couleur) {
+  let style = _stylesLigneParCouleur.get(couleur);
+  if (!style) {
+    style = new ol.style.Style({
+      stroke: new ol.style.Stroke({ color: couleur, width: 1.5, lineCap: 'round', lineJoin: 'round' })
+    });
+    _stylesLigneParCouleur.set(couleur, style);
+  }
+  return style;
+}
+
 // Override — couleurs de remplissage de GLASBEY_32 assez sombres (luminance percue
 // ITU-R BT.601 <= 58, seuil fixe par #00478E) pour que le contour cyclique (Blanc/Noir/
 // Jaune/Cyan, cf. CONTOURS) tombe parfois sur Noir et rende le point quasi invisible sur
@@ -50,6 +69,12 @@ const CONTOUR_OVERRIDE_PAR_COULEUR = {
   '#00478E': CONTOURS[0], // Bleu marine
 };
 
+// Contour fixe utilise par les modes Sexe/Population/Gestionnaire (cf. renderPoints) —
+// expose pour que la legende (app.js) affiche exactement le meme contour que la carte.
+export function getContourDefaut() {
+  return CONTOURS[0];
+}
+
 export function getContourParIndex(index) {
   const couleur = GLASBEY_32[index % GLASBEY_32.length];
   if (CONTOUR_OVERRIDE_PAR_COULEUR[couleur]) return CONTOUR_OVERRIDE_PAR_COULEUR[couleur];
@@ -58,7 +83,7 @@ export function getContourParIndex(index) {
 }
 
 /**
- * Analyse les données avant rendu pour initialiser les échelles de couleurs.
+ * Analyse les données avant rendu : palettes Individu/Population/Année.
  */
 function preparerCouleurs(locations) {
   couleursIndividus.clear();
@@ -68,26 +93,26 @@ function preparerCouleurs(locations) {
     couleursIndividus.set(id, getCouleurParIndex(i));
     indicesIndividus.set(id, i);
   });
-}
 
-/**
- * Calcule une couleur sur un gradient multi-étapes.
- */
-function getGradientColor(ratio) {
-  const colors = [
-    [255, 190, 11],  // Ancien : Jaune
-    [251, 86, 7],    // Orange
-    [155, 35, 53],   // Rouge
-    [131, 56, 236]   // Récent : Violet
-  ];
-  const idx = Math.min(Math.floor(ratio * (colors.length - 1)), colors.length - 2);
-  const localRatio = (ratio - idx / (colors.length - 1)) * (colors.length - 1);
-  const c1 = colors[idx];
-  const c2 = colors[idx + 1];
-  const r = Math.round(c1[0] + localRatio * (c2[0] - c1[0]));
-  const g = Math.round(c1[1] + localRatio * (c2[1] - c1[1]));
-  const b = Math.round(c1[2] + localRatio * (c2[2] - c1[2]));
-  return `rgb(${r},${g},${b})`;
+  couleursPopulations.clear();
+  const populations = [...new Set(locations.map(l => l.ani_pop_rattach).filter(Boolean))].sort();
+  populations.forEach((pop, i) => couleursPopulations.set(pop, getCouleurParIndex(i)));
+
+  // Palette Année — plausibilite dynamique (relative a l'annee courante, jamais figee
+  // en dur) pour ecarter les valeurs aberrantes connues en base (annee 2000, et 2068
+  // sur Arbizon — coquille de saisie), qui creeraient sinon une entree de legende
+  // parasite. Combine avec le scope existant de cette fonction (donnees affichees
+  // uniquement).
+  couleursAnnees.clear();
+  const anneeCourante = new Date().getFullYear();
+  const ANNEE_MIN_PLAUSIBLE = anneeCourante - 20;
+  const ANNEE_MAX_PLAUSIBLE = anneeCourante + 2;
+  const anneesDistinctes = [...new Set(
+    locations
+      .map(l => new Date(l.loc_datetime_local || l.loc_date_local).getFullYear())
+      .filter(a => Number.isFinite(a) && a >= ANNEE_MIN_PLAUSIBLE && a <= ANNEE_MAX_PLAUSIBLE)
+  )].sort((a, b) => a - b);
+  anneesDistinctes.forEach((annee, i) => couleursAnnees.set(annee, getCouleurParIndex(i)));
 }
 
 /**
@@ -99,8 +124,13 @@ export function getCouleur(loc, mode) {
     default:
       return couleursIndividus.get(loc.ani_id) || getCouleurParIndex(0);
 
-    // case 'date': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
-    // case 'saison': { ... } // Désactivé temporairement - à valider avec Ludovic/Alexandre
+    case 'annee': {
+      const annee = new Date(loc.loc_datetime_local || loc.loc_date_local).getFullYear();
+      return couleursAnnees.get(annee) || getCouleurParIndex(0);
+    }
+
+    case 'population':
+      return couleursPopulations.get(loc.ani_pop_rattach) || getCouleurParIndex(0);
 
     case 'sexe':
       if (loc.ani_sexe === 'M') return '#3A86FF';
@@ -581,7 +611,10 @@ export function changerModeCouleur(modeCouleur) {
     const loc = {
       ani_id: f.get('ani_id'),
       ani_sexe: f.get('ani_sexe'),
-      ani_gestionnaire: f.get('ani_gestionnaire')
+      ani_gestionnaire: f.get('ani_gestionnaire'),
+      ani_pop_rattach: f.get('ani_pop_rattach'),
+      loc_datetime_local: f.get('loc_datetime_local'),
+      loc_date_local: f.get('loc_date_local')
     };
     const [cR, cG, cB] = cssToRgba(getCouleur(loc, modeCouleur));
     // Meme regle qu en renderPoints() : contour uniforme Blanc hors mode Individu.
@@ -692,19 +725,43 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
 
     points.sort((a, b) => new Date(a.loc.loc_datetime_local) - new Date(b.loc.loc_datetime_local));
     const coords = points.map(p => p.coord);
-    const couleur = getCouleur(points[0].loc, modeCouleur);
 
-    const ligne = new ol.Feature({ geometry: new ol.geom.LineString(coords) });
-    ligne.set('ani_id', ani_id);
-    ligne.setStyle(new ol.style.Style({
-      stroke: new ol.style.Stroke({
-        color: couleur,
-        width: 1.5,
-        lineCap: 'round',
-        lineJoin: 'round'
-      })
-    }));
-    trajectoireSource.addFeature(ligne);
+    // Couleur du segment i (entre coords[i] et coords[i+1]) : par annee du point de
+    // depart en mode Annee — seul mode ou l'attribut source (date de la position)
+    // varie le long de la trajectoire d'un meme individu (Sexe/Gestionnaire/
+    // Population/Individu sont des attributs fixes de l'animal, identiques sur
+    // tous ses points).
+    const couleurUnique = modeCouleur === 'annee' ? null : getCouleur(points[0].loc, modeCouleur);
+    const couleurSegmentAt = i => modeCouleur === 'annee' ? getCouleur(points[i].loc, modeCouleur) : couleurUnique;
+
+    // Regroupement des segments consecutifs de meme couleur en runs — une seule
+    // Feature MultiLineString par couleur (au lieu d'une Feature LineString par
+    // segment). Les positions etant triees chronologiquement, l'annee est croissante
+    // au fil de la sequence : tous les segments d'une meme annee sont necessairement
+    // contigus, donc le nombre de runs est borne par le nombre d'annees distinctes de
+    // l'individu — jamais par son nombre de positions (memes modes Individu/Sexe/
+    // Gestionnaire/Population : une seule couleur -> un seul run -> une seule Feature,
+    // comportement identique a avant).
+    const parCouleur = new Map(); // couleur -> Array<Array<coord>> (runs de cette couleur)
+    let coloreurCourant = null;
+    let runCourant = null;
+    for (let i = 0; i < coords.length - 1; i++) {
+      const couleur = couleurSegmentAt(i);
+      if (couleur === coloreurCourant) {
+        runCourant.push(coords[i + 1]);
+      } else {
+        runCourant = [coords[i], coords[i + 1]];
+        if (!parCouleur.has(couleur)) parCouleur.set(couleur, []);
+        parCouleur.get(couleur).push(runCourant);
+        coloreurCourant = couleur;
+      }
+    }
+    parCouleur.forEach((runs, couleur) => {
+      const feature = new ol.Feature({ geometry: new ol.geom.MultiLineString(runs) });
+      feature.set('ani_id', ani_id);
+      feature.setStyle(getStyleLigne(couleur));
+      trajectoireSource.addFeature(feature);
+    });
 
     // Ajout de flèches directionnelles sur les segments assez longs
     for (let i = 0; i < coords.length - 1; i++) {
@@ -726,7 +783,7 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
           points: 3,
           radius: 6,
           rotation: -rotation,
-          fill: new ol.style.Fill({ color: couleur }),
+          fill: new ol.style.Fill({ color: couleurSegmentAt(i) }),
           stroke: new ol.style.Stroke({ color: 'white', width: 1 }),
           rotateWithView: false
         })
@@ -782,6 +839,8 @@ export function getMap() { return map; }
 export function getGpsSource() { return gpsSource; }
 export function getCouleursIndividus() { return couleursIndividus; }
 export function getIndicesIndividus() { return indicesIndividus; }
+export function getCouleursPopulations() { return couleursPopulations; }
+export function getCouleursAnnees() { return couleursAnnees; }
 
 /**
  * Masque/affiche les points GPS selon les lignes visibles dans le tableau Localisations.
@@ -835,7 +894,7 @@ export function filtrerPointsParVisibilite(visiblesSet) {
 
     const visible = !aniId || aniIdsVisibles?.has(aniId);
     if (!visible) {
-      if (geom?.getType() === 'LineString') {
+      if (geom?.getType() === 'LineString' || geom?.getType() === 'MultiLineString') {
         f.setStyle(new ol.style.Style({
           stroke: new ol.style.Stroke({ color: 'rgba(0,0,0,0)', width: 0 })
         }));
