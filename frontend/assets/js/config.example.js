@@ -9,6 +9,41 @@ export const LAMBERT93 =
   '+x_0=700000 +y_0=6600000 +ellps=GRS80 ' +
   '+towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
 
+// ETRS89-LAEA Europe (EPSG:3035) - projection metrique paneuropeenne (pas geographique),
+// demandee explicitement par Ludovic. Non connue nativement par proj4js, doit etre
+// enregistree explicitement via proj4.defs() (cf. map.js initMap()), sur le meme modele
+// que LAMBERT93 ci-dessus. Definition verifiee aupres d'epsg.io/3035.
+export const ETRS89 = '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
+
+// Projections disponibles pour l'affichage des coordonnees curseur (#mouseCoordsTarget,
+// cf. map.js) — pattern config-driven, coherent avec BASEMAPS_CONFIG plus bas. proj4def
+// est la chaine proj4 a enregistrer via proj4.defs() avant utilisation (null si la
+// projection est deja connue nativement par proj4js, ex. EPSG:4326). parDefaut identifie
+// l'entree active au chargement — une seule doit valoir true.
+export const PROJECTIONS_COORDONNEES_CONFIG = [
+  {
+    code: 'EPSG:2154',
+    nom: 'Lambert-93',
+    proj4def: LAMBERT93,
+    parDefaut: true,
+    format: c => `X : ${Math.round(c[0])}&nbsp;&nbsp;Y : ${Math.round(c[1])} (Lambert-93)`
+  },
+  {
+    code: 'EPSG:4326',
+    nom: 'WGS84',
+    proj4def: null,
+    parDefaut: false,
+    format: c => `Lat : ${c[1].toFixed(5)}&nbsp;&nbsp;Lon : ${c[0].toFixed(5)} (WGS84)`
+  },
+  {
+    code: 'EPSG:3035',
+    nom: 'ETRS89',
+    proj4def: ETRS89,
+    parDefaut: false,
+    format: c => `X : ${Math.round(c[0])}&nbsp;&nbsp;Y : ${Math.round(c[1])} (ETRS89)`
+  }
+];
+
 // Niveaux de zoom
 export const ZOOM_POINT_SINGLE = 14;
 export const ZOOM_FILTER_SINGLE = 13;
