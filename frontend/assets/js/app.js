@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
-import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG, capturerCarteEnBlob } from './map.js';
+import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, PROJECTIONS_COORDONNEES_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG, capturerCarteEnBlob, setProjectionCoordonnees } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 
@@ -428,6 +428,25 @@ async function startApp(token) {
     if (!mapInitialized) {
       mapInitialized = true;
       initMap('map', 'popup');
+
+      // Selecteur de projection curseur genere depuis PROJECTIONS_COORDONNEES_CONFIG
+      // (config.js) — meme pattern que les fonds de carte, cf. initBasemapSelector()/BASEMAPS_CONFIG.
+      const mouseCoordsTarget = document.getElementById('mouseCoordsTarget');
+      if (mouseCoordsTarget) {
+        const selectProjection = document.createElement('select');
+        selectProjection.id = 'selectProjectionCoordonnees';
+        selectProjection.className = 'select-projection-coords';
+        selectProjection.title = 'Système de projection affiché';
+        PROJECTIONS_COORDONNEES_CONFIG.forEach(p => {
+          const option = document.createElement('option');
+          option.value = p.code;
+          option.textContent = p.nom;
+          if (p.parDefaut) option.selected = true;
+          selectProjection.appendChild(option);
+        });
+        selectProjection.addEventListener('change', e => setProjectionCoordonnees(e.target.value));
+        mouseCoordsTarget.appendChild(selectProjection);
+      }
     }
     window._highlightPoint = highlightPoint;
     window._zoomToPoint = zoomToPoint;
