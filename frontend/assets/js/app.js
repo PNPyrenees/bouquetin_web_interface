@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getContourParIndex, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG, capturerCarteEnBlob } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG, capturerCarteEnBlob } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 
@@ -1181,23 +1181,6 @@ async function startApp(token) {
           }
         });
       }
-
-      document.getElementById('checkAll')?.addEventListener('change', (e) => {
-        const checked = e.target.checked;
-        document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-          if (label.style.display === 'none') return;
-          const checkbox = label.querySelector('input');
-          if (!checkbox) return;
-          checkbox.checked = checked;
-          if (checked) {
-            ajouterBadge(checkbox.closest('label').textContent.trim(), () => {
-              checkbox.checked = false;
-            }, `ani-${checkbox.value}`);
-          } else {
-            supprimerBadgeById(`ani-${checkbox.value}`);
-          }
-        });
-      });
     }
 
   } catch (err) {
@@ -1551,7 +1534,11 @@ function initBasemapSelector() {
 
   btnFondsCarte?.addEventListener('click', (e) => {
     e.stopPropagation();
-    afficherVueFonds();
+    if (sidebarContent?.classList.contains('vue-fonds-active')) {
+      afficherVueFiltres();
+    } else {
+      afficherVueFonds();
+    }
   });
   document.getElementById('btnFermerFondsCarte')?.addEventListener('click', afficherVueFiltres);
   document.getElementById('btnRetourFiltres')?.addEventListener('click', afficherVueFiltres);
@@ -1895,12 +1882,23 @@ function construireEntreesLegende(modeCouleur) {
         stroke: `rgb(${contour.strokeR}, ${contour.strokeG}, ${contour.strokeB})`
       });
     });
-  } else if (modeCouleur === 'sexe') {
-    entries.push({ label: 'Mâle', fill: getCouleur({ ani_sexe: 'M' }, 'sexe'), stroke: '#cccccc' });
-    entries.push({ label: 'Femelle', fill: getCouleur({ ani_sexe: 'F' }, 'sexe'), stroke: '#cccccc' });
-  } else if (modeCouleur === 'gestionnaire') {
-    entries.push({ label: 'PNP', fill: getCouleur({ ani_gestionnaire: 'PNP' }, 'gestionnaire'), stroke: '#cccccc' });
-    entries.push({ label: 'PNRPA', fill: getCouleur({ ani_gestionnaire: 'PNRPA' }, 'gestionnaire'), stroke: '#cccccc' });
+  } else {
+    // Contour fixe (Blanc) utilise sur la carte pour ces modes (cf. getContourDefaut()
+    // dans map.js) — le PDF doit afficher exactement ce contour, pas une couleur arbitraire.
+    const contourDefaut = getContourDefaut();
+    const contourDefautCss = `rgb(${contourDefaut.strokeR}, ${contourDefaut.strokeG}, ${contourDefaut.strokeB})`;
+    if (modeCouleur === 'population' || modeCouleur === 'annee') {
+      const couleursMap = modeCouleur === 'annee' ? getCouleursAnnees() : getCouleursPopulations();
+      couleursMap.forEach((couleur, cle) => {
+        entries.push({ label: String(cle), fill: couleur, stroke: contourDefautCss });
+      });
+    } else if (modeCouleur === 'sexe') {
+      entries.push({ label: 'Mâle', fill: getCouleur({ ani_sexe: 'M' }, 'sexe'), stroke: contourDefautCss });
+      entries.push({ label: 'Femelle', fill: getCouleur({ ani_sexe: 'F' }, 'sexe'), stroke: contourDefautCss });
+    } else if (modeCouleur === 'gestionnaire') {
+      entries.push({ label: 'PNP', fill: getCouleur({ ani_gestionnaire: 'PNP' }, 'gestionnaire'), stroke: contourDefautCss });
+      entries.push({ label: 'PNRPA', fill: getCouleur({ ani_gestionnaire: 'PNRPA' }, 'gestionnaire'), stroke: contourDefautCss });
+    }
   }
   return entries;
 }
@@ -2540,11 +2538,19 @@ export function mettreAJourLegende(modeForce = null) {
   const sectionCouleur = document.getElementById('legendeCouleur');
   const titreCouleur = document.getElementById('legendeCouleurTitre');
 
-  if (modeCouleur === 'individu') {
-    // Retire liste existante si present
-    document.getElementById('legendeIndividusList')?.remove();
-    sectionCouleur?.classList.remove('visible');
+  // Nettoyage centralise des 2 zones de legende couleur (liste dynamique, bloc
+  // categoriel a 2 emplacements) — chaque branche ci-dessous n'a plus qu'a afficher
+  // ce dont elle a besoin, plus besoin de nettoyer les autres.
+  document.getElementById('legendeIndividusList')?.remove();
+  sectionCouleur?.classList.remove('visible');
 
+  // Contour fixe (Blanc) utilise sur la carte pour les modes Population/Sexe/Gestionnaire
+  // (cf. getContourDefaut() dans map.js) — la legende doit afficher exactement ce contour,
+  // pas une couleur arbitraire.
+  const contourDefaut = getContourDefaut();
+  const contourDefautCss = `rgb(${contourDefaut.strokeR}, ${contourDefaut.strokeG}, ${contourDefaut.strokeB})`;
+
+  if (modeCouleur === 'individu') {
     const couleursMap = getCouleursIndividus();
     if (couleursMap.size === 0) return;
 
@@ -2582,8 +2588,38 @@ export function mettreAJourLegende(modeForce = null) {
 
     contenu.appendChild(liste);
 
+  } else if (modeCouleur === 'population' || modeCouleur === 'annee') {
+    // Meme pattern liste dynamique pour Population et Annee, contour neutre fixe
+    // (comme Sexe/Gestionnaire) — pas de contour par individu qui n a pas de sens ici.
+    const couleursMap = modeCouleur === 'annee' ? getCouleursAnnees() : getCouleursPopulations();
+    if (couleursMap.size === 0) return;
+
+    const liste = document.createElement('div');
+    liste.id = 'legendeIndividusList';
+
+    couleursMap.forEach((couleur, cle) => {
+      const ligne = document.createElement('div');
+      ligne.className = 'legende-individu-ligne';
+
+      const pastille = document.createElement('span');
+      pastille.className = 'legende-individu-pastille';
+      pastille.style.background = couleur;
+      pastille.style.border = `2px solid ${contourDefautCss}`;
+      pastille.style.width = '12px';
+      pastille.style.height = '12px';
+
+      const label = document.createElement('span');
+      label.className = 'legende-individu-label';
+      label.textContent = cle;
+
+      ligne.appendChild(pastille);
+      ligne.appendChild(label);
+      liste.appendChild(ligne);
+    });
+
+    contenu.appendChild(liste);
+
   } else if (modeCouleur === 'sexe') {
-    document.getElementById('legendeIndividusList')?.remove();
     sectionCouleur?.classList.add('visible');
     if (titreCouleur) titreCouleur.textContent = 'Sexe';
     const pastille1 = document.getElementById('legendeCouleurPastille1');
@@ -2595,18 +2631,17 @@ export function mettreAJourLegende(modeForce = null) {
     if (pastille1) {
       pastille1.className = 'legende-pastille';
       pastille1.style.background = getCouleur({ ani_sexe: 'M' }, 'sexe');
-      pastille1.style.border = '2px solid #cccccc';
+      pastille1.style.border = `2px solid ${contourDefautCss}`;
     }
     if (label1) label1.textContent = 'Mâle';
     if (pastille2) {
       pastille2.className = 'legende-pastille';
       pastille2.style.background = getCouleur({ ani_sexe: 'F' }, 'sexe');
-      pastille2.style.border = '2px solid #cccccc';
+      pastille2.style.border = `2px solid ${contourDefautCss}`;
     }
     if (label2) label2.textContent = 'Femelle';
 
   } else if (modeCouleur === 'gestionnaire') {
-    document.getElementById('legendeIndividusList')?.remove();
     sectionCouleur?.classList.add('visible');
     if (titreCouleur) titreCouleur.textContent = 'Gestionnaire';
     const pastille1 = document.getElementById('legendeCouleurPastille1');
@@ -2616,13 +2651,13 @@ export function mettreAJourLegende(modeForce = null) {
     if (pastille1) {
       pastille1.className = 'legende-pastille';
       pastille1.style.background = getCouleur({ ani_gestionnaire: 'PNP' }, 'gestionnaire');
-      pastille1.style.border = '2px solid #cccccc';
+      pastille1.style.border = `2px solid ${contourDefautCss}`;
     }
     if (label1) label1.textContent = 'PNP';
     if (pastille2) {
       pastille2.className = 'legende-pastille';
       pastille2.style.background = getCouleur({ ani_gestionnaire: 'PNRPA' }, 'gestionnaire');
-      pastille2.style.border = '2px solid #cccccc';
+      pastille2.style.border = `2px solid ${contourDefautCss}`;
     }
     if (label2) label2.textContent = 'PNRPA';
   }
