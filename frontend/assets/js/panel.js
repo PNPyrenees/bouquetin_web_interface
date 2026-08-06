@@ -552,8 +552,8 @@ function appliquerFiltresColonnes() {
  * attributaire (colonnesDisponibles, ou sous-ensemble choisi via options.colonnes),
  * via f_get_localisation (RPC paginee par batches de 10 000 positions), coherent avec
  * le reste des filtres carte.
- * @param {Object} options - projection ('wgs84'|'lambert93'), nomFichier (sans extension),
- *   colonnes (tableau de cles colonnesDisponibles, repli sur toutes si absent/vide).
+ * @param {Object} options - projection ('wgs84'|'lambert93'|'etrs89'), nomFichier (sans
+ *   extension), colonnes (tableau de cles colonnesDisponibles, repli sur toutes si absent/vide).
  */
 export async function exporterCSV(token, filters = {}, options = {}) {
   const aniIds = filters.ani_id || [];
@@ -564,7 +564,9 @@ export async function exporterCSV(token, filters = {}, options = {}) {
     return;
   }
 
-  const projection = options.projection === 'lambert93' ? 'lambert93' : 'wgs84';
+  const projection = options.projection === 'lambert93' || options.projection === 'etrs89'
+    ? options.projection
+    : 'wgs84';
   const colonnesExport = Array.isArray(options.colonnes) && options.colonnes.length > 0
     ? options.colonnes
     : colonnesDisponibles.map(c => c.key);
@@ -629,11 +631,13 @@ export async function exporterCSV(token, filters = {}, options = {}) {
     // Generer le CSV — colonnes choisies dans la modal (options.colonnes, repli sur
     // colonnesDisponibles complet si absent), plus 2 colonnes de coordonnees dont le
     // libelle et le contenu dependent de la projection choisie (options.projection) :
-    // WGS84 (conversion proj4, comme avant) ou Lambert-93 (coordonnees brutes de
-    // loc.geom.coordinates, deja dans ce systeme en base — aucune conversion).
+    // Lambert-93 et ETRS89 (coordonnees metriques X/Y, EPSG:2154 brut ou conversion
+    // proj4 vers EPSG:3035) ou WGS84 (conversion proj4 vers EPSG:4326, lat/lon degres).
     const colonnesCoord = projection === 'lambert93'
       ? ['loc_x_lambert93', 'loc_y_lambert93']
-      : ['loc_longitude', 'loc_latitude'];
+      : projection === 'etrs89'
+        ? ['loc_x_etrs89', 'loc_y_etrs89']
+        : ['loc_longitude', 'loc_latitude'];
     const header = [...colonnesExport, ...colonnesCoord].join(';');
     const lignes = locs.map(loc => {
       const cellules = colonnesExport.map(col => {
@@ -652,6 +656,10 @@ export async function exporterCSV(token, filters = {}, options = {}) {
       if (loc?.geom?.coordinates) {
         if (projection === 'lambert93') {
           const [x, y] = loc.geom.coordinates;
+          coord1 = x.toFixed(2);
+          coord2 = y.toFixed(2);
+        } else if (projection === 'etrs89') {
+          const [x, y] = proj4('EPSG:2154', 'EPSG:3035', loc.geom.coordinates);
           coord1 = x.toFixed(2);
           coord2 = y.toFixed(2);
         } else {
