@@ -1,5 +1,15 @@
 # CHANGELOG
 
+### Nouveaux modes de symbologie Annee et Population
+- Ajout de 2 nouveaux modes de coloration des points : par annee de la position et par population de rattachement de l'animal, en complement des modes existants Individu/Sexe/Gestionnaire
+- Filtre de plausibilite sur les annees pour ecarter les valeurs aberrantes presentes en base (coquilles de saisie)
+- En mode Trajectoire, le trait change desormais de couleur selon l'annee de chaque segment parcouru, plutot qu'une couleur unique sur toute la trajectoire - regroupement des segments contigus de meme couleur pour rester performant meme sur les gros volumes de positions
+- Legendes (ecran et export PDF) adaptees aux 2 nouveaux modes
+
+### Ajustements filtre Individu
+- Suppression de la case Tout cocher, devenue inaccessible depuis un choix d'interface anterieur (code mort retire proprement)
+- Champ de recherche repositionne juste au-dessus de la liste d'individus, apres les autres filtres du bloc
+
 ### Refonte des fonds de carte - couches IGN natives et sidebar dediee
 - Ajout de couches IGN natives via le service WMTS Geoplateforme : Plan IGN, Relief/altitude, Carte historique 1950 (fonds), Courbes de niveau, Carte des pentes, Hydrographie, Reseau routier, Occupation du sol (CORINE Land Cover), Limites administratives, Parcs nationaux, Estompage LiDAR HD (superpositions)
 - Mise a jour des fonds Orthophotos et Plan IGN existants vers le service WMTS natif (grille de tuiles exacte au lieu d'un calque XYZ approxime)
