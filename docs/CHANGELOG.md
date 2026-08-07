@@ -1,5 +1,22 @@
 # CHANGELOG
 
+### Refonte complete de la page Individus
+- Remplacement des filtres en entete de colonnes par une sidebar dediee, coherente avec la page Carte - filtrage en temps reel sur Nom, Sexe, Population, Gestionnaire, Statut
+- Suppression des filtres ID animal et Annee de naissance de la sidebar (peu utilises en pratique) - conserves comme colonnes triables dans le tableau
+- Ajout d'une colonne Derniere position dediee, juste apres le Nom, avec pastille et texte compact selon l'anciennete de la derniere position GPS recue
+- Style du tableau inspire des standards de presentation statistique officielle (fond blanc, zebrage discret, bordures fines, cellules compactes)
+- Nouvelle pagination numerotee (Premier/precedent/numeros de page avec ellipsis/suivant/Dernier), avec compteur de lignes affichees
+- Tableau limite a la hauteur visible de l'ecran avec defilement interne, pagination toujours visible en bas
+- Sur la fiche d'un individu, la sidebar affiche desormais uniquement un champ de recherche avec autocompletion pour naviguer rapidement vers un autre individu
+- Correction : les cartes de la fiche individu (Dernieres localisations, Sites de capture et relache) ne chargeaient plus depuis le passage aux fonds de carte IGN natifs - gestion WMTS ajoutee
+- Simplification du selecteur de fonds de carte sur les 2 cartes de la fiche individu (liste avec bouton radio, sans vignettes, sans les superpositions)
+- Fond de carte par defaut configurable independamment pour chacune des 2 cartes de la fiche individu
+- Correction d'un bug empechant certains fonds IGN (Plan IGN, Relief altitude, Carte historique) de s'afficher une fois selectionnes sur les cartes de la fiche individu
+
+### Meme style et pagination applique au panneau attributaire de la page Carte
+- Les deux onglets (Donnees et Individus observes) beneficient du meme style de tableau et de la meme pagination numerotee que la page Individus
+- Suppression des selecteurs de taille de page au profit d'une pagination fixe a 25 lignes, coherente entre les deux pages
+
 ### Selecteur de systeme de projection pour les coordonnees
 - Ajout d'un selecteur permettant de choisir le systeme de projection affiche sous le curseur sur la carte principale : Lambert-93, WGS84, ETRS89 (EPSG:3035, ETRS89-LAEA Europe)
 - Liste des projections disponibles centralisee dans la configuration, generee dynamiquement dans l'interface - ajouter une nouvelle projection ne necessite plus de modification du code d'affichage
