@@ -24,7 +24,7 @@ let colonnesActives = colonnesDisponibles
 let donneesTableau = [];     // Toutes les données reçues
 let donneesFiltrees = [];    // Après filtres colonnes
 let pageCourante = 1;
-let lignesParPage = 25;
+const LIGNES_PAR_PAGE = 25;
 
 let colonneTriee = null;
 let sensTriee = 'asc';
@@ -49,7 +49,6 @@ let colonnesIndividusActives = colonnesIndividus.filter(c => c.defaut).map(c => 
 let donneesIndividus = [];
 let donneesIndividusFiltrees = [];
 let pageCouranteIndividus = 1;
-let lignesParPageIndividus = 25;
 let colonneTrieeIndividus = null;
 let sensTrieeIndividus = 'asc';
 
@@ -133,13 +132,6 @@ export function initPanneau() {
     });
     trierIndividus();
     pageCouranteIndividus = 1;
-    reconstruireSelectPageSizeIndividus(donneesIndividusFiltrees.length);
-    rendrePageIndividus();
-  });
-
-  document.getElementById('panelIndividusPageSizeSelect')?.addEventListener('change', (e) => {
-    lignesParPageIndividus = e.target.value;
-    pageCouranteIndividus = 1;
     rendrePageIndividus();
   });
 
@@ -184,12 +176,19 @@ export function initPanneau() {
     }
   });
 
-  const pageSizeSelect = document.getElementById('panelPageSizeSelect');
-  pageSizeSelect?.addEventListener('change', (e) => {
-    lignesParPage = e.target.value;
-    pageCourante = 1;
-    rendrePage();
-  });
+  initialiserPagination(
+    'panelPaginationControls',
+    page => { pageCourante = page; },
+    rendrePage,
+    'panelTableWrapper'
+  );
+
+  initialiserPagination(
+    'panelIndividusPaginationControls',
+    page => { pageCouranteIndividus = page; },
+    rendrePageIndividus,
+    'panelIndividusTableWrapper'
+  );
 
   // Filtres par colonne — écoute sur les inputs de la ligne filtres
   document.addEventListener('input', (e) => {
@@ -311,7 +310,6 @@ export function mettreAJourPanneau(locations) {
   donneesFiltrees = [...donneesTableau];
   trierDonnees();
   pageCourante = 1;
-  reconstruireSelectPageSize(donneesFiltrees.length);
   rendrePage();
 }
 
@@ -351,9 +349,8 @@ function rendrePage() {
   if (!tbody) return;
 
   const total = donneesFiltrees.length;
-  const size = lignesParPage === 'all' ? total : parseInt(lignesParPage, 10);
-  const debut = lignesParPage === 'all' ? 0 : (pageCourante - 1) * size;
-  const fin = lignesParPage === 'all' ? total : Math.min(debut + size, total);
+  const debut = (pageCourante - 1) * LIGNES_PAR_PAGE;
+  const fin = Math.min(debut + LIGNES_PAR_PAGE, total);
   const page = donneesFiltrees.slice(debut, fin);
 
   // Rendu des lignes
@@ -407,7 +404,7 @@ function rendrePage() {
   rendrePagination(total);
 
   // Remonter le tableau en haut apres le changement de page
-  const tableWrapper = document.querySelector('.panel-table-wrapper');
+  const tableWrapper = document.getElementById('panelTableWrapper');
   if (tableWrapper) {
     tableWrapper.scrollTop = 0;
   }
@@ -450,73 +447,128 @@ function formaterValeur(key, valeur, loc = {}) {
   }
 }
 
-function rendrePagination(total) {
-  const paginationControls = document.getElementById('panelPaginationControls');
-  if (!paginationControls) return;
-
-  const size = lignesParPage === 'all' ? total : parseInt(lignesParPage, 10);
-  const nbPages = size > 0 ? Math.ceil(total / size) : 1;
-  const pageInfo = document.getElementById('panelPageInfo');
-  if (pageInfo) pageInfo.textContent = `Page ${pageCourante} sur ${nbPages || 0}`;
-
-  // Compteur positions — mis à jour avant le return
-  const totalEl = document.querySelector('.panel-positions-total');
-  if (totalEl) totalEl.innerHTML = `<strong>${donneesFiltrees.length}</strong> positions`;
-
-  // Retirer les boutons existants en gardant le pageInfo
-  paginationControls.querySelectorAll('.panel-page-btn, .panel-page-dots').forEach(b => b.remove());
-
-  if (nbPages <= 1) return;
-
-  // Construire tous les boutons dans un fragment
-  const fragment = document.createDocumentFragment();
-
-  // Bouton précédent
-  const btnPrev = document.createElement('button');
-  btnPrev.className = 'panel-page-btn';
-  btnPrev.textContent = '‹';
-  btnPrev.disabled = pageCourante === 1;
-  btnPrev.addEventListener('click', () => {
-    if (pageCourante > 1) { pageCourante--; rendrePage(); }
-  });
-  fragment.appendChild(btnPrev);
-
-  // Fenêtre glissante : page courante + suivante, ellipsis si suite
-  const pages = [];
-  for (let i = pageCourante; i <= Math.min(pageCourante + 1, nbPages); i++) {
-    pages.push(i);
-  }
-  if (pageCourante + 1 < nbPages) {
-    pages.push('...');
+function obtenirElementsPagination(totalPages, pageActive) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
 
-  pages.forEach(p => {
-    if (p === '...') {
-      const dots = document.createElement('span');
-      dots.className = 'panel-page-dots';
-      dots.textContent = '...';
-      fragment.appendChild(dots);
-    } else {
-      const btn = document.createElement('button');
-      btn.className = `panel-page-btn${p === pageCourante ? ' active' : ''}`;
-      btn.textContent = p;
-      btn.addEventListener('click', () => { pageCourante = p; rendrePage(); });
-      fragment.appendChild(btn);
+  if (pageActive <= 4) {
+    return [1, 2, 3, 4, 5, 'ellipsis', totalPages];
+  }
+
+  if (pageActive >= totalPages - 3) {
+    return [
+      1,
+      'ellipsis',
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages
+    ];
+  }
+
+  return [
+    1,
+    'ellipsis',
+    pageActive - 1,
+    pageActive,
+    pageActive + 1,
+    'ellipsis',
+    totalPages
+  ];
+}
+
+function creerBoutonPagination(libelle, pageCible, { actif = false, disabled = false } = {}) {
+  const bouton = document.createElement('button');
+  bouton.type = 'button';
+  bouton.className = `panel-page-btn${actif ? ' active' : ''}`;
+  bouton.textContent = libelle;
+  bouton.dataset.page = pageCible;
+  bouton.disabled = disabled;
+
+  if (actif) {
+    bouton.setAttribute('aria-current', 'page');
+  }
+
+  return bouton;
+}
+
+function mettreAJourPaginationTableau({ paginationId, infoId, totalLignes, pageActive }) {
+  const totalPages = Math.max(1, Math.ceil(totalLignes / LIGNES_PAR_PAGE));
+  const premiereLigne = totalLignes === 0
+    ? 0
+    : (pageActive - 1) * LIGNES_PAR_PAGE + 1;
+  const derniereLigne = Math.min(pageActive * LIGNES_PAR_PAGE, totalLignes);
+
+  const info = document.getElementById(infoId);
+  if (info) {
+    info.textContent = `ligne(s) ${premiereLigne} à ${derniereLigne} sur ${totalLignes}`;
+  }
+
+  const pagination = document.getElementById(paginationId);
+  if (!pagination) return;
+
+  pagination.innerHTML = '';
+  pagination.appendChild(
+    creerBoutonPagination('Premier', 1, { disabled: pageActive === 1 })
+  );
+  pagination.appendChild(
+    creerBoutonPagination('<', pageActive - 1, { disabled: pageActive === 1 })
+  );
+
+  obtenirElementsPagination(totalPages, pageActive).forEach(element => {
+    if (element === 'ellipsis') {
+      const ellipsis = document.createElement('span');
+      ellipsis.className = 'panel-page-ellipsis';
+      ellipsis.textContent = '…';
+      ellipsis.setAttribute('aria-hidden', 'true');
+      pagination.appendChild(ellipsis);
+      return;
     }
+
+    pagination.appendChild(
+      creerBoutonPagination(String(element), element, {
+        actif: element === pageActive
+      })
+    );
   });
 
-  // Bouton suivant
-  const btnNext = document.createElement('button');
-  btnNext.className = 'panel-page-btn';
-  btnNext.textContent = '›';
-  btnNext.disabled = pageCourante === nbPages;
-  btnNext.addEventListener('click', () => {
-    if (pageCourante < nbPages) { pageCourante++; rendrePage(); }
-  });
-  fragment.appendChild(btnNext);
+  pagination.appendChild(
+    creerBoutonPagination('>', pageActive + 1, {
+      disabled: pageActive === totalPages
+    })
+  );
+  pagination.appendChild(
+    creerBoutonPagination('Dernier', totalPages, {
+      disabled: pageActive === totalPages
+    })
+  );
+}
 
-  // Insérer le fragment après le pageInfo
-  paginationControls.appendChild(fragment);
+function initialiserPagination(paginationId, definirPage, rendre, wrapperId) {
+  document.getElementById(paginationId)?.addEventListener('click', (e) => {
+    const bouton = e.target.closest('.panel-page-btn[data-page]');
+    if (!bouton || bouton.disabled || bouton.classList.contains('active')) return;
+
+    const pageDemandee = Number(bouton.dataset.page);
+    if (!Number.isInteger(pageDemandee) || pageDemandee < 1) return;
+
+    definirPage(pageDemandee);
+    rendre();
+
+    const wrapper = document.getElementById(wrapperId);
+    if (wrapper) wrapper.scrollTop = 0;
+  });
+}
+
+function rendrePagination(total) {
+  mettreAJourPaginationTableau({
+    paginationId: 'panelPaginationControls',
+    infoId: 'panelTableInfo',
+    totalLignes: total,
+    pageActive: pageCourante
+  });
 }
 
 function appliquerFiltresColonnes() {
@@ -536,7 +588,6 @@ function appliquerFiltresColonnes() {
 
   trierDonnees();
   pageCourante = 1;
-  reconstruireSelectPageSize(donneesFiltrees.length);
   rendrePage();
 
   // Synchroniser les points carte avec les lignes visibles dans le tableau
@@ -719,99 +770,11 @@ export function filtrerCarteDepuisTableau(locs) {
   window._filtrerPointsCarte?.(visiblesSet);
 }
 
-/**
- * Calcule deux intervalles logiques et arrondis basés sur le nombre total de données
- */
-function calculerIntervalles(total) {
-  if (total <= 10) {
-    return [5, 10];
-  }
-  if (total <= 25) {
-    return [10, 25];
-  }
-  if (total <= 50) {
-    return [15, 25];
-  }
-  if (total <= 100) {
-    return [25, 50];
-  }
-  if (total <= 250) {
-    return [50, 100];
-  }
-  if (total <= 500) {
-    return [50, 200];
-  }
-  if (total <= 1000) {
-    return [100, 500];
-  }
-
-  // Pour total > 1000, arrondit à la centaine près
-  const step = Math.pow(10, Math.floor(Math.log10(total)) - 1);
-  const val1 = Math.round((total / 5) / step) * step;
-  const val2 = Math.round((total / 2) / step) * step;
-  return [val1 || 100, val2 || 500];
-}
-
-/**
- * Reconstruit dynamiquement les options du sélecteur selon le total actuel
- */
-function reconstruireSelectPageSize(total) {
-  const select = document.getElementById('panelPageSizeSelect');
-  if (!select) return;
-
-  const [i1, i2] = calculerIntervalles(total);
-  const ancienneValeur = select.value;
-
-  select.innerHTML = `
-    <option value="${i1}">${i1}</option>
-    <option value="${i2}">${i2}</option>
-    <option value="all">Tous</option>
-  `;
-
-  // Tente de restaurer la sélection précédente, sinon prend le premier intervalle
-  if (ancienneValeur === 'all') {
-    select.value = 'all';
-    lignesParPage = 'all';
-  } else if (Array.from(select.options).some(opt => opt.value === ancienneValeur)) {
-    select.value = ancienneValeur;
-    lignesParPage = ancienneValeur;
-  } else {
-    select.value = i1;
-    lignesParPage = i1;
-  }
-}
-
-function reconstruireSelectPageSizeIndividus(total) {
-  const select = document.getElementById('panelIndividusPageSizeSelect');
-  if (!select) return;
-
-  const [i1, i2] = calculerIntervalles(total);
-  const ancienneValeur = select.value;
-
-  select.innerHTML = `
-    <option value="${i1}">${i1}</option>
-    <option value="${i2}">${i2}</option>
-    <option value="all">Tous</option>
-  `;
-
-  if (ancienneValeur === 'all') {
-    select.value = 'all';
-    lignesParPageIndividus = 'all';
-  } else if (Array.from(select.options).some(opt => opt.value === ancienneValeur)) {
-    select.value = ancienneValeur;
-    lignesParPageIndividus = ancienneValeur;
-  } else {
-    select.value = i1;
-    lignesParPageIndividus = i1;
-  }
-}
-
 export function mettreAJourIndividus(animals) {
   donneesIndividus = animals || [];
   donneesIndividusFiltrees = [...donneesIndividus];
   trierIndividus();
   pageCouranteIndividus = 1;
-  reconstruireSelectPageSizeIndividus(donneesIndividusFiltrees.length);
   rendrePageIndividus();
 }
 
@@ -867,9 +830,8 @@ function rendrePageIndividus() {
   if (!tbody) return;
 
   const total = donneesIndividusFiltrees.length;
-  const size = lignesParPageIndividus === 'all' ? total : parseInt(lignesParPageIndividus, 10);
-  const debut = lignesParPageIndividus === 'all' ? 0 : (pageCouranteIndividus - 1) * size;
-  const fin = lignesParPageIndividus === 'all' ? total : Math.min(debut + size, total);
+  const debut = (pageCouranteIndividus - 1) * LIGNES_PAR_PAGE;
+  const fin = Math.min(debut + LIGNES_PAR_PAGE, total);
   const page = donneesIndividusFiltrees.slice(debut, fin);
 
   tbody.innerHTML = page.map(ani => `
@@ -922,63 +884,12 @@ function formaterValeurIndividu(key, valeur) {
 }
 
 function rendrePaginationIndividus(total) {
-  const paginationControls = document.getElementById('panelIndividusPaginationControls');
-  if (!paginationControls) return;
-
-  const size = lignesParPageIndividus === 'all' ? total : parseInt(lignesParPageIndividus, 10);
-  const nbPages = size > 0 ? Math.ceil(total / size) : 1;
-  const pageInfo = document.getElementById('panelIndividusPageInfo');
-  if (pageInfo) pageInfo.textContent = `Page ${pageCouranteIndividus} sur ${nbPages || 0}`;
-
-  const totalEl = document.querySelector('.panel-individus-total');
-  if (totalEl) totalEl.innerHTML = `<strong>${total}</strong> individus`;
-
-  paginationControls.querySelectorAll('.panel-page-btn, .panel-page-dots').forEach(b => b.remove());
-  if (nbPages <= 1) return;
-
-  const fragment = document.createDocumentFragment();
-
-  const btnPrev = document.createElement('button');
-  btnPrev.className = 'panel-page-btn';
-  btnPrev.textContent = '‹';
-  btnPrev.disabled = pageCouranteIndividus === 1;
-  btnPrev.addEventListener('click', () => {
-    if (pageCouranteIndividus > 1) { pageCouranteIndividus--; rendrePageIndividus(); }
+  mettreAJourPaginationTableau({
+    paginationId: 'panelIndividusPaginationControls',
+    infoId: 'panelIndividusTableInfo',
+    totalLignes: total,
+    pageActive: pageCouranteIndividus
   });
-  fragment.appendChild(btnPrev);
-
-  const pages = [];
-  for (let i = pageCouranteIndividus; i <= Math.min(pageCouranteIndividus + 1, nbPages); i++) {
-    pages.push(i);
-  }
-  if (pageCouranteIndividus + 1 < nbPages) {
-    pages.push('...');
-  }
-
-  pages.forEach(p => {
-    if (p === '...') {
-      const dots = document.createElement('span');
-      dots.className = 'panel-page-dots';
-      dots.textContent = '...';
-      fragment.appendChild(dots);
-    } else {
-      const btn = document.createElement('button');
-      btn.className = `panel-page-btn${p === pageCouranteIndividus ? ' active' : ''}`;
-      btn.textContent = p;
-      btn.addEventListener('click', () => { pageCouranteIndividus = p; rendrePageIndividus(); });
-      fragment.appendChild(btn);
-    }
-  });
-
-  const btnNext = document.createElement('button');
-  btnNext.className = 'panel-page-btn';
-  btnNext.textContent = '›';
-  btnNext.disabled = pageCouranteIndividus === nbPages;
-  btnNext.addEventListener('click', () => {
-    if (pageCouranteIndividus < nbPages) { pageCouranteIndividus++; rendrePageIndividus(); }
-  });
-  fragment.appendChild(btnNext);
-  paginationControls.appendChild(fragment);
 }
 
 export function setAniIdSelectionne(id) {
@@ -996,8 +907,7 @@ export function scrollToAniId(aniId, locDatetime = null) {
   }
   if (index === -1) return;
 
-  const size = lignesParPage === 'all' ? donneesFiltrees.length : parseInt(lignesParPage, 10);
-  const pageCible = Math.floor(index / size) + 1;
+  const pageCible = Math.floor(index / LIGNES_PAR_PAGE) + 1;
 
   if (pageCible !== pageCourante) {
     pageCourante = pageCible;
@@ -1028,8 +938,7 @@ export function scrollToAniIdIndividus(aniId) {
   const index = donneesIndividusFiltrees.findIndex(a => String(a.ani_id) === String(aniId));
   if (index === -1) return;
 
-  const size = lignesParPageIndividus === 'all' ? donneesIndividusFiltrees.length : parseInt(lignesParPageIndividus, 10);
-  const pageCible = Math.floor(index / size) + 1;
+  const pageCible = Math.floor(index / LIGNES_PAR_PAGE) + 1;
 
   if (pageCible !== pageCouranteIndividus) {
     pageCouranteIndividus = pageCible;

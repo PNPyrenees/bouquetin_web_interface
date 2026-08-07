@@ -418,27 +418,15 @@
               </div>
             </div>
           </div>
-          <div class="panel-table-wrapper">
+          <div class="panel-table-wrapper" id="panelTableWrapper">
             <table class="panel-table">
               <thead id="panelTableHead"></thead>
               <tbody id="panelTableBody"></tbody>
             </table>
           </div>
-          <div class="panel-pagination" id="panelPagination">
-            <div class="panel-pagesize-container">
-              <select id="panelPageSizeSelect" class="panel-pagesize-select">
-                <option value="5">5</option>
-                <option value="10">10</option>
-                <option value="15">15</option>
-                <option value="25" selected>25</option>
-                <option value="50">50</option>
-                <option value="all">Tous</option>
-              </select>
-            </div>
-            <div class="panel-pagination-controls" id="panelPaginationControls">
-              <span class="panel-page-info" id="panelPageInfo">Page 1 sur 0</span>
-            </div>
-            <span class="panel-positions-total"><strong>0</strong> positions totales</span>
+          <div class="panel-table-footer">
+            <div id="panelTableInfo" class="panel-table-info">ligne(s) 0 à 0 sur 0</div>
+            <nav id="panelPaginationControls" class="panel-table-pagination" aria-label="Pagination des localisations"></nav>
           </div>
         </div>
         <div class="panel-tab-content" id="panelContentIndividus" style="display:none">
@@ -456,27 +444,15 @@
               </div>
             </div>
           </div>
-          <div class="panel-table-wrapper">
+          <div class="panel-table-wrapper" id="panelIndividusTableWrapper">
             <table class="panel-table panel-table-individus">
               <thead id="panelIndividusHead"></thead>
               <tbody id="panelIndividusBody"></tbody>
             </table>
           </div>
-          <div class="panel-pagination" id="panelIndividusPagination">
-            <div class="panel-pagesize-container">
-              <select id="panelIndividusPageSizeSelect" class="panel-pagesize-select">
-                <option value="5">5</option>
-                <option value="10">10</option>
-                <option value="15">15</option>
-                <option value="25" selected>25</option>
-                <option value="50">50</option>
-                <option value="all">Tous</option>
-              </select>
-              <span class="panel-individus-total"><strong>0</strong> individus</span>
-            </div>
-            <div class="panel-pagination-controls" id="panelIndividusPaginationControls">
-              <span class="panel-page-info" id="panelIndividusPageInfo">Page 1 sur 0</span>
-            </div>
+          <div class="panel-table-footer">
+            <div id="panelIndividusTableInfo" class="panel-table-info">ligne(s) 0 à 0 sur 0</div>
+            <nav id="panelIndividusPaginationControls" class="panel-table-pagination" aria-label="Pagination des individus observés"></nav>
           </div>
         </div>
       </div>
