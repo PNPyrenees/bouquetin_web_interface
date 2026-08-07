@@ -73,6 +73,17 @@ export const SEUIL_ALERTE_VOLUME = 40000;
 export const N_POSITIONS_DEFAUT = 5;
 export const N_POSITIONS_MIN_TRAJECTOIRE = 2;
 
+// Seuils de fraicheur des positions GPS pour les animaux en suivi actif (page Individus) —
+// alerte visuelle (pastille) sur le tableau liste quand la derniere position remonte a
+// plus de X heures. Demande explicite de Ludovic. En heures (comparaison directe avec
+// l'ecart calcule entre la derniere position et maintenant, pas de conversion jours->heures
+// necessaire a l'usage).
+export const SEUILS_FRAICHEUR_POSITION = {
+  jaune: 24,   // pas de position depuis 24h
+  orange: 48,  // pas de position depuis 2 jours
+  rouge: 72    // pas de position depuis 3 jours
+};
+
 export const CLASSES_AGE = {
   F: [
     { label: 'Cabri',      min: 0, max: 0 },
@@ -333,6 +344,16 @@ export const BASEMAPS_CONFIG = [
     opacity: 0.6
   }
 ];
+
+// Fond de carte par defaut pour chacune des 2 cartes de la fiche individu (Dernieres
+// localisations / Sites de capture & relache) — distinct du fond visible:true de
+// BASEMAPS_CONFIG (utilise par la page Carte principale). Repli automatique sur ce
+// dernier si l'id configure ici est absent de BASEMAPS_CONFIG (cf. obtenirFondParDefaut(),
+// individuals.js).
+export const FONDS_PAR_DEFAUT_FICHE = {
+  localisations: 'ign_ortho',
+  sites: 'ign_ortho'
+};
 
 // Couleurs de marquage (collier/oreilles) — mapping temporaire cote client : le texte
 // libre en base (t_animal, ex. "rouge", "jaune / bleu") n'a pas de code couleur associe.

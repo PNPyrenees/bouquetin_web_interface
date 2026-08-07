@@ -67,57 +67,88 @@
     </div>
   </header>
 
+  <aside class="sidebar" id="indivSidebar">
+    <div class="sidebar-content">
+      <div class="sidebar-header" id="indivSidebarHeader">FILTRES</div>
+      <div class="indiv-sidebar-body">
+        <div class="input-group indiv-autocomplete">
+          <label for="filtreColNom">Nom</label>
+          <input
+            type="text"
+            id="filtreColNom"
+            class="sidebar-input"
+            placeholder="Rechercher..."
+            autocomplete="off"
+            aria-autocomplete="list"
+            aria-controls="suggestionsNom"
+            aria-expanded="false"
+          >
+          <div
+            id="suggestionsNom"
+            class="indiv-autocomplete-liste"
+            role="listbox"
+            hidden
+          ></div>
+        </div>
+        <div class="input-group indiv-filtre-liste">
+          <label>Sexe</label>
+          <select id="filtreColSexe" class="indiv-col-filtre">
+            <option value="">Tous</option>
+            <option value="M">M</option>
+            <option value="F">F</option>
+          </select>
+        </div>
+        <div class="input-group indiv-filtre-liste">
+          <label>Population</label>
+          <select id="filtreColPopulation" class="indiv-col-filtre">
+            <option value="">Tous</option>
+          </select>
+        </div>
+        <div class="input-group indiv-filtre-liste">
+          <label>Gestionnaire</label>
+          <select id="filtreColGestionnaire" class="indiv-col-filtre">
+            <option value="">Tous</option>
+          </select>
+        </div>
+        <div class="input-group indiv-filtre-liste">
+          <label>Statut</label>
+          <select id="filtreColStatut" class="indiv-col-filtre">
+            <option value="">Tous</option>
+            <option value="actif">Suivi actif</option>
+            <option value="non_suivi">Non suivi</option>
+            <option value="mort">Mort</option>
+          </select>
+        </div>
+      </div>
+      <div class="sidebar-footer">
+        <a id="btnReinitialiserFiltres" class="indiv-lien-reinitialiser">Réinitialiser</a>
+      </div>
+    </div>
+  </aside>
+
   <main id="indivScreen">
 
     <!-- VUE LISTE -->
     <div id="vueListe">
       <div class="indiv-liste">
         <div class="indiv-row indiv-liste-entete">
-          <div class="indiv-col">
-            <span class="indiv-col-label">Nom</span>
-            <input type="text" id="filtreColNom" class="indiv-col-filtre" placeholder="Rechercher...">
-          </div>
-          <div class="indiv-col">
-            <span class="indiv-col-label">ID animal</span>
-            <input type="text" id="filtreColId" class="indiv-col-filtre" placeholder="Rechercher...">
-          </div>
-          <div class="indiv-col">
-            <span class="indiv-col-label">Sexe</span>
-            <select id="filtreColSexe" class="indiv-col-filtre">
-              <option value="">Tous</option>
-              <option value="M">M</option>
-              <option value="F">F</option>
-            </select>
-          </div>
-          <div class="indiv-col">
-            <span class="indiv-col-label">Année naissance</span>
-            <input type="text" id="filtreColAnnee" class="indiv-col-filtre" placeholder="Rechercher...">
-          </div>
-          <div class="indiv-col">
-            <span class="indiv-col-label">Population</span>
-            <select id="filtreColPopulation" class="indiv-col-filtre">
-              <option value="">Tous</option>
-            </select>
-          </div>
-          <div class="indiv-col">
-            <span class="indiv-col-label">Gestionnaire</span>
-            <select id="filtreColGestionnaire" class="indiv-col-filtre">
-              <option value="">Tous</option>
-            </select>
-          </div>
-          <div class="indiv-col">
-            <span class="indiv-col-label">Statut</span>
-            <select id="filtreColStatut" class="indiv-col-filtre">
-              <option value="">Tous</option>
-              <option value="actif">Suivi actif</option>
-              <option value="non_suivi">Non suivi</option>
-              <option value="mort">Mort</option>
-            </select>
-          </div>
+          <div class="indiv-col indiv-col-triable" data-colonne="nom"><span class="indiv-col-label">Nom</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
+          <div class="indiv-col indiv-col-triable" data-colonne="fraicheur"><span class="indiv-col-label">Dernière position</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
+          <div class="indiv-col indiv-col-triable" data-colonne="id"><span class="indiv-col-label">ID animal</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
+          <div class="indiv-col indiv-col-triable" data-colonne="sexe"><span class="indiv-col-label">Sexe</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
+          <div class="indiv-col indiv-col-triable" data-colonne="annee"><span class="indiv-col-label">Année naissance</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
+          <div class="indiv-col indiv-col-triable" data-colonne="population"><span class="indiv-col-label">Population</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
+          <div class="indiv-col indiv-col-triable" data-colonne="gestionnaire"><span class="indiv-col-label">Gestionnaire</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
+          <div class="indiv-col indiv-col-triable" data-colonne="statut"><span class="indiv-col-label">Statut</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
         </div>
         <div id="indivTableBody">
-          <!-- Peuplée en JS par peuplerTableauListe() -->
+          <!-- Peuplée en JS par rendrePageIndividus() -->
         </div>
+      </div>
+
+      <div class="table-footer">
+        <div id="indivTableInfo" class="table-info">ligne(s) 0 à 0 sur 0</div>
+        <nav id="indivPagination" class="table-pagination" aria-label="Pagination"></nav>
       </div>
     </div>
 
@@ -160,7 +191,7 @@
       <div class="fiche-grid-2x2">
           <div class="fiche-carte" id="carteDernieresLocalisations">
             <div class="fiche-carte-entete-ligne">
-              <div class="fiche-carte-titre">Dernières localisations</div>
+              <div class="fiche-carte-titre">Localisations</div>
               <div class="fiche-carte-controles">
                 <input type="number" id="ficheInputN" placeholder="Toutes" min="1" title="Nombre de positions">
                 <label>

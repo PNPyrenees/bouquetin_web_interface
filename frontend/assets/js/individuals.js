@@ -1,11 +1,15 @@
-import { login, fetchAnimals, fetchColliersActifs, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal } from './api.js';
-import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, COULEURS_MARQUAGE, GLASBEY_32, getCouleurParIndex } from './config.js';
+import { login, fetchAnimals, fetchColliersActifs, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal, fetchLocalisationsRPC } from './api.js';
+import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, FONDS_PAR_DEFAUT_FICHE, COULEURS_MARQUAGE, GLASBEY_32, getCouleurParIndex, SEUILS_FRAICHEUR_POSITION } from './config.js';
 
 let currentToken = null;
 let currentAniId = null;
 let animals = [];
 let colliersActifs = new Set();
+let dernierePositionParAnimal = new Map();
 let loginEnCours = false;
+let pageCourante = 1;
+let filtresListeAvantFiche = null;
+const LIGNES_PAR_PAGE = 25;
 
 // Cartes de la fiche individu — instances OpenLayers autonomes, independantes du
 // singleton de map.js (page separee, pas de conflit de contexte JS possible)
@@ -139,6 +143,129 @@ const STATUT_CLASSES = {
   mort: 'indiv-statut-mort'
 };
 
+// Palier de fraicheur d'une derniere position, pour un animal en suivi actif — lit
+// SEUILS_FRAICHEUR_POSITION (config.js). Retourne null si la position est assez recente
+// (pas d'alerte a afficher), 'aucune' si l'animal n'a jamais eu de position (cas distinct
+// d'un simple retard, cf. strategie validee), sinon le palier le plus severe atteint.
+function computeFraicheur(dateDerniere) {
+  if (!dateDerniere) return 'aucune';
+  const heuresEcoulees = (Date.now() - new Date(dateDerniere).getTime()) / 3600000;
+  if (heuresEcoulees >= SEUILS_FRAICHEUR_POSITION.rouge) return 'rouge';
+  if (heuresEcoulees >= SEUILS_FRAICHEUR_POSITION.orange) return 'orange';
+  if (heuresEcoulees >= SEUILS_FRAICHEUR_POSITION.jaune) return 'jaune';
+  return null;
+}
+
+const FRAICHEUR_LABELS = {
+  jaune: 'Pas de position depuis plus de 24h',
+  orange: 'Pas de position depuis plus de 2 jours',
+  rouge: 'Pas de position depuis plus de 3 jours',
+  aucune: 'Aucune position reçue'
+};
+
+// Duree ecoulee depuis la derniere position, format compact pour la colonne Fraicheur
+// (distinct du texte complet du tooltip, cf. FRAICHEUR_LABELS) — heures sous 48h, jours au-dela.
+function formaterEcheanceFraicheur(dateDerniere) {
+  const heures = (Date.now() - new Date(dateDerniere).getTime()) / 3600000;
+  return heures < 48 ? `${Math.floor(heures)} h` : `${Math.floor(heures / 24)} j`;
+}
+
+// Contenu de la colonne Fraicheur (2e position, apres Nom) — pastille + texte court,
+// style compact. tier vient de computeFraicheur() : null (position recente, "A jour"),
+// 'aucune' (jamais de position), ou le palier atteint (jaune/orange/rouge).
+function creerCelluleFraicheur(tier, dateDerniere) {
+  const cellule = document.createElement('div');
+  cellule.className = 'indiv-fraicheur-cellule';
+
+  const pastille = document.createElement('span');
+  const texte = document.createElement('span');
+  texte.className = 'indiv-fraicheur-texte';
+
+  if (tier === 'aucune') {
+    pastille.className = 'indiv-fraicheur-pastille indiv-fraicheur-aucune';
+    texte.textContent = 'Aucune position';
+    cellule.title = FRAICHEUR_LABELS.aucune;
+  } else if (tier) {
+    pastille.className = `indiv-fraicheur-pastille indiv-fraicheur-${tier}`;
+    texte.textContent = formaterEcheanceFraicheur(dateDerniere);
+    cellule.title = `${FRAICHEUR_LABELS[tier]} (dernière position : ${formaterDateHeure(dateDerniere)})`;
+  } else {
+    pastille.className = 'indiv-fraicheur-pastille indiv-fraicheur-a-jour';
+    texte.textContent = 'À jour';
+    cellule.title = `Dernière position : ${formaterDateHeure(dateDerniere)}`;
+  }
+
+  cellule.append(pastille, texte);
+  return cellule;
+}
+
+let colonneTriee = null;
+let sensTriee = 'asc';
+
+// Statut : ordre logique (actif = le plus pertinent a surveiller), pas alphabetique.
+const ORDRE_STATUT = { actif: 0, non_suivi: 1, mort: 2 };
+
+function comparerTexte(a, b) {
+  return (a || '').localeCompare(b || '', 'fr', { sensitivity: 'base' });
+}
+
+function comparerNombre(a, b) {
+  const na = a == null || a === '' ? Infinity : Number(a);
+  const nb = b == null || b === '' ? Infinity : Number(b);
+  return na - nb;
+}
+
+// Cle numerique de tri pour Fraicheur — heures ecoulees depuis la derniere position
+// (pas le texte affiche). Infinity pour non-actif ou "jamais de position" : ces cas
+// se classent systematiquement en dernier en ordre croissant, sans logique conditionnelle
+// selon le sens du tri.
+function cleTriFraicheur(ani) {
+  if (computeStatut(ani, colliersActifs) !== 'actif') return Infinity;
+  const dateDerniere = dernierePositionParAnimal.get(String(ani.ani_id));
+  if (!dateDerniere) return Infinity;
+  return (Date.now() - new Date(dateDerniere).getTime()) / 3600000;
+}
+
+const COMPARATEURS_COLONNES = {
+  nom: (a, b) => comparerTexte(a.ani_nom, b.ani_nom),
+  fraicheur: (a, b) => cleTriFraicheur(a) - cleTriFraicheur(b),
+  id: (a, b) => comparerNombre(a.ani_id, b.ani_id),
+  sexe: (a, b) => comparerTexte(a.ani_sexe, b.ani_sexe),
+  annee: (a, b) => comparerNombre(a.ani_annee_naissance, b.ani_annee_naissance),
+  population: (a, b) => comparerTexte(a.ani_pop_rattach, b.ani_pop_rattach),
+  gestionnaire: (a, b) => comparerTexte(a.ani_gestionnaire, b.ani_gestionnaire),
+  statut: (a, b) => (ORDRE_STATUT[computeStatut(a, colliersActifs)] ?? 99) - (ORDRE_STATUT[computeStatut(b, colliersActifs)] ?? 99)
+};
+
+// Met a jour l'etat de tri puis delegue le rendu a rendrePageIndividus() — le tri porte
+// sur l'ensemble filtre complet (pas seulement la page affichee), et revient a la page 1
+// (un nouvel ordre rend la page courante arbitraire par rapport au resultat precedent).
+function trierTableau(colonne) {
+  if (!COMPARATEURS_COLONNES[colonne]) return;
+
+  sensTriee = (colonneTriee === colonne && sensTriee === 'asc') ? 'desc' : 'asc';
+  colonneTriee = colonne;
+  pageCourante = 1;
+
+  mettreAJourIndicateursTri();
+  rendrePageIndividus();
+}
+
+function mettreAJourIndicateursTri() {
+  document.querySelectorAll('.indiv-col-triable').forEach(col => {
+    const active = col.dataset.colonne === colonneTriee;
+    col.classList.toggle('indiv-col-triee', active);
+    const up = col.querySelector('.indiv-sort-up');
+    const down = col.querySelector('.indiv-sort-down');
+    if (up) up.classList.toggle('active', active && sensTriee === 'asc');
+    if (down) down.classList.toggle('active', active && sensTriee === 'desc');
+  });
+}
+
+document.querySelectorAll('.indiv-col-triable').forEach(col => {
+  col.addEventListener('click', () => trierTableau(col.dataset.colonne));
+});
+
 // Pastille compacte de statut pour les lignes de la liste — meme icone/couleur
 // que la pastille sur la photo de la fiche individu (PASTILLE_ICONES/STATUT_CLASSES,
 // cf. remplirPastilleStatutPhoto), juste plus petite. Le texte du statut n'est plus
@@ -210,49 +337,256 @@ function peuplerFiltresDynamiques() {
   }
 }
 
-/**
- * Combine les filtres par colonne (ET logique) — filtrage purement client, sur les
- * donnees deja chargees par fetchAnimals() (aucun appel API).
- */
-function appliquerFiltresListe() {
-  const filtreNom = (document.getElementById('filtreColNom')?.value || '').trim().toLowerCase();
-  const filtreId = (document.getElementById('filtreColId')?.value || '').trim().toLowerCase();
-  const filtreSexe = document.getElementById('filtreColSexe')?.value || '';
-  const filtreAnnee = (document.getElementById('filtreColAnnee')?.value || '').trim();
-  const filtrePopulation = document.getElementById('filtreColPopulation')?.value || '';
-  const filtreGestionnaire = document.getElementById('filtreColGestionnaire')?.value || '';
-  const filtreStatut = document.getElementById('filtreColStatut')?.value || '';
+const IDS_FILTRES_TEXTE = ['filtreColNom'];
+const IDS_FILTRES_SELECT = ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'];
+const LIMITE_SUGGESTIONS_NOM = 8;
 
-  document.querySelectorAll('#indivTableBody .indiv-row').forEach(row => {
-    const ani = animals.find(a => String(a.ani_id) === row.dataset.aniId);
-    if (!ani) return;
-
-    const nom = (ani.ani_nom || '').toLowerCase();
-    const idAnimal = String(ani.ani_id || '').toLowerCase();
-    const population = ani.ani_pop_rattach || '';
-    const gestionnaire = ani.ani_gestionnaire || '';
-    const annee = String(ani.ani_annee_naissance ?? '');
-
-    const matchNom = !filtreNom || nom.includes(filtreNom);
-    const matchId = !filtreId || idAnimal.includes(filtreId);
-    const matchSexe = !filtreSexe || ani.ani_sexe === filtreSexe;
-    const matchAnnee = !filtreAnnee || annee.includes(filtreAnnee);
-    const matchPopulation = !filtrePopulation || population === filtrePopulation;
-    const matchGestionnaire = !filtreGestionnaire || gestionnaire === filtreGestionnaire;
-    const matchStatut = !filtreStatut || row.dataset.statut === filtreStatut;
-
-    const visible = matchNom && matchId && matchSexe &&
-      matchAnnee && matchPopulation && matchGestionnaire && matchStatut;
-    row.style.display = visible ? '' : 'none';
-  });
+function lireValeurFiltre(id) {
+  return document.getElementById(id)?.value || '';
 }
 
-['filtreColNom', 'filtreColId', 'filtreColAnnee'].forEach(id => {
-  document.getElementById(id)?.addEventListener('input', appliquerFiltresListe);
+function definirValeurFiltre(id, valeur) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const valeurNormalisee = valeur == null ? '' : String(valeur);
+  if (el.tomselect) el.tomselect.setValue(valeurNormalisee, true);
+  else el.value = valeurNormalisee;
+}
+
+function memoriserFiltresListe() {
+  const valeurs = {};
+  [...IDS_FILTRES_TEXTE, ...IDS_FILTRES_SELECT].forEach(id => {
+    valeurs[id] = lireValeurFiltre(id);
+  });
+  return valeurs;
+}
+
+function restaurerFiltresListe(valeurs) {
+  if (!valeurs) return;
+  Object.entries(valeurs).forEach(([id, valeur]) => definirValeurFiltre(id, valeur));
+}
+
+function estVueFicheActive() {
+  return document.getElementById('vueFiche')?.style.display !== 'none';
+}
+
+function fermerSuggestionsNom() {
+  const liste = document.getElementById('suggestionsNom');
+  const champNom = document.getElementById('filtreColNom');
+  if (!liste) return;
+
+  liste.hidden = true;
+  liste.innerHTML = '';
+  champNom?.setAttribute('aria-expanded', 'false');
+}
+
+function obtenirCriteresFiltres({ inclureNom = true } = {}) {
+  return {
+    nom: inclureNom ? lireValeurFiltre('filtreColNom').trim().toLowerCase() : '',
+    sexe: lireValeurFiltre('filtreColSexe'),
+    population: lireValeurFiltre('filtreColPopulation'),
+    gestionnaire: lireValeurFiltre('filtreColGestionnaire'),
+    statut: lireValeurFiltre('filtreColStatut')
+  };
+}
+
+function animalCorrespondAuxFiltres(ani, criteres) {
+  const nom = (ani.ani_nom || '').toLowerCase();
+  const population = ani.ani_pop_rattach || '';
+  const gestionnaire = ani.ani_gestionnaire || '';
+  const statut = computeStatut(ani, colliersActifs);
+
+  return (
+    (!criteres.nom || nom.includes(criteres.nom)) &&
+    (!criteres.sexe || ani.ani_sexe === criteres.sexe) &&
+    (!criteres.population || population === criteres.population) &&
+    (!criteres.gestionnaire || gestionnaire === criteres.gestionnaire) &&
+    (!criteres.statut || statut === criteres.statut)
+  );
+}
+
+function afficherSuggestionsNom() {
+  if (!estVueFicheActive()) {
+    fermerSuggestionsNom();
+    return;
+  }
+
+  const champNom = document.getElementById('filtreColNom');
+  const liste = document.getElementById('suggestionsNom');
+  if (!champNom || !liste) return;
+
+  const recherche = champNom.value.trim().toLowerCase();
+  if (!recherche) {
+    fermerSuggestionsNom();
+    return;
+  }
+
+  const correspondances = animals
+    .filter(ani => (ani.ani_nom || '').toLowerCase().includes(recherche))
+    .slice(0, LIMITE_SUGGESTIONS_NOM);
+
+  liste.innerHTML = '';
+
+  if (correspondances.length === 0) {
+    fermerSuggestionsNom();
+    return;
+  }
+
+  correspondances.forEach(ani => {
+    const suggestion = document.createElement('button');
+    suggestion.type = 'button';
+    suggestion.className = 'indiv-autocomplete-suggestion';
+    suggestion.dataset.aniId = ani.ani_id;
+    suggestion.setAttribute('role', 'option');
+
+    const nom = document.createElement('span');
+    nom.className = 'indiv-autocomplete-nom';
+    nom.textContent = ani.ani_nom || '';
+
+    const id = document.createElement('span');
+    id.className = 'indiv-autocomplete-id';
+    id.textContent = `ID ${ani.ani_id}`;
+
+    suggestion.append(nom, id);
+    liste.appendChild(suggestion);
+  });
+
+  liste.hidden = false;
+  champNom.setAttribute('aria-expanded', 'true');
+}
+
+// La sidebar conserve un HTML unique pour les deux vues. En mode fiche, le CSS masque
+// les filtres de liste et leur footer pour ne garder que la recherche par nom.
+function definirModeSidebarFiche(actif) {
+  document.getElementById('indivSidebar')?.classList.toggle('indiv-sidebar--fiche', actif);
+
+  const titre = document.getElementById('indivSidebarHeader');
+  if (titre) titre.textContent = actif ? 'RECHERCHER UN INDIVIDU' : 'FILTRES';
+}
+
+function remplirFiltresDepuisAnimal(animal) {
+  if (!animal) return;
+  definirValeurFiltre('filtreColNom', animal.ani_nom);
+}
+
+/**
+ * Combine les filtres par colonne (ET logique) — filtrage purement client, sur les
+ * donnees deja chargees par fetchAnimals() (aucun appel API). Fonction pure : renvoie
+ * le sous-ensemble filtre, ne touche pas au DOM (cf. rendrePageIndividus()).
+ */
+function obtenirAnimauxFiltres() {
+  const criteres = obtenirCriteresFiltres();
+  return animals.filter(ani => animalCorrespondAuxFiltres(ani, criteres));
+}
+
+// Le filtrage en temps reel revient toujours a la page 1, car chaque modification
+// change l'ensemble de resultats.
+function appliquerFiltresListe() {
+  pageCourante = 1;
+  rendrePageIndividus();
+}
+
+document.getElementById('btnReinitialiserFiltres')?.addEventListener('click', reinitialiserFiltresListe);
+
+document.getElementById('filtreColNom')?.addEventListener('input', () => {
+  if (estVueFicheActive()) {
+    afficherSuggestionsNom();
+    return;
+  }
+
+  fermerSuggestionsNom();
+  appliquerFiltresListe();
 });
-['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'].forEach(id => {
-  document.getElementById(id)?.addEventListener('change', appliquerFiltresListe);
+
+IDS_FILTRES_SELECT.forEach(id => {
+  document.getElementById(id)?.addEventListener('change', () => {
+    if (estVueFicheActive()) return;
+    appliquerFiltresListe();
+  });
 });
+
+document.getElementById('suggestionsNom')?.addEventListener('click', (e) => {
+  const suggestion = e.target.closest('.indiv-autocomplete-suggestion');
+  if (!suggestion) return;
+
+  e.stopPropagation();
+
+  const animal = animals.find(
+    ani => String(ani.ani_id) === String(suggestion.dataset.aniId)
+  );
+  if (!animal) {
+    fermerSuggestionsNom();
+    return;
+  }
+
+  definirValeurFiltre('filtreColNom', animal.ani_nom);
+  fermerSuggestionsNom();
+
+  if (estVueFicheActive()) {
+    afficherFiche(animal.ani_id);
+  } else {
+    appliquerFiltresListe();
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.indiv-autocomplete')) {
+    fermerSuggestionsNom();
+  }
+});
+
+document.querySelector('.indiv-sidebar-body')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    fermerSuggestionsNom();
+    return;
+  }
+
+  if (e.key === 'Enter' && e.target.classList.contains('sidebar-input')) {
+    e.preventDefault();
+    fermerSuggestionsNom();
+
+    if (estVueFicheActive() && e.target.id === 'filtreColNom') {
+      rechercherIndividuDepuisFiche();
+    } else if (!estVueFicheActive()) {
+      appliquerFiltresListe();
+    }
+  }
+});
+
+// Recherche exclusivement dans animals, deja charge en memoire. Une correspondance
+// unique ouvre directement sa fiche ; sinon la liste reprend avec le seul filtre Nom.
+function rechercherIndividuDepuisFiche() {
+  const texte = lireValeurFiltre('filtreColNom').trim();
+  const texteNormalise = texte.toLowerCase();
+  const correspondances = animals.filter(ani =>
+    (ani.ani_nom || '').toLowerCase().includes(texteNormalise)
+  );
+
+  if (correspondances.length === 1) {
+    afficherFiche(correspondances[0].ani_id);
+    return;
+  }
+
+  afficherListe({ restaurerFiltres: false });
+  [...IDS_FILTRES_TEXTE, ...IDS_FILTRES_SELECT].forEach(id => definirValeurFiltre(id, ''));
+  definirValeurFiltre('filtreColNom', texte);
+  filtresListeAvantFiche = null;
+  appliquerFiltresListe();
+}
+
+// Vide les 5 champs (TomSelect inclus) puis reapplique — equivaut a "tout afficher".
+function reinitialiserFiltresListe() {
+  IDS_FILTRES_TEXTE.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  IDS_FILTRES_SELECT.forEach(id => {
+    const el = document.getElementById(id);
+    if (el?.tomselect) el.tomselect.setValue('');
+    else if (el) el.value = '';
+  });
+  appliquerFiltresListe();
+}
 
 // TomSelect — remplace le rendu natif de ces 4 selects, dont le popup ouvert
 // (coins arrondis + ombre sur Chrome/Windows) ignore border-radius/box-shadow en CSS.
@@ -291,55 +625,212 @@ document.getElementById('indivScreen')?.addEventListener('scroll', () => {
   });
 }, { passive: true });
 
-function peuplerTableauListe() {
+// Construit une ligne .indiv-row pour un animal donne — appelee uniquement pour les
+// animaux de la page courante (cf. rendrePageIndividus()), pas pour tout animals d'un coup.
+function creerLigneIndividu(ani) {
+  const row = document.createElement('div');
+  row.className = 'indiv-row';
+
+  const statutKey = computeStatut(ani, colliersActifs);
+
+  const celluleNom = document.createElement('div');
+  celluleNom.className = 'indiv-cell';
+  celluleNom.appendChild(creerValeurNode(ani.ani_nom));
+
+  const celluleId = document.createElement('div');
+  celluleId.className = 'indiv-cell';
+  celluleId.appendChild(creerValeurNode(ani.ani_id));
+
+  const celluleSexe = document.createElement('div');
+  celluleSexe.className = 'indiv-cell';
+  celluleSexe.appendChild(creerValeurNode(ani.ani_sexe));
+
+  const celluleAnnee = document.createElement('div');
+  celluleAnnee.className = 'indiv-cell';
+  celluleAnnee.appendChild(creerValeurNode(ani.ani_annee_naissance));
+
+  const cellulePopulation = document.createElement('div');
+  cellulePopulation.className = 'indiv-cell';
+  cellulePopulation.appendChild(creerValeurNode(ani.ani_pop_rattach));
+
+  const celluleGestionnaire = document.createElement('div');
+  celluleGestionnaire.className = 'indiv-cell';
+  celluleGestionnaire.appendChild(creerValeurNode(ani.ani_gestionnaire));
+
+  const celluleStatut = document.createElement('div');
+  celluleStatut.className = 'indiv-cell';
+  celluleStatut.appendChild(creerPastilleStatut(statutKey));
+
+  const celluleFraicheur = document.createElement('div');
+  celluleFraicheur.className = 'indiv-cell';
+  if (statutKey === 'actif') {
+    const dateDerniere = dernierePositionParAnimal.get(String(ani.ani_id));
+    const tier = computeFraicheur(dateDerniere);
+    celluleFraicheur.appendChild(creerCelluleFraicheur(tier, dateDerniere));
+  } else {
+    const tiret = document.createElement('span');
+    tiret.className = 'valeur-na';
+    tiret.textContent = '-';
+    celluleFraicheur.appendChild(tiret);
+  }
+
+  row.append(celluleNom, celluleFraicheur, celluleId, celluleSexe, celluleAnnee, cellulePopulation, celluleGestionnaire, celluleStatut);
+  row.addEventListener('click', () => afficherFiche(ani.ani_id));
+  return row;
+}
+
+// Pipeline complet : filtre -> trie -> pagine -> ne rend que la page courante. Remplace
+// entierement l'ancien mecanisme display:none par ligne — plus aucune ligne masquee dans
+// le DOM, seule la page courante y est presente a un instant donne.
+function rendrePageIndividus() {
   const corps = document.getElementById('indivTableBody');
   if (!corps) return;
+
+  let liste = obtenirAnimauxFiltres();
+  if (colonneTriee) {
+    const comparateur = COMPARATEURS_COLONNES[colonneTriee];
+    liste = [...liste].sort((a, b) => {
+      const cmp = comparateur(a, b);
+      return sensTriee === 'asc' ? cmp : -cmp;
+    });
+  }
+
+  const totalPages = Math.max(1, Math.ceil(liste.length / LIGNES_PAR_PAGE));
+  pageCourante = Math.min(Math.max(1, pageCourante), totalPages);
+
+  const debut = (pageCourante - 1) * LIGNES_PAR_PAGE;
+  const page = liste.slice(debut, debut + LIGNES_PAR_PAGE);
+
   corps.innerHTML = '';
+  page.forEach(ani => corps.appendChild(creerLigneIndividu(ani)));
 
-  animals.forEach(ani => {
-    const row = document.createElement('div');
-    row.className = 'indiv-row';
-    row.dataset.aniId = ani.ani_id;
-    const statutKey = computeStatut(ani, colliersActifs);
-    row.dataset.statut = statutKey;
+  mettreAJourPagination(totalPages, liste.length);
+}
 
-    const celluleNom = document.createElement('div');
-    celluleNom.className = 'indiv-cell';
-    celluleNom.appendChild(creerValeurNode(ani.ani_nom));
+function obtenirElementsPagination(totalPages) {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
 
-    const celluleId = document.createElement('div');
-    celluleId.className = 'indiv-cell';
-    celluleId.appendChild(creerValeurNode(ani.ani_id));
+  if (pageCourante <= 4) {
+    return [1, 2, 3, 4, 5, 'ellipsis', totalPages];
+  }
 
-    const celluleSexe = document.createElement('div');
-    celluleSexe.className = 'indiv-cell';
-    celluleSexe.appendChild(creerValeurNode(ani.ani_sexe));
+  if (pageCourante >= totalPages - 3) {
+    return [
+      1,
+      'ellipsis',
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages
+    ];
+  }
 
-    const celluleAnnee = document.createElement('div');
-    celluleAnnee.className = 'indiv-cell';
-    celluleAnnee.appendChild(creerValeurNode(ani.ani_annee_naissance));
+  return [
+    1,
+    'ellipsis',
+    pageCourante - 1,
+    pageCourante,
+    pageCourante + 1,
+    'ellipsis',
+    totalPages
+  ];
+}
 
-    const cellulePopulation = document.createElement('div');
-    cellulePopulation.className = 'indiv-cell';
-    cellulePopulation.appendChild(creerValeurNode(ani.ani_pop_rattach));
+function creerBoutonPagination(libelle, pageCible, { actif = false, disabled = false } = {}) {
+  const bouton = document.createElement('button');
+  bouton.type = 'button';
+  bouton.className = `page-btn${actif ? ' active' : ''}`;
+  bouton.textContent = libelle;
+  bouton.dataset.page = pageCible;
+  bouton.disabled = disabled;
 
-    const celluleGestionnaire = document.createElement('div');
-    celluleGestionnaire.className = 'indiv-cell';
-    celluleGestionnaire.appendChild(creerValeurNode(ani.ani_gestionnaire));
+  if (actif) {
+    bouton.setAttribute('aria-current', 'page');
+  }
 
-    const celluleStatut = document.createElement('div');
-    celluleStatut.className = 'indiv-cell';
-    celluleStatut.appendChild(creerPastilleStatut(statutKey));
+  return bouton;
+}
 
-    row.append(celluleNom, celluleId, celluleSexe, celluleAnnee, cellulePopulation, celluleGestionnaire, celluleStatut);
+function mettreAJourPagination(totalPages, totalLignes) {
+  const infoEl = document.getElementById('indivTableInfo');
+  if (infoEl) {
+    const premiereLigne = totalLignes === 0
+      ? 0
+      : (pageCourante - 1) * LIGNES_PAR_PAGE + 1;
+    const derniereLigne = Math.min(pageCourante * LIGNES_PAR_PAGE, totalLignes);
+    infoEl.textContent = `ligne(s) ${premiereLigne} à ${derniereLigne} sur ${totalLignes}`;
+  }
 
-    row.addEventListener('click', () => afficherFiche(ani.ani_id));
-    corps.appendChild(row);
+  const pagination = document.getElementById('indivPagination');
+  if (!pagination) return;
+
+  pagination.innerHTML = '';
+
+  pagination.appendChild(
+    creerBoutonPagination('Premier', 1, {
+      disabled: pageCourante === 1
+    })
+  );
+
+  pagination.appendChild(
+    creerBoutonPagination('<', pageCourante - 1, {
+      disabled: pageCourante === 1
+    })
+  );
+
+  obtenirElementsPagination(totalPages).forEach(element => {
+    if (element === 'ellipsis') {
+      const ellipsis = document.createElement('span');
+      ellipsis.className = 'page-ellipsis';
+      ellipsis.textContent = '…';
+      ellipsis.setAttribute('aria-hidden', 'true');
+      pagination.appendChild(ellipsis);
+      return;
+    }
+
+    pagination.appendChild(
+      creerBoutonPagination(String(element), element, {
+        actif: element === pageCourante
+      })
+    );
   });
 
+  pagination.appendChild(
+    creerBoutonPagination('>', pageCourante + 1, {
+      disabled: pageCourante === totalPages
+    })
+  );
+
+  pagination.appendChild(
+    creerBoutonPagination('Dernier', totalPages, {
+      disabled: pageCourante === totalPages
+    })
+  );
+}
+
+document.getElementById('indivPagination')?.addEventListener('click', (e) => {
+  const bouton = e.target.closest('.page-btn[data-page]');
+  if (!bouton || bouton.disabled || bouton.classList.contains('active')) return;
+
+  const pageDemandee = Number(bouton.dataset.page);
+  if (!Number.isInteger(pageDemandee) || pageDemandee < 1) return;
+
+  pageCourante = pageDemandee;
+  rendrePageIndividus();
+
+  const corps = document.getElementById('indivTableBody');
+  if (corps) corps.scrollTop = 0;
+});
+
+function peuplerTableauListe() {
   peuplerFiltresDynamiques();
   initTomSelectFiltresColonnes();
-  appliquerFiltresListe();
+  mettreAJourIndicateursTri();
+  pageCourante = 1;
+  rendrePageIndividus();
 }
 
 /**
@@ -846,11 +1337,61 @@ function assurerProjectionLambert93() {
   _projRegistered = true;
 }
 
+// Cache du GetCapabilities WMTS IGN — meme principe que chargerCapacitesWMTS() dans
+// map.js (promesse memoisee, un seul fetch reel partage par toutes les couches WMTS).
+// Duplique ici plutot qu'importe : individuals.js reste volontairement sans dependance
+// sur map.js (singleton de la page Carte, cf. discussion prealable plus haut).
+let _wmtsCapabilitiesPromise = null;
+function chargerCapacitesWMTS() {
+  if (!_wmtsCapabilitiesPromise) {
+    _wmtsCapabilitiesPromise = fetch('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetCapabilities')
+      .then(res => {
+        if (!res.ok) throw new Error(`GetCapabilities IGN : HTTP ${res.status}`);
+        return res.text();
+      })
+      .then(texte => new ol.format.WMTSCapabilities().read(texte));
+  }
+  return _wmtsCapabilitiesPromise;
+}
+
+// Cree une couche ol.layer.Tile pour un fond WMTS IGN — meme logique que
+// creerCoucheWMTS() dans map.js. La couche existe immediatement (necessaire pour
+// l'ordre des layers dans new ol.Map()/insertAt(), construit de facon synchrone) ;
+// sa source est affectee de facon asynchrone (setSource) une fois le GetCapabilities
+// resolu. Un echec (reseau, ou layer/matrixSet/style introuvable) est capture ici et
+// n'affecte que cette couche.
+function creerCoucheWMTS(bm) {
+  const layer = new ol.layer.Tile({ visible: bm.visible, opacity: bm.opacity ?? 1 });
+  chargerCapacitesWMTS()
+    .then(capacites => {
+      const options = ol.source.WMTS.optionsFromCapabilities(capacites, {
+        layer: bm.layer,
+        matrixSet: bm.matrixSet,
+        style: bm.style,
+        format: bm.format,
+        crossOrigin: 'anonymous'
+      });
+      if (!options) {
+        throw new Error(`Couche introuvable dans le GetCapabilities IGN : layer="${bm.layer}" matrixSet="${bm.matrixSet}" style="${bm.style}"`);
+      }
+      layer.setSource(new ol.source.WMTS(options));
+    })
+    .catch(err => {
+      console.error(`Fond WMTS "${bm.nom}" indisponible :`, err.message);
+      if (window._showToast) window._showToast(`"${bm.nom}" n'a pas pu être chargé.`);
+    });
+  return layer;
+}
+
 // Cree un layer OL Tile pour un fond de carte BASEMAPS_CONFIG donne — meme logique
-// xyz/osm/wms que map.js (basemaps, non importee : individuals.js reste volontairement
+// xyz/osm/wms/wmts que map.js (basemaps, non importee : individuals.js reste volontairement
 // sans dependance sur map.js, singleton de la page Carte, cf. discussion prealable
 // plus haut). Remplace l'ancien creerCoucheFond() (xyz uniquement, fond fixe).
 function creerCoucheBasemap(bm) {
+  if (bm.type === 'wmts') {
+    return creerCoucheWMTS(bm);
+  }
+
   let source;
   if (bm.type === 'osm') {
     source = new ol.source.OSM();
@@ -870,15 +1411,30 @@ function creerCoucheBasemap(bm) {
   return new ol.layer.Tile({ source });
 }
 
+// Resout le fond par defaut d'une des 2 cartes de la fiche individu — configure par cle
+// (FONDS_PAR_DEFAUT_FICHE.localisations/.sites, config.js), avec repli sur le fond
+// visible:true habituel de BASEMAPS_CONFIG si l'id configure est absent/invalide.
+function obtenirFondParDefaut(cle) {
+  const idConfigure = FONDS_PAR_DEFAUT_FICHE[cle];
+  return BASEMAPS_CONFIG.find(bm => bm.id === idConfigure)
+    || BASEMAPS_CONFIG.find(bm => bm.visible)
+    || BASEMAPS_CONFIG[0];
+}
+
 // Remplace le layer de fond (toujours index 0, cf. initCarteLocalisations/initCarteSites)
 // d'une carte OL par un nouveau fond BASEMAPS_CONFIG — retrait + insertion, pas de toggle
 // de visibilite comme switchBasemap() (map.js) : les cartes de la fiche individu ne
 // pre-creent qu'un seul layer de fond a la fois (pas les 8 empiles), pour rester legeres.
+// visible:true force explicitement — bm.visible dans BASEMAPS_CONFIG reflète l'état de la
+// page Carte (false pour tous les fonds sauf ign_ortho par defaut) et non des cartes de la
+// fiche individu. Sans ce forçage, les fonds avec bm.visible=false (ign_topo, ign_relief_slopes,
+// ign_scan50_1950…) seraient inserés invisibles, donnant un fond vide à la sélection.
 function changerCoucheBasemap(carte, basemapId) {
   if (!carte) return;
   const bm = BASEMAPS_CONFIG.find(b => b.id === basemapId) || BASEMAPS_CONFIG[0];
   carte.getLayers().removeAt(0);
-  carte.getLayers().insertAt(0, creerCoucheBasemap(bm));
+  // { ...bm, visible: true } surcharge bm.visible localement sans muter BASEMAPS_CONFIG.
+  carte.getLayers().insertAt(0, creerCoucheBasemap({ ...bm, visible: true }));
 }
 
 // Peuple un <select> avec les 8 fonds de BASEMAPS_CONFIG (liste complete, non filtree —
@@ -890,33 +1446,35 @@ function changerCoucheBasemap(carte, basemapId) {
 // l'ancien <select>. Reutilise changerCoucheBasemap() (layer unique remplace, pas
 // d'empilement des 8 fonds comme sur la page Carte — carte fiche individu volontairement
 // plus legere, decision documentee sur changerCoucheBasemap).
-function initBoutonFondsCarte(suffixe, getCarteActuelle) {
+function initBoutonFondsCarte(suffixe, getCarteActuelle, cleFondDefaut) {
   const bouton = document.getElementById(`btnFondsCarte${suffixe}`);
   const panneau = document.getElementById(`basemapPanel${suffixe}`);
   const liste = document.getElementById(`basemapListe${suffixe}`);
   if (!bouton || !panneau || !liste) return;
 
-  liste.innerHTML = '';
-  BASEMAPS_CONFIG.forEach(bm => {
-    const item = document.createElement('div');
-    item.className = `fiche-basemap-item${bm.visible ? ' active' : ''}`;
+  const fondParDefaut = obtenirFondParDefaut(cleFondDefaut);
 
-    const img = document.createElement('div');
-    img.className = 'fiche-basemap-item-img';
-    const imgEl = document.createElement('img');
-    imgEl.src = `../${bm.apercu}`;
-    imgEl.alt = bm.nom;
-    imgEl.onerror = () => { imgEl.style.display = 'none'; };
-    img.appendChild(imgEl);
+  liste.innerHTML = '';
+  BASEMAPS_CONFIG.filter(bm => bm.category !== 'overlay').forEach(bm => {
+    const estParDefaut = bm.id === fondParDefaut.id;
+    const item = document.createElement('label');
+    item.className = `fiche-basemap-item${estParDefaut ? ' active' : ''}`;
+
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = `fondsCarte${suffixe}`;
+    radio.className = 'fiche-basemap-radio';
+    radio.checked = estParDefaut;
 
     const nom = document.createElement('span');
     nom.textContent = bm.nom;
 
-    item.append(img, nom);
+    item.append(radio, nom);
     item.addEventListener('click', (e) => {
       e.stopPropagation();
       liste.querySelectorAll('.fiche-basemap-item').forEach(el => el.classList.remove('active'));
       item.classList.add('active');
+      radio.checked = true;
       changerCoucheBasemap(getCarteActuelle(), bm.id);
       panneau.classList.remove('open');
     });
@@ -935,8 +1493,8 @@ function initBoutonFondsCarte(suffixe, getCarteActuelle) {
   });
 }
 
-initBoutonFondsCarte('Localisations', () => _carteLocalisations);
-initBoutonFondsCarte('Sites', () => _carteSites);
+initBoutonFondsCarte('Localisations', () => _carteLocalisations, 'localisations');
+initBoutonFondsCarte('Sites', () => _carteSites, 'sites');
 
 // EPSG:2154 (Lambert-93) — coherent avec le reste du schema (t_animal/v_localisation
 // via f_get_localisation). Utilise pour l'avertissement de coherence du CRS/SRID dans
@@ -1053,7 +1611,7 @@ function initCarteLocalisations() {
   _carteLocalisations = new ol.Map({
     target: 'ficheMapLocalisations',
     controls: [],
-    layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), coucheLocalisations],
+    layers: [creerCoucheBasemap(obtenirFondParDefaut('localisations')), coucheLocalisations],
     overlays: [_popupOverlayLocalisations],
     view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
   });
@@ -1266,7 +1824,7 @@ function initCarteSites() {
     target: 'ficheMapSites',
     controls: [],
     layers: [
-      creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]),
+      creerCoucheBasemap(obtenirFondParDefaut('sites')),
       coucheSitesLiens,
       coucheSitesPoints
     ],
@@ -1725,6 +2283,11 @@ async function initGraphiquesSynthese(aniId, capteurs) {
 }
 
 async function afficherFiche(aniId) {
+  fermerSuggestionsNom();
+
+  const ficheEtaitActive = estVueFicheActive();
+  if (!ficheEtaitActive) filtresListeAvantFiche = memoriserFiltresListe();
+
   currentAniId = aniId;
   const animal = animals.find(a => String(a.ani_id) === String(aniId));
   const ficheNom = document.getElementById('ficheNom');
@@ -1732,6 +2295,8 @@ async function afficherFiche(aniId) {
 
   document.getElementById('vueListe').style.display = 'none';
   document.getElementById('vueFiche').style.display = 'flex';
+  remplirFiltresDepuisAnimal(animal);
+  definirModeSidebarFiche(true);
 
   try {
     const [detail, capteurs, captures] = await Promise.all([
@@ -1773,9 +2338,17 @@ async function afficherFiche(aniId) {
   }
 }
 
-function afficherListe() {
+function afficherListe({ restaurerFiltres = true } = {}) {
+  fermerSuggestionsNom();
+
   document.getElementById('vueFiche').style.display = 'none';
-  document.getElementById('vueListe').style.display = 'block';
+  document.getElementById('vueListe').style.display = 'flex';
+  definirModeSidebarFiche(false);
+  if (restaurerFiltres && filtresListeAvantFiche) {
+    restaurerFiltresListe(filtresListeAvantFiche);
+    filtresListeAvantFiche = null;
+    appliquerFiltresListe();
+  }
 }
 
 document.getElementById('btnRetourListe')?.addEventListener('click', afficherListe);
@@ -1795,6 +2368,25 @@ async function initPage(token) {
       fetchAnimals(token),
       fetchColliersActifs(token)
     ]);
+
+    // Derniere position par animal en suivi actif — un seul appel RPC (limit_par_animal:1),
+    // meme mecanisme que fetchAnimauxSuivis() (api.js), restreint aux ids colliersActifs
+    // (necessite colliersActifs deja resolu, donc sequence apres le Promise.all ci-dessus,
+    // pas en parallele). Un animal actif sans aucune position n'apparait simplement pas
+    // dans le resultat (cf. computeFraicheur, cas 'aucune').
+    dernierePositionParAnimal = new Map();
+    const idsActifs = [...colliersActifs];
+    if (idsActifs.length > 0) {
+      const positions = await fetchLocalisationsRPC(token, { ani_id: idsActifs, limit_par_animal: 1 });
+      positions.forEach(loc => {
+        const cle = String(loc.ani_id);
+        const date = loc.loc_datetime_local || loc.loc_date_local;
+        if (!date) return;
+        const dateActuelle = dernierePositionParAnimal.get(cle);
+        if (!dateActuelle || date > dateActuelle) dernierePositionParAnimal.set(cle, date);
+      });
+    }
+
     peuplerTableauListe();
   } catch (err) {
     console.error('Erreur chargement individus:', err);

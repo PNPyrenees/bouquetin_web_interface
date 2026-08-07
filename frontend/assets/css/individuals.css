@@ -7,12 +7,148 @@
 #indivScreen {
   position: fixed;
   top: 60px;
-  left: 0;
+  left: var(--sidebar-width);
   right: 0;
   bottom: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   padding: 16px 32px;
   background: var(--color-bg-light);
+}
+
+/* ============================================
+   SIDEBAR DE FILTRES — coherente visuellement avec la sidebar de la page Carte
+   (main.css : .sidebar/.sidebar-content/.sidebar-header/.sidebar-footer/.btn-apply/
+   .sidebar-input/.input-group, tous reutilises tels quels, aucune classe redefinie ici).
+   ============================================ */
+.indiv-sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #e8efec;
+}
+
+.indiv-lien-reinitialiser {
+  color: #2D6A4F;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.indiv-lien-reinitialiser:hover {
+  text-decoration: underline;
+}
+
+/* TomSelect (Sexe/Population/Gestionnaire/Statut) — desormais dans #indivSidebar,
+   plus dans #indivScreen : re-scope des regles qui ciblaient #indivScreen. */
+#indivSidebar .ts-wrapper.indiv-col-filtre {
+  width: 100%;
+}
+
+#indivSidebar .ts-wrapper.indiv-col-filtre .ts-control {
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--input-border-radius);
+  font-family: var(--font-family);
+  font-size: 12px;
+  background: #ffffff;
+  color: var(--color-text);
+  min-height: 0;
+  flex-wrap: nowrap;
+}
+
+#indivSidebar .ts-wrapper.indiv-col-filtre .ts-control > input {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+/* En vue fiche, la sidebar devient une barre de recherche compacte : les filtres
+   propres a la liste et les actions de filtrage sont masques. */
+#indivSidebar.indiv-sidebar--fiche .indiv-filtre-liste,
+#indivSidebar.indiv-sidebar--fiche .sidebar-footer {
+  display: none;
+}
+
+#indivSidebar.indiv-sidebar--fiche .indiv-sidebar-body {
+  flex: 0 0 auto;
+  overflow: visible;
+  padding: 12px 16px 16px;
+  background: #e8efec;
+}
+
+#indivSidebar.indiv-sidebar--fiche .indiv-autocomplete {
+  margin: 0;
+}
+
+/* Autocompletion du filtre Nom — le conteneur sert de repere au panneau
+   positionne sous le champ, dans la sidebar commune aux vues liste et fiche. */
+.indiv-autocomplete {
+  position: relative;
+  z-index: 20;
+}
+
+.indiv-autocomplete-liste {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 200;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+}
+
+.indiv-autocomplete-liste[hidden] {
+  display: none;
+}
+
+.indiv-autocomplete-suggestion {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-bottom: 1px solid #e7e7e7;
+  background: #ffffff;
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.indiv-autocomplete-suggestion:last-child {
+  border-bottom: 0;
+}
+
+.indiv-autocomplete-suggestion:hover,
+.indiv-autocomplete-suggestion:focus {
+  background: #e8efec;
+  outline: none;
+}
+
+.indiv-autocomplete-nom {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.indiv-autocomplete-id {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
 }
 
 /* ============================================
@@ -34,6 +170,10 @@
    la liste) passe au-dessus via z-index. */
 #vueListe {
   position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
 }
 
 #vueListe::before {
@@ -52,54 +192,138 @@
   z-index: 0;
 }
 
-/* Liste moderne — remplace le tableau classique */
+/* Tableau inspire du rendu INSEE : aucune bordure exterieure ni separation
+   verticale. Les lignes de donnees alternent un voile discret et sont separees
+   par un trait fin ; l'entete conserve sa separation plus marquee. */
 .indiv-liste {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  margin-left: -24px;
   overflow: hidden;
+  border: 0;
+  background: #ffffff;
+}
+
+#indivTableBody {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .indiv-row {
   display: grid;
-  grid-template-columns: 1.3fr 0.8fr 0.6fr 1fr 1fr 1fr 1.2fr;
-  gap: 12px;
+  grid-template-columns: 1.3fr 0.9fr 0.8fr 0.6fr 1fr 1fr 1fr 1.2fr;
+  gap: 0;
   align-items: center;
-  padding: 10px 16px;
+  padding: 0;
 }
 
 .indiv-row:not(.indiv-liste-entete) {
-  border-bottom: 1px solid #e0e0e0;
+  background: #ffffff;
+  border: 0;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background-color 0.15s;
 }
 
-.indiv-row:not(.indiv-liste-entete):last-child {
-  border-bottom: none;
+/* Les lignes sont toutes creees dans #indivTableBody : nth-child porte donc
+   uniquement sur les donnees et ne compte jamais l'entete, qui est son frere. */
+#indivTableBody .indiv-row:nth-child(odd) {
+  box-shadow: inset 0 0 0 9999px rgba(0, 0, 0, 0.023);
 }
 
+/* Le combinateur adjacent exclut naturellement la premiere ligne de donnees. */
+#indivTableBody .indiv-row + .indiv-row {
+  border-top: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* Le fond vert se superpose au voile inset des lignes impaires au lieu de le
+   remplacer, les deux effets utilisant des proprietes distinctes. */
 .indiv-row:not(.indiv-liste-entete):hover {
-  background: rgba(245, 245, 245, 0.75);
+  background: rgba(45, 106, 79, 0.06);
 }
 
 .indiv-liste-entete {
-  background: #F8F9FA;
-  border-bottom: 1px solid #e0e0e0;
-  padding: 12px 16px;
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  background: #ffffff;
+  border: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
+  padding: 0;
 }
 
 .indiv-col {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
 }
 
+.indiv-liste-entete .indiv-col {
+  padding: 10px 22px 10px 10px;
+}
+
+.indiv-col-triable {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.indiv-col-triable:hover {
+  outline: 2px solid rgba(0, 0, 0, 0.05);
+  outline-offset: -2px;
+}
+
+.indiv-col-triable:hover .indiv-col-label {
+  color: #2D6A4F;
+}
+
+.indiv-col-triee .indiv-col-label {
+  color: #2D6A4F;
+}
+
+.indiv-tri-icone {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  line-height: 1;
+  opacity: 0.125;
+  transform: translateY(-50%);
+}
+
+.indiv-col-triee .indiv-tri-icone {
+  opacity: 0.6;
+}
+
+.indiv-sort-up,
+.indiv-sort-down {
+  color: #000000;
+  font-size: 9px;
+}
+
+.indiv-sort-up.active,
+.indiv-sort-down.active {
+  color: var(--color-primary-hover);
+}
+
 .indiv-col-label {
+  min-width: 0;
+  max-width: 100%;
   font-family: var(--font-family);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
+  line-height: 1.2;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--color-text-muted);
 }
 
@@ -107,7 +331,6 @@
    .ts-wrapper (meme classe indiv-col-filtre recopiee par TomSelect), qui
    affiche alors sa propre bordure en plus de celle du .ts-control interne
    (effet "double case"). */
-input.indiv-col-filtre,
 select.indiv-col-filtre {
   width: 100%;
   padding: 6px 8px;
@@ -130,36 +353,6 @@ select.indiv-col-filtre {
   display: none;
 }
 
-/* TomSelect remplace le rendu de ces selects (cf. individuals.js,
-   initTomSelectFiltresColonnes) — le select natif est masque par la regle
-   generique ".ts-wrapper ~ select" (main.css) des que le widget est injecte.
-   Le wrapper recupere la classe indiv-col-filtre du select d'origine, donc on
-   restyle .ts-control/.ts-dropdown pour retrouver le meme gabarit que les
-   champs texte voisins (radius/ombre deja a 0 via la regle #indivScreen plus bas). */
-#indivScreen .ts-wrapper.indiv-col-filtre {
-  width: 100%;
-}
-
-#indivScreen .ts-wrapper.indiv-col-filtre .ts-control {
-  padding: 6px 8px;
-  border: 1px solid var(--color-border);
-  font-family: var(--font-family);
-  font-size: 12px;
-  background: #ffffff;
-  color: var(--color-text);
-  min-height: 0;
-  flex-wrap: nowrap;
-}
-
-/* La lib impose min-width:7rem au champ de recherche interne et un flex qui
-   passe a la ligne des que ca ne tient plus — dans une colonne de filtre
-   etroite ca fait grossir la case des le focus. On le laisse retrecir sans
-   jamais passer sous l'item affiche. */
-#indivScreen .ts-wrapper.indiv-col-filtre .ts-control > input {
-  min-width: 0;
-  flex: 1 1 0;
-}
-
 /* Le dropdown est deplace vers <body> par dropdownParent:'body' (individuals.js,
    initTomSelectFiltresColonnes) — plus un descendant de #indivScreen/.ts-wrapper une
    fois ouvert, d'ou le ciblage par classe dediee (ts.dropdown.classList.add) plutot
@@ -171,8 +364,11 @@ select.indiv-col-filtre {
 }
 
 .indiv-cell {
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
   font-family: var(--font-family);
-  font-size: var(--font-size-small);
+  font-size: 12.5px;
   color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -216,11 +412,133 @@ select.indiv-col-filtre {
   background: #c0392b;
 }
 
+/* Pastille de la colonne Fraicheur — 10px, sans marge (premiere piece de
+   .indiv-fraicheur-cellule, l'espacement vient du gap du conteneur). Couleurs :
+   jaune/orange/rouge deja definies pour SEUILS_FRAICHEUR_POSITION (config.js),
+   aucune = gris (identique a .indiv-statut-non-suivi), a-jour = vert institutionnel
+   (identique a .indiv-statut-actif). */
+.indiv-fraicheur-pastille {
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.indiv-fraicheur-pastille.indiv-fraicheur-jaune {
+  background: #f2c14e;
+}
+
+.indiv-fraicheur-pastille.indiv-fraicheur-orange {
+  background: #e8720c;
+}
+
+.indiv-fraicheur-pastille.indiv-fraicheur-rouge {
+  background: #c0392b;
+}
+
+.indiv-fraicheur-pastille.indiv-fraicheur-aucune {
+  background: #9e9e9e;
+}
+
+.indiv-fraicheur-pastille.indiv-fraicheur-a-jour {
+  background: #2D6A4F;
+}
+
+.indiv-fraicheur-cellule {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.indiv-fraicheur-texte {
+  font-family: var(--font-family);
+  font-size: var(--font-size-small);
+  color: var(--color-text);
+}
+
 @media (max-width: 900px) {
   .indiv-row {
     grid-template-columns: repeat(2, 1fr);
     row-gap: 10px;
   }
+}
+
+/* Footer fixe sous la zone de donnees scrollable. */
+.table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  width: calc(100% + 24px);
+  min-height: 50px;
+  margin-left: -24px;
+  padding: 6px 14px;
+  background: #ffffff;
+  font-family: var(--font-family);
+  font-size: 14px;
+  line-height: 21px;
+  box-sizing: border-box;
+}
+
+.table-info {
+  color: #000000;
+  white-space: nowrap;
+}
+
+.table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.page-btn {
+  display: inline-block;
+  box-sizing: border-box;
+  min-width: 38px;
+  height: 37px;
+  margin-left: 2px;
+  padding: 7px 14px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: #000000;
+  font-family: var(--font-family);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.page-btn.active {
+  border: 1px solid rgba(0, 0, 0, 0.3);
+  background: linear-gradient(rgba(230, 230, 230, 0.05), rgba(0, 0, 0, 0.05));
+  color: #000000;
+  cursor: default;
+}
+
+.page-btn.disabled,
+.page-btn:disabled {
+  color: rgba(0, 0, 0, 0.5);
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  cursor: default;
+}
+
+.page-ellipsis {
+  padding: 0 14px;
+  color: #000000;
+}
+
+.page-btn:not(.active):not(:disabled):hover {
+  background: #f1f5f3;
+  border-color: #c7d4ce;
+  color: #1f5f46;
 }
 
 /* ============================================
@@ -268,14 +586,13 @@ select.indiv-col-filtre {
   transform: translateX(-2px);
 }
 
-/* La fiche remplit au moins toute la hauteur disponible de #indivScreen (colonne
-   flex), sans jamais etre forcee en dessous de son contenu — min-height (pas
-   height) laisse #indivScreen (overflow-y:auto) defiler si le contenu est plus
-   grand que l'ecran. */
+/* La fiche remplit l'espace disponible de #indivScreen et conserve son propre
+   scroll vertical, independamment de la zone scrollable de la vue liste. */
 #vueFiche {
-  display: flex;
+  flex: 1;
   flex-direction: column;
-  min-height: 100%;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .fiche-carte-entete {
@@ -811,7 +1128,7 @@ select.indiv-col-filtre {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px;
+  padding: 6px 8px;
   border-radius: 3px;
   cursor: pointer;
   transition: background 0.15s;
@@ -822,20 +1139,10 @@ select.indiv-col-filtre {
   background: var(--map-ui-bg-active);
 }
 
-.fiche-basemap-item-img {
-  width: 40px;
-  height: 30px;
-  border-radius: 2px;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
+.fiche-basemap-radio {
   flex-shrink: 0;
-}
-
-.fiche-basemap-item-img img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
+  margin: 0;
+  cursor: pointer;
 }
 
 .fiche-basemap-item span {
@@ -1157,7 +1464,7 @@ select.indiv-col-filtre {
 #indivScreen input,
 #indivScreen select,
 #indivScreen textarea,
-#indivScreen button,
+#indivScreen button:not(.page-btn),
 #indivScreen .ts-wrapper,
 #indivScreen .ts-control,
 #indivScreen .ts-dropdown,
@@ -1171,18 +1478,6 @@ select.indiv-col-filtre {
 #vueFiche * {
   border-radius: 0 !important;
   box-shadow: none !important;
-}
-
-/* Remove row borders in list view to avoid "too many lines/traits" and table look */
-.indiv-row:not(.indiv-liste-entete) {
-  border-bottom: none !important;
-}
-
-
-/* Make list table header flat and sober */
-.indiv-liste-entete {
-  background: transparent !important;
-  border-bottom: none !important;
 }
 
 /* Legend dots and the status icon on the fiche photo must stay round —
