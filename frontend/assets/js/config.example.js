@@ -56,13 +56,13 @@ export const ZOOM_MIN_MANUAL = 6;
 export const IGN_API_KEY = 'VOTRE_CLE_IGN';
 
 export const ROLE_LABELS = {
-  'role_lecture': 'Lecteur',
-  'role_ecriture': 'Administrateur',
+  'pnp_bqt_reader': 'Lecteur',
+  'pnp_bqt_writer': 'Administrateur',
 };
 
 export const ROLE_INITIALES = {
-  'role_lecture': 'LC',
-  'role_ecriture': 'AD',
+  'pnp_bqt_reader': 'LC',
+  'pnp_bqt_writer': 'AD',
 };
 
 export const SEUIL_ALERTE_VOLUME = 40000;
@@ -299,7 +299,7 @@ export const BASEMAPS_CONFIG = [
   // Couverture "tous parcs nationaux de France" — pas de couche IGN specifique au Parc
   // national des Pyrenees (verifie dans le GetCapabilities, aucun identifiant dedie).
   // Patrinat_PN affiche l'ensemble des parcs nationaux francais simultanement, sans
-  // filtrage possible en WMTS — a valider a l'usage.
+  // filtrage possible en WMTS — a valider a l'usage (cf. echange precedent).
   {
     id: 'ign_parcs_nationaux',
     nom: 'Parcs nationaux (France)',
@@ -327,8 +327,8 @@ export const BASEMAPS_CONFIG = [
     visible: false
   },
   // Couverture LiDAR HD potentiellement partielle sur les Pyrenees a la date de cet
-  // ajout (campagne nationale progressive) — a valider visuellement, retirer si la
-  // zone du parc n'est pas encore couverte.
+  // ajout (campagne nationale progressive) — a valider visuellement (cf. echange
+  // precedent), retirer si la zone du parc n'est pas encore couverte.
   {
     id: 'ign_lidar_hd',
     nom: 'Estompage LiDAR HD',
@@ -351,8 +351,8 @@ export const BASEMAPS_CONFIG = [
 // dernier si l'id configure ici est absent de BASEMAPS_CONFIG (cf. obtenirFondParDefaut(),
 // individuals.js).
 export const FONDS_PAR_DEFAUT_FICHE = {
-  localisations: 'ign_ortho',
-  sites: 'ign_ortho'
+  localisations: 'openstreetmap',
+  sites: 'openstreetmap'
 };
 
 // Couleurs de marquage (collier/oreilles) — mapping temporaire cote client : le texte
