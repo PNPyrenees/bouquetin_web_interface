@@ -1886,6 +1886,14 @@ function cssToRgbArray(css) {
  * {label, fill, stroke} — meme source de donnees que mettreAJourLegende() (DOM),
  * mais sans effet de bord DOM, pour alimenter le dessin vectoriel dans le PDF.
  */
+// Y a-t-il, parmi les positions actuellement affichees, au moins un animal sans
+// population assignee ? Determine s'il faut ajouter l'entree "Inconnu" (grise,
+// #aaaaaa) a la legende Population — couleursPopulations (map.js) ne contient
+// jamais cette valeur (cf. .filter(Boolean) dans preparerCouleurs()).
+function auMoinsUnAnimalSansPopulation() {
+  return getGpsSource().getFeatures().some(f => !f.get('ani_pop_rattach'));
+}
+
 function construireEntreesLegende(modeCouleur) {
   const entries = [];
   if (modeCouleur === 'individu') {
@@ -1911,6 +1919,9 @@ function construireEntreesLegende(modeCouleur) {
       couleursMap.forEach((couleur, cle) => {
         entries.push({ label: String(cle), fill: couleur, stroke: contourDefautCss });
       });
+      if (modeCouleur === 'population' && auMoinsUnAnimalSansPopulation()) {
+        entries.push({ label: 'Inconnu', fill: '#aaaaaa', stroke: contourDefautCss });
+      }
     } else if (modeCouleur === 'sexe') {
       entries.push({ label: 'Mâle', fill: getCouleur({ ani_sexe: 'M' }, 'sexe'), stroke: contourDefautCss });
       entries.push({ label: 'Femelle', fill: getCouleur({ ani_sexe: 'F' }, 'sexe'), stroke: contourDefautCss });
@@ -2611,7 +2622,8 @@ export function mettreAJourLegende(modeForce = null) {
     // Meme pattern liste dynamique pour Population et Annee, contour neutre fixe
     // (comme Sexe/Gestionnaire) — pas de contour par individu qui n a pas de sens ici.
     const couleursMap = modeCouleur === 'annee' ? getCouleursAnnees() : getCouleursPopulations();
-    if (couleursMap.size === 0) return;
+    const montrerInconnu = modeCouleur === 'population' && auMoinsUnAnimalSansPopulation();
+    if (couleursMap.size === 0 && !montrerInconnu) return;
 
     const liste = document.createElement('div');
     liste.id = 'legendeIndividusList';
@@ -2635,6 +2647,26 @@ export function mettreAJourLegende(modeForce = null) {
       ligne.appendChild(label);
       liste.appendChild(ligne);
     });
+
+    if (montrerInconnu) {
+      const ligne = document.createElement('div');
+      ligne.className = 'legende-individu-ligne';
+
+      const pastille = document.createElement('span');
+      pastille.className = 'legende-individu-pastille';
+      pastille.style.background = '#aaaaaa';
+      pastille.style.border = `2px solid ${contourDefautCss}`;
+      pastille.style.width = '12px';
+      pastille.style.height = '12px';
+
+      const label = document.createElement('span');
+      label.className = 'legende-individu-label';
+      label.textContent = 'Inconnu';
+
+      ligne.appendChild(pastille);
+      ligne.appendChild(label);
+      liste.appendChild(ligne);
+    }
 
     contenu.appendChild(liste);
 

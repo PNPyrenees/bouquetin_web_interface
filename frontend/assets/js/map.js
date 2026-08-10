@@ -130,7 +130,7 @@ export function getCouleur(loc, mode) {
     }
 
     case 'population':
-      return couleursPopulations.get(loc.ani_pop_rattach) || getCouleurParIndex(0);
+      return couleursPopulations.get(loc.ani_pop_rattach) || '#aaaaaa';
 
     case 'sexe':
       if (loc.ani_sexe === 'M') return '#3A86FF';
