@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, PROJECTIONS_COORDONNEES_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, exporterCarteJPG, capturerCarteEnBlob, setProjectionCoordonnees } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 
@@ -1701,8 +1701,8 @@ function initToolbarCarte() {
       document.querySelectorAll('.modal-export-only-csv').forEach(section => {
         section.style.display = _formatExportActif === 'csv' ? '' : 'none';
       });
-      document.querySelectorAll('.modal-export-only-pdf').forEach(section => {
-        section.style.display = _formatExportActif === 'pdf' ? '' : 'none';
+      document.querySelectorAll('.modal-export-only-pdf-jpg').forEach(section => {
+        section.style.display = (_formatExportActif === 'pdf' || _formatExportActif === 'jpg') ? '' : 'none';
       });
     });
   });
@@ -1713,9 +1713,10 @@ function initToolbarCarte() {
 
     if (_formatExportActif === 'jpg') {
       try {
+        const inclureLegendeJPG = document.getElementById('exportInclureLegende')?.checked ?? true;
         const nomSuggere = nomFichierSuggere(nomFichier, `bouquetins_carte_${date}`, 'jpg');
         const fileHandle = await obtenirFileHandleExport(nomSuggere, 'jpg', 'image/jpeg', 'Image JPEG');
-        await exporterCarteJPG(nomFichier, fileHandle);
+        await exporterCarteJPGRapport(nomFichier, inclureLegendeJPG, fileHandle);
       } catch (err) {
         console.error('Erreur export JPG:', err);
         if (err?.name === 'SecurityError') {
@@ -1784,7 +1785,7 @@ async function ouvrirModalExport() {
   document.querySelectorAll('.modal-export-only-csv').forEach(section => {
     section.style.display = '';
   });
-  document.querySelectorAll('.modal-export-only-pdf').forEach(section => {
+  document.querySelectorAll('.modal-export-only-pdf-jpg').forEach(section => {
     section.style.display = 'none';
   });
   const inclureLegende = document.getElementById('exportInclureLegende');
@@ -2125,6 +2126,244 @@ async function exporterCarteRapportPDF(nomFichier, inclureLegende = true, fileHa
     }
   } else {
     doc.save(nomFinal);
+  }
+}
+
+// --- Export JPG enrichi (habillage logo/resume/legende) ---
+
+// Meme facteur que pixelRatio*SURECHANTILLONNAGE dans capturerCarteEnBlob (map.js) — la
+// carte capturee est deja a cette echelle ; l'habillage doit suivre pour rester net et
+// proportionne au meme niveau de detail sur l'image finale.
+const HABILLAGE_SCALE = (window.devicePixelRatio || 1) * 2;
+
+function chargerImageDepuisUrl(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Impossible de charger l'image : ${url}`));
+    img.src = url;
+  });
+}
+
+// Cesure manuelle par mot — equivalent canvas de doc.splitTextToSize (jsPDF), qui n'a pas
+// d'equivalent natif sur CanvasRenderingContext2D.
+function enroulerTexteCanvas(ctx, texte, largeurMax) {
+  const mots = texte.split(' ');
+  const lignes = [];
+  let ligneCourante = '';
+  mots.forEach(mot => {
+    const essai = ligneCourante ? `${ligneCourante} ${mot}` : mot;
+    if (ctx.measureText(essai).width > largeurMax && ligneCourante) {
+      lignes.push(ligneCourante);
+      ligneCourante = mot;
+    } else {
+      ligneCourante = essai;
+    }
+  });
+  if (ligneCourante) lignes.push(ligneCourante);
+  return lignes;
+}
+
+/**
+ * Dessine la legende couleur (entries {label, fill, stroke}, cf. construireEntreesLegende())
+ * sur un canvas 2D — variante image plate de dessinerLegendePDF() : pas de pagination
+ * possible ici, la legende s'enroule en lignes sur la largeur disponible et se tronque
+ * ("+N autres") si elle depasse hauteurMax.
+ */
+function dessinerLegendeCanvas(ctx, entries, x, y, largeurMax, hauteurMax, scale) {
+  const rayon = 4 * scale;
+  const ligneHauteur = 20 * scale;
+  const espaceEntree = 14 * scale;
+  ctx.font = `${11 * scale}px sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+
+  let cx = x;
+  let ligne = 0;
+  const maxLignes = Math.max(1, Math.floor(hauteurMax / ligneHauteur));
+  let affiches = 0;
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const largeurTexte = ctx.measureText(entry.label).width;
+    const largeurEntree = rayon * 2 + 6 * scale + largeurTexte + espaceEntree;
+
+    if (cx + largeurEntree > x + largeurMax && cx > x) {
+      ligne++;
+      cx = x;
+      if (ligne >= maxLignes) {
+        const restant = entries.length - affiches;
+        if (restant > 0) {
+          const cy = y + (ligne - 1) * ligneHauteur + ligneHauteur / 2;
+          ctx.fillStyle = '#555555';
+          ctx.fillText(`+ ${restant} autres`, cx, cy);
+        }
+        return ligne * ligneHauteur;
+      }
+    }
+
+    const cy = y + ligne * ligneHauteur + ligneHauteur / 2;
+
+    ctx.beginPath();
+    ctx.arc(cx + rayon, cy, rayon, 0, Math.PI * 2);
+    ctx.fillStyle = entry.fill;
+    ctx.fill();
+    ctx.lineWidth = 1.5 * scale;
+    ctx.strokeStyle = entry.stroke;
+    ctx.stroke();
+
+    ctx.fillStyle = '#333333';
+    ctx.fillText(entry.label, cx + rayon * 2 + 6 * scale, cy);
+
+    cx += largeurEntree;
+    affiches++;
+  }
+
+  return (ligne + 1) * ligneHauteur;
+}
+
+/**
+ * Export JPG enrichi — meme habillage informatif que le rapport PDF (exporterCarteRapportPDF) :
+ * logo/titre/resume/filtres en bandeau haut, legende couleur en bandeau bas — mais compose
+ * directement sur l'image finale plutot qu'un document multi-pages. Reutilise
+ * capturerCarteEnBlob() (map.js) et construireEntreesLegende() (deja ecrite pour le PDF).
+ */
+async function exporterCarteJPGRapport(nomFichier, inclureLegende, fileHandle = null) {
+  const [blobCarte, logoDataUrl] = await Promise.all([
+    capturerCarteEnBlob(),
+    svgVersPngDataURL('assets/img/logo-parc.svg')
+  ]);
+
+  const urlCarte = URL.createObjectURL(blobCarte);
+  let imgCarte, logoImg;
+  try {
+    [imgCarte, logoImg] = await Promise.all([
+      chargerImageDepuisUrl(urlCarte),
+      chargerImageDepuisUrl(logoDataUrl)
+    ]);
+  } finally {
+    URL.revokeObjectURL(urlCarte);
+  }
+
+  const scale = HABILLAGE_SCALE;
+  const marge = 16 * scale;
+  const largeur = imgCarte.width;
+
+  const logoHauteur = 34 * scale;
+  const logoLargeur = logoHauteur * (logoImg.naturalWidth / logoImg.naturalHeight);
+
+  const resumeCount = (document.getElementById('exportResumeCount')?.textContent || '0').trim();
+  const resumeFiltresTexte = document.getElementById('exportResumeFiltres')?.textContent || 'Aucun filtre actif';
+  const genereLe = `Généré le ${new Date().toLocaleString('fr-FR')}`;
+  const positionsTexte = `${resumeCount} positions affichées`;
+
+  const canvasMesure = document.createElement('canvas');
+  const ctxMesure = canvasMesure.getContext('2d');
+  ctxMesure.font = `${12 * scale}px sans-serif`;
+  const largeurMetaMax = largeur * 0.42;
+  const lignesFiltres = enroulerTexteCanvas(ctxMesure, `Filtres : ${resumeFiltresTexte}`, largeurMetaMax);
+
+  const ligneMetaHauteur = 16 * scale;
+  const hauteurBlocMeta = ligneMetaHauteur * (2 + lignesFiltres.length);
+  const hauteurEntete = Math.round(Math.max(logoHauteur, hauteurBlocMeta) + marge * 1.6);
+
+  let entriesLegende = [];
+  let hauteurLegendeReservee = 0;
+  if (inclureLegende) {
+    const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
+    entriesLegende = construireEntreesLegende(modeCouleur);
+    if (entriesLegende.length > 0) {
+      hauteurLegendeReservee = Math.round(Math.min(imgCarte.height * 0.28, 130 * scale) + marge * 1.5);
+    }
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = largeur;
+  canvas.height = hauteurEntete + imgCarte.height + hauteurLegendeReservee;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Bandeau haut
+  ctx.drawImage(logoImg, marge, (hauteurEntete - logoHauteur) / 2, logoLargeur, logoHauteur);
+
+  ctx.fillStyle = '#1a1a1a';
+  ctx.font = `bold ${18 * scale}px sans-serif`;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.fillText('Cartographique - Suivi GPS bouquetins', marge + logoLargeur + 14 * scale, hauteurEntete / 2);
+
+  ctx.font = `${12 * scale}px sans-serif`;
+  ctx.textAlign = 'right';
+  let metaY = (hauteurEntete - hauteurBlocMeta) / 2 + ligneMetaHauteur / 2;
+  ctx.fillStyle = '#666666';
+  ctx.fillText(genereLe, largeur - marge, metaY);
+  metaY += ligneMetaHauteur;
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillText(positionsTexte, largeur - marge, metaY);
+  metaY += ligneMetaHauteur;
+  ctx.fillStyle = '#666666';
+  lignesFiltres.forEach(ligne => {
+    ctx.fillText(ligne, largeur - marge, metaY);
+    metaY += ligneMetaHauteur;
+  });
+  ctx.textAlign = 'left';
+
+  ctx.strokeStyle = '#e0e0e0';
+  ctx.lineWidth = 1 * scale;
+  ctx.beginPath();
+  ctx.moveTo(0, hauteurEntete);
+  ctx.lineTo(largeur, hauteurEntete);
+  ctx.stroke();
+
+  // Carte
+  ctx.drawImage(imgCarte, 0, hauteurEntete);
+
+  // Bandeau bas (legende)
+  if (hauteurLegendeReservee > 0) {
+    const yLegende = hauteurEntete + imgCarte.height;
+    ctx.strokeStyle = '#e0e0e0';
+    ctx.beginPath();
+    ctx.moveTo(0, yLegende);
+    ctx.lineTo(largeur, yLegende);
+    ctx.stroke();
+
+    dessinerLegendeCanvas(
+      ctx, entriesLegende,
+      marge, yLegende + marge * 0.6,
+      largeur - marge * 2, hauteurLegendeReservee - marge * 1.2,
+      scale
+    );
+  }
+
+  const blobFinal = await new Promise((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Echec de generation du JPEG')), 'image/jpeg', 0.92);
+  });
+
+  const date = new Date().toISOString().slice(0, 10);
+  const nomBrut = (nomFichier || '').trim();
+  const nomSanitise = nomBrut.replace(/[\\/:*?"<>|]/g, '').trim();
+  const nomFinal = nomSanitise ? `${nomSanitise}.jpg` : `bouquetins_carte_${date}.jpg`;
+
+  if (fileHandle) {
+    const writable = await fileHandle.createWritable();
+    try {
+      await writable.write(blobFinal);
+    } finally {
+      await writable.close();
+    }
+    return;
+  }
+
+  const url = URL.createObjectURL(blobFinal);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = nomFinal;
+    a.click();
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 

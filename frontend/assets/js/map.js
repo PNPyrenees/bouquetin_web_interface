@@ -1233,33 +1233,3 @@ export function capturerCarteEnBlob() {
     map.renderSync();
   });
 }
-
-/** Exporte la vue actuelle de la carte en JPEG. */
-export async function exporterCarteJPG(nomFichier, fileHandle = null) {
-  const blob = await capturerCarteEnBlob();
-
-  if (fileHandle) {
-    const writable = await fileHandle.createWritable();
-    try {
-      await writable.write(blob);
-    } finally {
-      await writable.close();
-    }
-    return;
-  }
-
-  const url = URL.createObjectURL(blob);
-  try {
-    const date = new Date().toISOString().slice(0, 10);
-    const nomBrut = (nomFichier || '').trim();
-    const nomSanitise = nomBrut.replace(/[\\/:*?"<>|]/g, '').trim();
-    const nomFinal = nomSanitise ? `${nomSanitise}.jpg` : `bouquetins_carte_${date}.jpg`;
-
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = nomFinal;
-    a.click();
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
