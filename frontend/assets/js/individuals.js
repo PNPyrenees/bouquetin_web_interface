@@ -171,7 +171,8 @@ function formaterEcheanceFraicheur(dateDerniere) {
 }
 
 // Contenu de la colonne Fraicheur (2e position, apres Nom) — pastille + texte court,
-// style compact. tier vient de computeFraicheur() : null (position recente, "A jour"),
+// style compact. tier vient de computeFraicheur() : null (position recente, texte =
+// heures ecoulees via formaterEcheanceFraicheur, meme format que jaune/orange/rouge),
 // 'aucune' (jamais de position), ou le palier atteint (jaune/orange/rouge).
 function creerCelluleFraicheur(tier, dateDerniere) {
   const cellule = document.createElement('div');
@@ -191,7 +192,7 @@ function creerCelluleFraicheur(tier, dateDerniere) {
     cellule.title = `${FRAICHEUR_LABELS[tier]} (dernière position : ${formaterDateHeure(dateDerniere)})`;
   } else {
     pastille.className = 'indiv-fraicheur-pastille indiv-fraicheur-a-jour';
-    texte.textContent = 'À jour';
+    texte.textContent = formaterEcheanceFraicheur(dateDerniere);
     cellule.title = `Dernière position : ${formaterDateHeure(dateDerniere)}`;
   }
 
