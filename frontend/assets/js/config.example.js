@@ -20,6 +20,20 @@ export const ETRS89 = '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 
 // est la chaine proj4 a enregistrer via proj4.defs() avant utilisation (null si la
 // projection est deja connue nativement par proj4js, ex. EPSG:4326). parDefaut identifie
 // l'entree active au chargement — une seule doit valoir true.
+//
+// Pour ajouter une nouvelle projection :
+// 1. Recuperer la chaine proj4 sur epsg.io/[code] (ex. epsg.io/2154), onglet "Export" →
+//    "Proj4js". La coller telle quelle dans proj4def.
+// 2. proj4def = null uniquement pour les projections deja connues nativement par proj4js
+//    (WGS84/EPSG:4326, Web Mercator/EPSG:3857) — toute autre projection necessite cette
+//    chaine explicite, sinon proj4.defs() ne peut pas l'enregistrer et la conversion echoue.
+// 3. Determiner le format d'affichage (X/Y en metres, ou Lat/Lon en degres) : verifier
+//    l'unite affichee sur epsg.io ("metre" vs "degree"), ou directement dans la chaine
+//    proj4 — si elle commence par "+proj=longlat", la projection est geographique
+//    (degres, format Lat/Lon). Tout autre "+proj=..." (lcc, laea, utm, merc, etc.) est
+//    une projection metrique projetee (metres, format X/Y).
+//    Exemples ci-dessous : LAMBERT93 (+proj=lcc) et ETRS89 (+proj=laea) sont toutes deux
+//    en X/Y ; seule WGS84 (EPSG:4326, geographique, proj4def null) est en Lat/Lon.
 export const PROJECTIONS_COORDONNEES_CONFIG = [
   {
     code: 'EPSG:2154',
