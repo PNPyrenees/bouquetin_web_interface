@@ -1,5 +1,18 @@
 # CHANGELOG
 
+### Fiche individu - sidebar en carte d'identite
+- La sidebar en vue fiche individu affiche desormais la carte d'identite complete de l'animal (photo, identite, marquage, dates cles) au lieu d'un champ de recherche - la navigation rapide entre individus par recherche est retiree
+- L'en-tete de la fiche est simplifie en consequence
+
+### Export JPG enrichi
+- Le format JPG contient desormais les memes informations contextuelles que le rapport PDF : logo, titre, date de generation, resume des positions et filtres actifs, legende des couleurs - le tout compose directement sur l'image
+
+### Corrections diverses
+- Le resume affiche dans la modal d'export mentionne desormais les filtres actifs par defaut (individus en cours de suivi, limite de positions) qui etaient auparavant ignores dans le texte alors qu'ils influencaient le resultat
+- Uniformisation de l'affichage des valeurs manquantes sur toute l'application : remplacement de N/A par un tiret simple
+- Correction : en mode de symbologie Population, les animaux sans population assignee prenaient a tort la couleur d'une vraie population plutot qu'une couleur neutre
+- Correction d'une regression de style typographique suite au deplacement du bloc identite
+
 ### Refonte complete de la page Individus
 - Remplacement des filtres en entete de colonnes par une sidebar dediee, coherente avec la page Carte - filtrage en temps reel sur Nom, Sexe, Population, Gestionnaire, Statut
 - Suppression des filtres ID animal et Annee de naissance de la sidebar (peu utilises en pratique) - conserves comme colonnes triables dans le tableau
