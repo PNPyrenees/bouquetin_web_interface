@@ -707,7 +707,7 @@ function creerValeurNode(v) {
   if (v === null || v === undefined || v === '') {
     const span = document.createElement('span');
     span.className = 'valeur-na';
-    span.textContent = 'N/A';
+    span.textContent = '-';
     return span;
   }
   return document.createTextNode(v);
@@ -1492,7 +1492,7 @@ function initCarteLocalisations() {
       if (hit) return;
       hit = true;
       const dateRaw = feature.get('loc_datetime_local') || feature.get('loc_date_local');
-      const dateStr = dateRaw ? dateRaw.replace('T', ' ').slice(0, 16) : 'N/A';
+      const dateStr = dateRaw ? dateRaw.replace('T', ' ').slice(0, 16) : '-';
       const altitude = feature.get('loc_altitude_capteur');
 
       popupEl.innerHTML = '';
@@ -1505,7 +1505,7 @@ function initCarteLocalisations() {
       popupEl.appendChild(ligneDate);
       const ligneAltitude = document.createElement('div');
       ligneAltitude.className = 'popup-champ';
-      ligneAltitude.textContent = `Altitude : ${altitude != null ? altitude + ' m' : 'N/A'}`;
+      ligneAltitude.textContent = `Altitude : ${altitude != null ? altitude + ' m' : '-'}`;
       popupEl.appendChild(ligneAltitude);
 
       _popupOverlayLocalisations.setPosition(evt.coordinate);
@@ -1735,7 +1735,7 @@ function initCarteSites() {
       lignes.forEach(([label, valeur]) => {
         const div = document.createElement('div');
         div.className = 'popup-champ';
-        div.textContent = `${label} : ${valeur || 'N/A'}`;
+        div.textContent = `${label} : ${valeur || '-'}`;
         popupEl.appendChild(div);
       });
 

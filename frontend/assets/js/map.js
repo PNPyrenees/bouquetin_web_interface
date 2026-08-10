@@ -687,14 +687,14 @@ function showPopup(feature, coordinate, popupEl) {
     ? p.loc_datetime_local.replace('T', ' ').slice(0, 16)
     : p.loc_date_local
       ? p.loc_date_local.replace('T', ' ').slice(0, 16)
-      : 'N/A';
+      : '-';
 
   popupEl.innerHTML = '';
   const content = document.createElement('div');
   content.className = 'popup-content';
 
   const strong = document.createElement('strong');
-  strong.textContent = p.ani_nom || 'N/A';
+  strong.textContent = p.ani_nom || '-';
   content.appendChild(strong);
 
   const info = document.createElement('div');
