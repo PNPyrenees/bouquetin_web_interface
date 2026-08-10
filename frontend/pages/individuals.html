@@ -71,24 +71,9 @@
     <div class="sidebar-content">
       <div class="sidebar-header" id="indivSidebarHeader">FILTRES</div>
       <div class="indiv-sidebar-body">
-        <div class="input-group indiv-autocomplete">
+        <div class="input-group indiv-filtre-liste">
           <label for="filtreColNom">Nom</label>
-          <input
-            type="text"
-            id="filtreColNom"
-            class="sidebar-input"
-            placeholder="Rechercher..."
-            autocomplete="off"
-            aria-autocomplete="list"
-            aria-controls="suggestionsNom"
-            aria-expanded="false"
-          >
-          <div
-            id="suggestionsNom"
-            class="indiv-autocomplete-liste"
-            role="listbox"
-            hidden
-          ></div>
+          <input type="text" id="filtreColNom" class="sidebar-input" placeholder="Rechercher..." autocomplete="off">
         </div>
         <div class="input-group indiv-filtre-liste">
           <label>Sexe</label>
@@ -122,6 +107,33 @@
       </div>
       <div class="sidebar-footer">
         <a id="btnReinitialiserFiltres" class="indiv-lien-reinitialiser">Réinitialiser</a>
+      </div>
+
+      <div class="indiv-sidebar-identite" id="indivSidebarIdentite">
+        <div class="fiche-illustration-bloc">
+          <div class="fiche-illustration">
+            <img src="../assets/img/bqt_profil_normal.jpg" alt="" class="fiche-illustration-photo" id="fichePhoto">
+            <svg class="fiche-illustration-collier fiche-illustration-masque" viewBox="0 0 193.23 103.56" xmlns="http://www.w3.org/2000/svg">
+              <use id="useCollier" href="../assets/img/sprite.svg#icon-collier"/>
+            </svg>
+            <svg class="fiche-illustration-oreille fiche-illustration-oreille-gauche" viewBox="0 0 57.32 80.86" xmlns="http://www.w3.org/2000/svg">
+              <use id="useOreilleGauche" href="../assets/img/sprite.svg#icon-oreille"/>
+            </svg>
+            <svg class="fiche-illustration-oreille fiche-illustration-oreille-droite" viewBox="0 0 57.32 80.86" xmlns="http://www.w3.org/2000/svg">
+              <use id="useOreilleDroite" href="../assets/img/sprite.svg#icon-oreille"/>
+            </svg>
+            <img src="../assets/img/capteur.png" alt="" class="fiche-illustration-capteur fiche-illustration-masque">
+            <div class="fiche-illustration-statut" id="ficheIllustrationStatut"></div>
+          </div>
+        </div>
+
+        <h2 id="ficheNom" class="indiv-sidebar-identite-nom">-</h2>
+
+        <div class="fiche-entete-champs" id="carteIdentitePrincipale"></div>
+        <hr class="indiv-sidebar-identite-separateur">
+        <div class="fiche-entete-champs" id="carteIdentiteMarquage"></div>
+        <hr class="indiv-sidebar-identite-separateur">
+        <div class="fiche-entete-champs" id="carteIdentiteDates"></div>
       </div>
     </div>
   </aside>
@@ -158,35 +170,6 @@
         <svg width="20" height="20" class="btn-retour-icon"><use href="../assets/img/sprite.svg#icon-retour"/></svg>
         <span>Retour à la liste</span>
       </button>
-
-      <div class="fiche-carte fiche-carte-entete">
-        <div class="fiche-entete-corps">
-          <div class="fiche-illustration-bloc">
-            <div class="fiche-illustration">
-              <img src="../assets/img/bqt_profil_normal.jpg" alt="" class="fiche-illustration-photo" id="fichePhoto">
-              <svg class="fiche-illustration-collier fiche-illustration-masque" viewBox="0 0 193.23 103.56" xmlns="http://www.w3.org/2000/svg">
-                <use id="useCollier" href="../assets/img/sprite.svg#icon-collier"/>
-              </svg>
-              <svg class="fiche-illustration-oreille fiche-illustration-oreille-gauche" viewBox="0 0 57.32 80.86" xmlns="http://www.w3.org/2000/svg">
-                <use id="useOreilleGauche" href="../assets/img/sprite.svg#icon-oreille"/>
-              </svg>
-              <svg class="fiche-illustration-oreille fiche-illustration-oreille-droite" viewBox="0 0 57.32 80.86" xmlns="http://www.w3.org/2000/svg">
-                <use id="useOreilleDroite" href="../assets/img/sprite.svg#icon-oreille"/>
-              </svg>
-              <img src="../assets/img/capteur.png" alt="" class="fiche-illustration-capteur fiche-illustration-masque">
-              <div class="fiche-illustration-statut" id="ficheIllustrationStatut"></div>
-            </div>
-          </div>
-          <div class="fiche-entete-infos">
-            <div class="fiche-entete-nom-row">
-              <h2 id="ficheNom">N/A</h2>
-            </div>
-            <div class="fiche-entete-champs" id="carteIdentitePrincipale"></div>
-            <div class="fiche-entete-champs" id="carteIdentiteMarquage"></div>
-            <div class="fiche-entete-champs" id="carteIdentiteDates"></div>
-          </div>
-        </div>
-      </div>
 
       <div class="fiche-grid-2x2">
           <div class="fiche-carte" id="carteDernieresLocalisations">

@@ -340,7 +340,6 @@ function peuplerFiltresDynamiques() {
 
 const IDS_FILTRES_TEXTE = ['filtreColNom'];
 const IDS_FILTRES_SELECT = ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'];
-const LIMITE_SUGGESTIONS_NOM = 8;
 
 function lireValeurFiltre(id) {
   return document.getElementById(id)?.value || '';
@@ -371,16 +370,6 @@ function estVueFicheActive() {
   return document.getElementById('vueFiche')?.style.display !== 'none';
 }
 
-function fermerSuggestionsNom() {
-  const liste = document.getElementById('suggestionsNom');
-  const champNom = document.getElementById('filtreColNom');
-  if (!liste) return;
-
-  liste.hidden = true;
-  liste.innerHTML = '';
-  champNom?.setAttribute('aria-expanded', 'false');
-}
-
 function obtenirCriteresFiltres({ inclureNom = true } = {}) {
   return {
     nom: inclureNom ? lireValeurFiltre('filtreColNom').trim().toLowerCase() : '',
@@ -406,68 +395,13 @@ function animalCorrespondAuxFiltres(ani, criteres) {
   );
 }
 
-function afficherSuggestionsNom() {
-  if (!estVueFicheActive()) {
-    fermerSuggestionsNom();
-    return;
-  }
-
-  const champNom = document.getElementById('filtreColNom');
-  const liste = document.getElementById('suggestionsNom');
-  if (!champNom || !liste) return;
-
-  const recherche = champNom.value.trim().toLowerCase();
-  if (!recherche) {
-    fermerSuggestionsNom();
-    return;
-  }
-
-  const correspondances = animals
-    .filter(ani => (ani.ani_nom || '').toLowerCase().includes(recherche))
-    .slice(0, LIMITE_SUGGESTIONS_NOM);
-
-  liste.innerHTML = '';
-
-  if (correspondances.length === 0) {
-    fermerSuggestionsNom();
-    return;
-  }
-
-  correspondances.forEach(ani => {
-    const suggestion = document.createElement('button');
-    suggestion.type = 'button';
-    suggestion.className = 'indiv-autocomplete-suggestion';
-    suggestion.dataset.aniId = ani.ani_id;
-    suggestion.setAttribute('role', 'option');
-
-    const nom = document.createElement('span');
-    nom.className = 'indiv-autocomplete-nom';
-    nom.textContent = ani.ani_nom || '';
-
-    const id = document.createElement('span');
-    id.className = 'indiv-autocomplete-id';
-    id.textContent = `ID ${ani.ani_id}`;
-
-    suggestion.append(nom, id);
-    liste.appendChild(suggestion);
-  });
-
-  liste.hidden = false;
-  champNom.setAttribute('aria-expanded', 'true');
-}
-
-// La sidebar conserve un HTML unique pour les deux vues. En mode fiche, le CSS masque
-// les filtres de liste et leur footer pour ne garder que la recherche par nom.
+// En vue fiche, la sidebar bascule entierement sur la carte d'identite de l'animal
+// affiche (#indivSidebarIdentite) — plus aucun filtre ni recherche visible.
 function definirModeSidebarFiche(actif) {
   document.getElementById('indivSidebar')?.classList.toggle('indiv-sidebar--fiche', actif);
 
   const titre = document.getElementById('indivSidebarHeader');
-  if (titre) titre.textContent = actif ? 'RECHERCHER UN INDIVIDU' : 'FILTRES';
-}
-
-function remplirFiltresDepuisAnimal(animal) {
-  if (!animal) return;
-  definirValeurFiltre('filtreColNom', animal.ani_nom);
+  if (titre) titre.textContent = actif ? 'FICHE INDIVIDU' : 'FILTRES';
 }
 
 /**
@@ -489,91 +423,18 @@ function appliquerFiltresListe() {
 
 document.getElementById('btnReinitialiserFiltres')?.addEventListener('click', reinitialiserFiltresListe);
 
-document.getElementById('filtreColNom')?.addEventListener('input', () => {
-  if (estVueFicheActive()) {
-    afficherSuggestionsNom();
-    return;
-  }
-
-  fermerSuggestionsNom();
-  appliquerFiltresListe();
-});
+document.getElementById('filtreColNom')?.addEventListener('input', appliquerFiltresListe);
 
 IDS_FILTRES_SELECT.forEach(id => {
-  document.getElementById(id)?.addEventListener('change', () => {
-    if (estVueFicheActive()) return;
-    appliquerFiltresListe();
-  });
-});
-
-document.getElementById('suggestionsNom')?.addEventListener('click', (e) => {
-  const suggestion = e.target.closest('.indiv-autocomplete-suggestion');
-  if (!suggestion) return;
-
-  e.stopPropagation();
-
-  const animal = animals.find(
-    ani => String(ani.ani_id) === String(suggestion.dataset.aniId)
-  );
-  if (!animal) {
-    fermerSuggestionsNom();
-    return;
-  }
-
-  definirValeurFiltre('filtreColNom', animal.ani_nom);
-  fermerSuggestionsNom();
-
-  if (estVueFicheActive()) {
-    afficherFiche(animal.ani_id);
-  } else {
-    appliquerFiltresListe();
-  }
-});
-
-document.addEventListener('click', (e) => {
-  if (!e.target.closest('.indiv-autocomplete')) {
-    fermerSuggestionsNom();
-  }
+  document.getElementById(id)?.addEventListener('change', appliquerFiltresListe);
 });
 
 document.querySelector('.indiv-sidebar-body')?.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    fermerSuggestionsNom();
-    return;
-  }
-
   if (e.key === 'Enter' && e.target.classList.contains('sidebar-input')) {
     e.preventDefault();
-    fermerSuggestionsNom();
-
-    if (estVueFicheActive() && e.target.id === 'filtreColNom') {
-      rechercherIndividuDepuisFiche();
-    } else if (!estVueFicheActive()) {
-      appliquerFiltresListe();
-    }
+    appliquerFiltresListe();
   }
 });
-
-// Recherche exclusivement dans animals, deja charge en memoire. Une correspondance
-// unique ouvre directement sa fiche ; sinon la liste reprend avec le seul filtre Nom.
-function rechercherIndividuDepuisFiche() {
-  const texte = lireValeurFiltre('filtreColNom').trim();
-  const texteNormalise = texte.toLowerCase();
-  const correspondances = animals.filter(ani =>
-    (ani.ani_nom || '').toLowerCase().includes(texteNormalise)
-  );
-
-  if (correspondances.length === 1) {
-    afficherFiche(correspondances[0].ani_id);
-    return;
-  }
-
-  afficherListe({ restaurerFiltres: false });
-  [...IDS_FILTRES_TEXTE, ...IDS_FILTRES_SELECT].forEach(id => definirValeurFiltre(id, ''));
-  definirValeurFiltre('filtreColNom', texte);
-  filtresListeAvantFiche = null;
-  appliquerFiltresListe();
-}
 
 // Vide les 5 champs (TomSelect inclus) puis reapplique — equivaut a "tout afficher".
 function reinitialiserFiltresListe() {
@@ -2284,8 +2145,6 @@ async function initGraphiquesSynthese(aniId, capteurs) {
 }
 
 async function afficherFiche(aniId) {
-  fermerSuggestionsNom();
-
   const ficheEtaitActive = estVueFicheActive();
   if (!ficheEtaitActive) filtresListeAvantFiche = memoriserFiltresListe();
 
@@ -2296,7 +2155,6 @@ async function afficherFiche(aniId) {
 
   document.getElementById('vueListe').style.display = 'none';
   document.getElementById('vueFiche').style.display = 'flex';
-  remplirFiltresDepuisAnimal(animal);
   definirModeSidebarFiche(true);
 
   try {
@@ -2340,8 +2198,6 @@ async function afficherFiche(aniId) {
 }
 
 function afficherListe({ restaurerFiltres = true } = {}) {
-  fermerSuggestionsNom();
-
   document.getElementById('vueFiche').style.display = 'none';
   document.getElementById('vueListe').style.display = 'flex';
   definirModeSidebarFiche(false);
