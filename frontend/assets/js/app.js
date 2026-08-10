@@ -1798,8 +1798,15 @@ async function ouvrirModalExport() {
   if (resumeFiltres) {
     const f = window._derniersFiltresAppliques || {};
     const labels = [];
-    if (f.date_from || f.date_to) labels.push(`Période : ${f.date_from || '...'} → ${f.date_to || '...'}`);
-    if (f.saisonFrom || f.saisonTo) labels.push(`Saison : ${f.saisonFrom || '...'} → ${f.saisonTo || '...'}`);
+    if (f.ani_is_followed === true || f.suivisSeulement === true) {
+      labels.push('Individus en cours de suivi');
+    }
+    if (f.limit_par_animal != null) {
+      const n = f.limit_par_animal;
+      labels.push(`${n} dernière${n > 1 ? 's' : ''} position${n > 1 ? 's' : ''} par individu`);
+    }
+    if (f.date_from || f.date_to) labels.push(`Période : du ${f.date_from || '...'} au ${f.date_to || '...'}`);
+    if (f.saisonFrom || f.saisonTo) labels.push(`Saison : du ${f.saisonFrom || '...'} au ${f.saisonTo || '...'}`);
     if (f.annees?.length) labels.push(`Années : ${f.annees.join(', ')}`);
     if (f.sexe) labels.push(`Sexe : ${f.sexe}`);
     if (f.gestionnaire) labels.push(`Gestionnaire : ${f.gestionnaire}`);
