@@ -7,19 +7,29 @@
   <meta name="description" content="Plateforme de suivi des bouquetins - Parc National des Pyrénées">
   <title>Plateforme de suivi des bouquetins</title>
   <link rel="icon" type="image/png" href="assets/img/PNP_logo_minuature.png">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Bebas+Neue&display=swap"
+  <!-- Préchargement de Bebas Neue pour éviter le FOUC typographique sur le header-title -->
+  <link rel="preload"
+    href="https://fonts.gstatic.com/s/bebasneu/v16/JTUSjIg69CK48gW7PXoo9WdhyyTh89ZNpQ.woff2"
+    as="font"
+    type="font/woff2"
+    crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Bebas+Neue&display=swap"
     rel="stylesheet">
+
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v10.9.0/ol.css">
-  <script src="https://cdn.jsdelivr.net/npm/ol@v10.9.0/dist/ol.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
   <link rel="stylesheet" href="assets/css/main.css">
   <link rel="stylesheet" href="assets/css/map.css">
   <link rel="stylesheet" href="assets/css/panel.css">
-  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+  <script src="https://cdn.jsdelivr.net/npm/ol@v10.9.0/dist/ol.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/fr.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
