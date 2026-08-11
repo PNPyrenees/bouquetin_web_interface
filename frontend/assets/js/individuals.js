@@ -1,5 +1,5 @@
 import { login, fetchAnimals, fetchColliersActifs, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal, fetchLocalisationsRPC } from './api.js';
-import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, FONDS_PAR_DEFAUT_FICHE, COULEURS_MARQUAGE, GLASBEY_32, getCouleurParIndex, SEUILS_FRAICHEUR_POSITION } from './config.js';
+import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, COULEURS_MARQUAGE, GLASBEY_32, getCouleurParIndex, SEUILS_FRAICHEUR_POSITION } from './config.js';
 
 let currentToken = null;
 let currentAniId = null;
@@ -1273,16 +1273,6 @@ function creerCoucheBasemap(bm) {
   return new ol.layer.Tile({ source });
 }
 
-// Resout le fond par defaut d'une des 2 cartes de la fiche individu — configure par cle
-// (FONDS_PAR_DEFAUT_FICHE.localisations/.sites, config.js), avec repli sur le fond
-// visible:true habituel de BASEMAPS_CONFIG si l'id configure est absent/invalide.
-function obtenirFondParDefaut(cle) {
-  const idConfigure = FONDS_PAR_DEFAUT_FICHE[cle];
-  return BASEMAPS_CONFIG.find(bm => bm.id === idConfigure)
-    || BASEMAPS_CONFIG.find(bm => bm.visible)
-    || BASEMAPS_CONFIG[0];
-}
-
 // Remplace le layer de fond (toujours index 0, cf. initCarteLocalisations/initCarteSites)
 // d'une carte OL par un nouveau fond BASEMAPS_CONFIG — retrait + insertion, pas de toggle
 // de visibilite comme switchBasemap() (map.js) : les cartes de la fiche individu ne
@@ -1295,26 +1285,21 @@ function changerCoucheBasemap(carte, basemapId) {
   if (!carte) return;
   const bm = BASEMAPS_CONFIG.find(b => b.id === basemapId) || BASEMAPS_CONFIG[0];
   carte.getLayers().removeAt(0);
-  // { ...bm, visible: true } surcharge bm.visible localement sans muter BASEMAPS_CONFIG.
   carte.getLayers().insertAt(0, creerCoucheBasemap({ ...bm, visible: true }));
 }
 
-// Peuple un <select> avec les 8 fonds de BASEMAPS_CONFIG (liste complete, non filtree —
-// meme choix que la carte principale, demande explicite de Ludovic). getCarteActuelle()
-// est un callback (pas la carte directement) car le select est peuple au chargement du
-// script, avant que _carteLocalisations/_carteSites existent (crees a la demande dans
-// initCarteLocalisations/initCarteSites, au premier affichage d'une fiche).
-// Bouton + panneau liste verticale compacte pour choisir le fond de carte — remplace
-// l'ancien <select>. Reutilise changerCoucheBasemap() (layer unique remplace, pas
-// d'empilement des 8 fonds comme sur la page Carte — carte fiche individu volontairement
-// plus legere, decision documentee sur changerCoucheBasemap).
-function initBoutonFondsCarte(suffixe, getCarteActuelle, cleFondDefaut) {
+// Bouton + panneau liste verticale compacte pour choisir le fond de carte, individuellement
+// par petite carte. fondParDefaut identique pour les 2 cartes — meme fond que celui charge
+// initialement par initCarteLocalisations()/initCarteSites() (BASEMAPS_CONFIG.find(bm =>
+// bm.visible) || BASEMAPS_CONFIG[0]), juste pour pre-cocher le bon radio a l'ouverture du
+// panneau ; changerCoucheBasemap() prend ensuite le relais a chaque selection utilisateur.
+function initBoutonFondsCarte(suffixe, getCarteActuelle) {
   const bouton = document.getElementById(`btnFondsCarte${suffixe}`);
   const panneau = document.getElementById(`basemapPanel${suffixe}`);
   const liste = document.getElementById(`basemapListe${suffixe}`);
   if (!bouton || !panneau || !liste) return;
 
-  const fondParDefaut = obtenirFondParDefaut(cleFondDefaut);
+  const fondParDefaut = BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0];
 
   liste.innerHTML = '';
   BASEMAPS_CONFIG.filter(bm => bm.category !== 'overlay').forEach(bm => {
@@ -1355,8 +1340,8 @@ function initBoutonFondsCarte(suffixe, getCarteActuelle, cleFondDefaut) {
   });
 }
 
-initBoutonFondsCarte('Localisations', () => _carteLocalisations, 'localisations');
-initBoutonFondsCarte('Sites', () => _carteSites, 'sites');
+initBoutonFondsCarte('Localisations', () => _carteLocalisations);
+initBoutonFondsCarte('Sites', () => _carteSites);
 
 // EPSG:2154 (Lambert-93) — coherent avec le reste du schema (t_animal/v_localisation
 // via f_get_localisation). Utilise pour l'avertissement de coherence du CRS/SRID dans
@@ -1473,7 +1458,7 @@ function initCarteLocalisations() {
   _carteLocalisations = new ol.Map({
     target: 'ficheMapLocalisations',
     controls: [],
-    layers: [creerCoucheBasemap(obtenirFondParDefaut('localisations')), coucheLocalisations],
+    layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), coucheLocalisations],
     overlays: [_popupOverlayLocalisations],
     view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
   });
@@ -1686,7 +1671,7 @@ function initCarteSites() {
     target: 'ficheMapSites',
     controls: [],
     layers: [
-      creerCoucheBasemap(obtenirFondParDefaut('sites')),
+      creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]),
       coucheSitesLiens,
       coucheSitesPoints
     ],
@@ -2144,6 +2129,53 @@ async function initGraphiquesSynthese(aniId, capteurs) {
   }
 }
 
+// Vide immediatement tous les champs de la fiche precedemment affichee (photo,
+// identite, marquage, dates, cartes, graphique, captures/relaches) — appele avant
+// tout nouveau chargement pour ne jamais laisser les donnees du precedent individu
+// visibles pendant le fetch des nouvelles (cf. bug Alexa -> retour liste -> Anis).
+function viderFiche() {
+  const statutPhoto = document.getElementById('ficheIllustrationStatut');
+  if (statutPhoto) { statutPhoto.className = 'fiche-illustration-statut'; statutPhoto.innerHTML = ''; }
+
+  const fichePhoto = document.getElementById('fichePhoto');
+  if (fichePhoto) fichePhoto.src = '../assets/img/bqt_profil_normal.jpg';
+  document.querySelector('.fiche-illustration')?.classList.remove('fiche-illustration--femelle');
+  document.querySelector('.fiche-illustration-collier')?.classList.add('fiche-illustration-masque');
+  document.querySelector('.fiche-illustration-capteur')?.classList.add('fiche-illustration-masque');
+  document.getElementById('useOreilleGauche')?.classList.add('fiche-illustration-masque');
+  document.getElementById('useOreilleDroite')?.classList.add('fiche-illustration-masque');
+
+  ['carteIdentitePrincipale', 'carteIdentiteMarquage', 'carteIdentiteDates', 'captureRelacheListe', 'legendeSitesCouleurs', 'legendeColliersDistance'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '';
+  });
+
+  const compteurPositions = document.getElementById('compteurPositionsLocalisations');
+  if (compteurPositions) compteurPositions.textContent = '';
+
+  const popupLocalisations = document.getElementById('popupLocalisations');
+  if (popupLocalisations) popupLocalisations.style.display = 'none';
+  const popupSites = document.getElementById('popupSites');
+  if (popupSites) popupSites.style.display = 'none';
+
+  _sourceLocalisations?.clear();
+  _sourceSitesPoints?.clear();
+  _sourceSitesLiens?.clear();
+
+  detruireGraphiquesSynthese();
+}
+
+// Overlay de chargement pendant le fetch d'une nouvelle fiche (cf. viderFiche()).
+function afficherChargementFiche() {
+  const overlay = document.getElementById('ficheLoading');
+  if (overlay) overlay.style.display = 'flex';
+}
+
+function masquerChargementFiche() {
+  const overlay = document.getElementById('ficheLoading');
+  if (overlay) overlay.style.display = 'none';
+}
+
 async function afficherFiche(aniId) {
   const ficheEtaitActive = estVueFicheActive();
   if (!ficheEtaitActive) filtresListeAvantFiche = memoriserFiltresListe();
@@ -2153,9 +2185,13 @@ async function afficherFiche(aniId) {
   const ficheNom = document.getElementById('ficheNom');
   if (ficheNom) ficheNom.textContent = animal?.ani_nom || `Individu ${aniId}`;
 
+  viderFiche();
+
   document.getElementById('vueListe').style.display = 'none';
   document.getElementById('vueFiche').style.display = 'flex';
   definirModeSidebarFiche(true);
+
+  afficherChargementFiche();
 
   try {
     const [detail, capteurs, captures] = await Promise.all([
@@ -2194,11 +2230,14 @@ async function afficherFiche(aniId) {
     }, 50);
   } catch (err) {
     console.error('Erreur chargement fiche individu:', err);
+  } finally {
+    masquerChargementFiche();
   }
 }
 
 function afficherListe({ restaurerFiltres = true } = {}) {
   document.getElementById('vueFiche').style.display = 'none';
+  viderFiche();
   document.getElementById('vueListe').style.display = 'flex';
   definirModeSidebarFiche(false);
   if (restaurerFiltres && filtresListeAvantFiche) {

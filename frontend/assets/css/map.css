@@ -456,6 +456,9 @@
   overflow-y: auto;
   overflow-x: hidden;
   flex-shrink: 0;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #9ab5ac transparent;
 }
 
 #legendeIndividusList::-webkit-scrollbar {

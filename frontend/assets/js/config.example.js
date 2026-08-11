@@ -359,16 +359,6 @@ export const BASEMAPS_CONFIG = [
   }
 ];
 
-// Fond de carte par defaut pour chacune des 2 cartes de la fiche individu (Dernieres
-// localisations / Sites de capture & relache) — distinct du fond visible:true de
-// BASEMAPS_CONFIG (utilise par la page Carte principale). Repli automatique sur ce
-// dernier si l'id configure ici est absent de BASEMAPS_CONFIG (cf. obtenirFondParDefaut(),
-// individuals.js).
-export const FONDS_PAR_DEFAUT_FICHE = {
-  localisations: 'openstreetmap',
-  sites: 'openstreetmap'
-};
-
 // Couleurs de marquage (collier/oreilles) — mapping temporaire cote client : le texte
 // libre en base (t_animal, ex. "rouge", "jaune / bleu") n'a pas de code couleur associe.
 // Migration vers une table dediee prevue plus tard — garde isole de sa consommation

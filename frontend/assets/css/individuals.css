@@ -560,10 +560,51 @@ select.indiv-col-filtre {
 /* La fiche remplit l'espace disponible de #indivScreen et conserve son propre
    scroll vertical, independamment de la zone scrollable de la vue liste. */
 #vueFiche {
+  position: relative;
   flex: 1;
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* Overlay de chargement fiche individu — reprend le pattern de #mapLoading (map.css,
+   page Carte, non chargee ici), en noir plutot que vert pour se distinguer visuellement
+   de ce contexte. Couvre #vueFiche pendant le fetch d'une nouvelle fiche (cf.
+   afficherFiche()) pour qu'aucune donnee de l'individu precedent ne reste visible. */
+#ficheLoading {
+  position: absolute;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(2px);
+}
+
+.fiche-loading-spinner {
+  width: 70px;
+  height: 70px;
+  background-image: url('../img/logo_tramnoir.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  animation: ficheSpin 2s linear infinite;
+  filter: brightness(0);
+}
+
+.fiche-loading-texte {
+  font-family: var(--font-family);
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+@keyframes ficheSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .fiche-illustration-bloc {
