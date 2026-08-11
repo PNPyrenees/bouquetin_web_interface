@@ -1,5 +1,11 @@
 # CHANGELOG
 
+### Corrections de stabilite visuelle au chargement des pages
+- Correction des attributs de dimension des logos du header, qui ne correspondaient pas aux vraies proportions des fichiers image - source d'un leger decalage visuel au chargement
+- Reordonnancement du chargement des scripts et feuilles de style pour que les styles soient toujours appliques avant l'execution des scripts bloquants
+- Largeurs fixes appliquees aux logos du header pour eliminer tout recalcul de mise en page pendant leur chargement
+- Correction du flash de l'ecran de connexion au chargement de page - l'etat visible par defaut est desormais garanti par CSS des le premier rendu, plutot que decide par un script qui s'executait apres coup
+
 ### Fiche individu - sidebar en carte d'identite
 - La sidebar en vue fiche individu affiche desormais la carte d'identite complete de l'animal (photo, identite, marquage, dates cles) au lieu d'un champ de recherche - la navigation rapide entre individus par recherche est retiree
 - L'en-tete de la fiche est simplifie en consequence
