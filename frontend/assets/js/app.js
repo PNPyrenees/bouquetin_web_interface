@@ -1,6 +1,6 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, PROJECTIONS_COORDONNEES_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, zoomToPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 
@@ -449,7 +449,6 @@ async function startApp(token) {
       }
     }
     window._highlightPoint = highlightPoint;
-    window._zoomToPoint = zoomToPoint;
     window._getMap = getMap;
     window._filtrerPointsCarte = filtrerPointsParVisibilite;
     window._getGpsFeatures = () => getGpsSource().getFeatures();

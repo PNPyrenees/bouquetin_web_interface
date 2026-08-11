@@ -1,4 +1,4 @@
-import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, PROJECTIONS_COORDONNEES_CONFIG, ZOOM_POINT_SINGLE, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG, GLASBEY_32, getCouleurParIndex } from './config.js';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, PROJECTIONS_COORDONNEES_CONFIG, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, IGN_API_KEY, BASEMAPS_CONFIG, GLASBEY_32, getCouleurParIndex } from './config.js';
 let map;
 let gpsSource;
 let gpsLayer;
@@ -22,10 +22,6 @@ const couleursAnnees = new Map();
 // methodes WebGL sur un contexte invalide (evite le crash en cascade).
 let _webglContextLost = false;
 
-// Mode de coloration actif — conserve entre deux appels pour que
-// changerModeCouleur() sache quels attributs sont deja en place sur les features.
-let _modeCouleurActif = 'individu';
-
 // Contours variables — 4 styles pour differencier les individus avec couleurs proches
 const CONTOURS = [
   { strokeR: 255, strokeG: 255, strokeB: 255, strokeA: 1, strokeWidth: 2 }, // Blanc
@@ -33,10 +29,6 @@ const CONTOURS = [
   { strokeR: 255, strokeG: 220, strokeB: 0,   strokeA: 1, strokeWidth: 2 }, // Jaune
   { strokeR: 0,   strokeG: 200, strokeB: 255, strokeA: 1, strokeWidth: 2 }, // Cyan
 ];
-
-// Suffixe normalise par mode — utilise par renderPoints() (mode actif uniquement)
-// et changerModeCouleur() (injection des nouvelles couleurs a la volee).
-const MODES_COULEUR_SUFFIXES = { individu: 'Individu', sexe: 'Sexe', gestionnaire: 'Gestionnaire' };
 
 // Styles de ligne de trajectoire, mis en cache par couleur — evite de recreer un
 // ol.style.Style/ol.style.Stroke par run partage entre plusieurs individus/annees
@@ -633,7 +625,6 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
     gpsSource.addFeature(feature);
   });
 
-  _modeCouleurActif = modeCouleur;
   // Pas d appel a changerModeCouleur() ici — les features viennent d etre crees
   // avec les bons attributs fillR/G/B, le style de gpsLayer pointe deja sur ces
   // attributs generiques (cf. initMap). Un setStyle redondant forcerait un re-rendu
@@ -694,8 +685,6 @@ export function changerModeCouleur(modeCouleur) {
       f.set('strokeB', contour.strokeB);
     }
   });
-
-  _modeCouleurActif = modeCouleur;
 
   // Le style WebGL pointe toujours sur fillR/G/B et strokeR/G/B (generiques) —
   // les f.set() ci-dessus declenchent automatiquement le re-rendu OL via changed().
@@ -1001,24 +990,12 @@ export function highlightPoint(ani_id, locDatetime = null) {
   _featureSurlignee = feature;
 }
 
-export function clearHighlight() {
+function clearHighlight() {
   if (!_featureSurlignee) return;
   const radiusOriginal = _featureSurlignee.get('_radiusAvantSurbrillance');
   if (radiusOriginal !== undefined) _featureSurlignee.set('radius', radiusOriginal);
   haloSource.clear();
   _featureSurlignee = null;
-}
-
-export function zoomToPoint(loc) {
-  const features = gpsSource.getFeatures();
-  const feature = features.find(f => String(f.get('ani_id')) === String(loc.ani_id));
-  if (!feature) return;
-
-  const geom = feature.getGeometry();
-  if (!geom) return;
-
-  const coord = geom.getCoordinates();
-  map.getView().animate({ center: coord, duration: 400 });
 }
 
 // --- Filtre spatial par dessin de polygone ---
