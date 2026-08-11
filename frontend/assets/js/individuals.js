@@ -2253,4 +2253,6 @@ async function initPage(token) {
 const tokenSauvegarde = sessionStorage.getItem('bqt_token');
 if (tokenSauvegarde) {
   initPage(tokenSauvegarde).catch(() => deconnecter());
+} else {
+  afficherLoginScreen();
 }

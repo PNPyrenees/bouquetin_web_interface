@@ -2771,6 +2771,9 @@ document.getElementById('btnDeconnexion')?.addEventListener('click', deconnecter
 const tokenSauvegarde = sessionStorage.getItem('bqt_token');
 if (tokenSauvegarde) {
   startApp(tokenSauvegarde).catch(() => deconnecter());
+} else {
+  const loginScreen = document.getElementById('loginScreen');
+  if (loginScreen) loginScreen.style.display = 'flex';
 }
 
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
