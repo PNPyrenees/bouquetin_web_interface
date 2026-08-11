@@ -1,5 +1,13 @@
 # CHANGELOG
 
+### Surbrillance de la position selectionnee
+- Au clic sur une ligne du tableau de localisations, la position correspondante est desormais mise en surbrillance sur la carte (halo + leger agrandissement), sans jamais alterer la couleur ou le contour d'origine du point
+- Le clic direct sur un point de la carte applique la meme surbrillance et synchronise la selection dans le tableau
+- Correction : pour un animal ayant plusieurs positions affichees, la surbrillance ciblait parfois la mauvaise position au lieu de celle reellement cliquee
+
+### Nettoyage
+- Suppression de code mort dans map.js (fonction, variables et imports inutilises)
+
 ### Corrections de stabilite visuelle du header au chargement
 - Correction des dimensions declarees des logos du header, qui ne correspondaient pas aux vraies proportions des fichiers image
 - Largeurs CSS fixes appliquees aux logos pour eliminer tout recalcul de mise en page pendant leur chargement
