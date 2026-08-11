@@ -120,21 +120,21 @@ header {
 
 .logo-parc {
   height: 48px;
-  width: auto;
+  width: 95.84px;
   margin-left: -20px;
-   margin-right: 16px;
+  margin-right: 16px;
 }
 
 .logo-bqt {
   height: 48px;
-  width: auto;
+  width: 71.91px;
   object-fit: contain;
   margin-right: 16px;
 }
 
 .logo-rf {
   height: 48px;
-  width: auto;
+  width: 59.05px;
   object-fit: contain;
   margin-right: 6px;
 }
