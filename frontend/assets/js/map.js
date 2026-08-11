@@ -2,6 +2,8 @@ import { DEFAULT_CENTER, DEFAULT_ZOOM, MAX_ZOOM, PROJECTIONS_COORDONNEES_CONFIG,
 let map;
 let gpsSource;
 let gpsLayer;
+let haloSource;
+let haloLayer;
 let trajectoireSource;
 let popupOverlay;
 let basemaps = [];
@@ -292,6 +294,15 @@ export function initMap(targetId, popupId) {
     }
   });
 
+  // Halo de surbrillance — feature separee (Canvas2D, pas WebGL) car un seul point a
+  // la fois : aucun enjeu de performance, et ca isole totalement la surbrillance du
+  // pipeline WebGLPoints (gpsLayer) — le point reel n'est jamais modifie, ni couleur
+  // ni rayon, cf. highlightPoint()/clearHighlight().
+  haloSource = new ol.source.Vector();
+  haloLayer = new ol.layer.Vector({
+    source: haloSource
+  });
+
   // Création de la couche des lignes (trajectoires)
   const trajectoireLayer = new ol.layer.Vector({
     source: trajectoireSource
@@ -323,6 +334,7 @@ export function initMap(targetId, popupId) {
       ...basemaps,
       ...overlaysWmts.values(),
       trajectoireLayer,
+      haloLayer,
       gpsLayer
     ],
     overlays: [popupOverlay],
@@ -448,10 +460,24 @@ export function initMap(targetId, popupId) {
       console.warn('forEachFeatureAtPixel echoue (contexte WebGL invalide ?) :', err.message);
       return;
     }
-    if (!hit) popupEl.style.display = 'none';
+    if (!hit) {
+      popupEl.style.display = 'none';
+      clearHighlight();
+    } else {
+      // Surbrillance du point cliqué directement sur la carte — symétrique au clic
+      // sur une ligne du tableau (panel.js), pour que les deux entrées se comportent
+      // de façon cohérente.
+      highlightPoint(aniId, locDatetime);
+    }
 
     document.querySelectorAll('.panel-table-row.selected-carte').forEach(tr => {
       tr.classList.remove('selected-carte');
+    });
+    // .selected-click n'est jamais pose ici (uniquement par panel.js sur clic tableau)
+    // mais doit etre retire ici : sinon une ancienne ligne selectionnee via le tableau
+    // reste visuellement marquee apres un clic direct sur la carte.
+    document.querySelectorAll('.panel-table-row.selected-click').forEach(tr => {
+      tr.classList.remove('selected-click');
     });
 
     const panneauOuvert = document.getElementById('sidebarRight')?.classList.contains('visible');
@@ -519,7 +545,7 @@ function cssToRgba(css) {
  * @param {string} modeCouleur - Mode de coloration actif
  */
 export function renderPoints(locations, clearBefore = true, modeTrajectoire = false, modeCouleur = 'individu') {
-  if (clearBefore) gpsSource.clear();
+  if (clearBefore) { gpsSource.clear(); haloSource?.clear(); _featureSurlignee = null; }
 
   preparerCouleurs(locations);
 
@@ -930,18 +956,57 @@ export function filtrerPointsParVisibilite(visiblesSet) {
   });
 }
 
-export function highlightPoint(ani_id, actif) {
-  const features = gpsSource.getFeatures();
-  features.forEach(f => {
-    if (String(f.get('ani_id')) === String(ani_id)) {
-      if (actif) {
-        f.set('_originalRadius', f.get('radius'));
-        f.set('radius', (f.get('radius') || 6) + 3);
-      } else {
-        f.set('radius', f.get('_originalRadius') || 6);
-      }
-    }
+// Halo de surbrillance (feature independante dans haloSource, Canvas2D) + agrandissement
+// du point reel lui-meme (attribut radius uniquement — jamais fillR/G/B/strokeR/G/B,
+// donc son contour/couleur d'origine reste toujours intact quel que soit le mode de
+// symbologie actif).
+let _featureSurlignee = null;
+
+// locDatetime (loc_datetime_local ou loc_date_local selon la position) distingue les
+// positions d'un meme animal — sans lui, un individu ayant plusieurs positions
+// affichees surlignerait toujours la meme feature (la premiere trouvee), quelle que
+// soit la ligne du tableau reellement cliquee.
+export function highlightPoint(ani_id, locDatetime = null) {
+  const dejaCePoint = _featureSurlignee &&
+    String(_featureSurlignee.get('ani_id')) === String(ani_id) &&
+    (!locDatetime || (_featureSurlignee.get('loc_datetime_local') || _featureSurlignee.get('loc_date_local')) === locDatetime);
+  if (dejaCePoint) return;
+
+  clearHighlight();
+
+  const feature = gpsSource.getFeatures().find(f => {
+    if (String(f.get('ani_id')) !== String(ani_id)) return false;
+    if (!locDatetime) return true;
+    return (f.get('loc_datetime_local') || f.get('loc_date_local')) === locDatetime;
   });
+  if (!feature) return;
+
+  const geom = feature.getGeometry();
+  if (!geom) return;
+
+  feature.set('_radiusAvantSurbrillance', feature.get('radius'));
+  feature.set('radius', (feature.get('radius') || 4) + 3);
+
+  const haloRayon = feature.get('radius') + 2;
+  const halo = new ol.Feature({ geometry: new ol.geom.Point(geom.getCoordinates()) });
+  halo.setStyle(new ol.style.Style({
+    image: new ol.style.Circle({
+      radius: haloRayon,
+      fill: new ol.style.Fill({ color: 'rgba(233, 152, 82, 0.89)' }),
+      stroke: new ol.style.Stroke({ color: 'rgba(255, 0, 0, 0.9)', width: 2 })
+    })
+  }));
+  haloSource.addFeature(halo);
+
+  _featureSurlignee = feature;
+}
+
+export function clearHighlight() {
+  if (!_featureSurlignee) return;
+  const radiusOriginal = _featureSurlignee.get('_radiusAvantSurbrillance');
+  if (radiusOriginal !== undefined) _featureSurlignee.set('radius', radiusOriginal);
+  haloSource.clear();
+  _featureSurlignee = null;
 }
 
 export function zoomToPoint(loc) {

@@ -376,9 +376,12 @@ function rendrePage() {
       document.querySelectorAll('.panel-table-row.selected-carte').forEach(r => r.classList.remove('selected-carte'));
       tr.classList.add('selected-carte');
       aniIdSelectionne = String(loc.ani_id);
-      if (window._afficherPositionsIndividu) window._afficherPositionsIndividu(loc.ani_id);
 
-      // Recentrer la carte sur ce point GPS precis
+      // Recentrer la carte sur ce point GPS precis — pas d'appel a
+      // window._afficherPositionsIndividu() ici (contrairement a rendrePageIndividus()) :
+      // cette fonction cherche par ani_id seul (premiere feature trouvee, sans tenir
+      // compte de la date), ce qui entrait en course avec ce recentrage precis et
+      // provoquait un recentrage erratique au clic (2 view.animate() concurrents).
       if (loc?.geom?.coordinates) {
         const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
         const coord = ol.proj.fromLonLat(wgs84);
@@ -387,6 +390,10 @@ function rendrePage() {
           duration: 400
         });
       }
+
+      // Surbrillance jaune du point correspondant sur la carte — date de localisation
+      // incluse pour cibler la position exacte cliquee, pas juste l'animal
+      window._highlightPoint?.(loc.ani_id, loc.loc_datetime_local || loc.loc_date_local || null);
 
       // Surligner la ligne selectionnee
       document.querySelectorAll('.panel-table-row.selected-click').forEach(r => r.classList.remove('selected-click'));
