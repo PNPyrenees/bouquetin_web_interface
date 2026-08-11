@@ -1,10 +1,17 @@
 # CHANGELOG
 
-### Corrections de stabilite visuelle au chargement des pages
-- Correction des attributs de dimension des logos du header, qui ne correspondaient pas aux vraies proportions des fichiers image - source d'un leger decalage visuel au chargement
-- Reordonnancement du chargement des scripts et feuilles de style pour que les styles soient toujours appliques avant l'execution des scripts bloquants
-- Largeurs fixes appliquees aux logos du header pour eliminer tout recalcul de mise en page pendant leur chargement
-- Correction du flash de l'ecran de connexion au chargement de page - l'etat visible par defaut est desormais garanti par CSS des le premier rendu, plutot que decide par un script qui s'executait apres coup
+### Corrections de stabilite visuelle du header au chargement
+- Correction des dimensions declarees des logos du header, qui ne correspondaient pas aux vraies proportions des fichiers image
+- Largeurs CSS fixes appliquees aux logos pour eliminer tout recalcul de mise en page pendant leur chargement
+- Correction du lien de prechargement de la police du titre
+- Reordonnancement du chargement des feuilles de style et des scripts pour que les styles soient toujours appliques avant l'execution des scripts bloquants
+- Compression du logo bouquetin du header (reduction de poids de 98%, meme rendu visuel)
+- L'ecran de connexion ne s'affiche plus du tout, meme brievement, pour un utilisateur deja connecte
+- Stabilisation du chevron du menu de session (plus de flash au chargement)
+- Harmonisation du header de la page Statistiques avec les pages Carte et Individus (logos, avatar de session, memes correctifs de stabilite)
+
+### Fiabilite de la session
+- L'application redemarre desormais integralement (filtres, cartes, caches, ecouteurs) apres chaque deconnexion et reconnexion, plutot que de tenter une reinitialisation manuelle partielle
 
 ### Fiche individu - sidebar en carte d'identite
 - La sidebar en vue fiche individu affiche desormais la carte d'identite complete de l'animal (photo, identite, marquage, dates cles) au lieu d'un champ de recherche - la navigation rapide entre individus par recherche est retiree
