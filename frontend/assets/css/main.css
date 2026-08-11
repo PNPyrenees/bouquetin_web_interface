@@ -96,7 +96,6 @@ body {
    independamment de sa classe .show). L'opacite d'un enfant ne peut pas annuler celle
    d'un parent (meme avec !important) — d'ou un ciblage explicite plutot qu'une regle sur
    body avec contre-regle sur #header. */
-.sidebar,
 #mapScreen,
 #indivScreen,
 .sidebar-right {
@@ -122,19 +121,12 @@ header {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-/* Fusion des deux blocs .header-top en une seule règle.
-   background-color sert de couleur de secours pendant le chargement de
-   header_top.png — choisie proche de la teinte dominante de l'image pour
-   supprimer le flash blanc → image perçu au premier paint. */
+/* Header blanc et stable sur toutes les pages. */
 .header-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #eef3f5;
-  background-image: url('../img/header_top.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-color: #ffffff;
   height: 60px;
   padding: 0 20px;
   border-bottom: 1px solid #e0e0e0;
@@ -147,22 +139,31 @@ header {
 }
 
 .logo-parc {
+  display: block;
   height: 48px;
   width: 95.84px;
+  color: transparent;
+  font-size: 0;
   margin-left: -20px;
   margin-right: 16px;
 }
 
 .logo-bqt {
+  display: block;
   height: 48px;
   width: 71.91px;
+  color: transparent;
+  font-size: 0;
   object-fit: contain;
   margin-right: 16px;
 }
 
 .logo-rf {
+  display: block;
   height: 48px;
   width: 59.05px;
+  color: transparent;
+  font-size: 0;
   object-fit: contain;
   margin-right: 6px;
 }
@@ -228,7 +229,8 @@ header {
 .header-top-right {
   display: flex;
   align-items: center;
-  flex: 0 0 auto;
+  flex: 0 0 66px;
+  width: 66px;
   justify-content: flex-end;
 }
 
@@ -1682,6 +1684,10 @@ select:has(+ .ts-wrapper) {
   display: flex;
   z-index: 99999;
   background: #2D6A4F;
+}
+
+html.has-session #loginScreen {
+  display: none;
 }
 
 .login-left {
