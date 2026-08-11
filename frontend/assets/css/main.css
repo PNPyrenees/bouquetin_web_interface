@@ -56,14 +56,20 @@
    .capture-map-legende recoivent bien le fond vert translucide.
    ============================================ */
 :root {
-  --map-ui-color-rgb: 9, 148, 105;         /* vert pur (--color-primary) en RGB */
-  --map-ui-opacity: 0.5;                   /* opacite du fond — variable independante */
-  --map-ui-color-active-rgb: 6, 107, 74;   /* vert actif/selectionne en RGB */
-  --map-ui-opacity-active: 0.95;           /* opacite du fond en etat actif/hover */
+  --map-ui-color-rgb: 9, 148, 105;
+  /* vert pur (--color-primary) en RGB */
+  --map-ui-opacity: 0.5;
+  /* opacite du fond — variable independante */
+  --map-ui-color-active-rgb: 6, 107, 74;
+  /* vert actif/selectionne en RGB */
+  --map-ui-opacity-active: 0.95;
+  /* opacite du fond en etat actif/hover */
   --map-ui-bg: rgba(var(--map-ui-color-rgb), var(--map-ui-opacity));
   --map-ui-bg-active: rgba(var(--map-ui-color-active-rgb), var(--map-ui-opacity-active));
-  --map-ui-text: #ffffff;                  /* texte/libelles/nombres (ex: "200 km") */
-  --map-ui-icon: #ffffff;                  /* icones des boutons + trait de l'echelle */
+  --map-ui-text: #ffffff;
+  /* texte/libelles/nombres (ex: "200 km") */
+  --map-ui-icon: #ffffff;
+  /* icones des boutons + trait de l'echelle */
 }
 
 * {
@@ -249,7 +255,7 @@ header {
 }
 
 .session-trigger:hover {
-  background: rgba(0,0,0,0.06);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 .session-avatar {
@@ -282,7 +288,7 @@ header {
   background: white;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   min-width: 180px;
   z-index: 9999;
   padding: 6px 0;
@@ -352,7 +358,7 @@ header {
   padding: 24px;
   max-width: 440px;
   width: 90%;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 .modal-volume-titre {
@@ -423,7 +429,7 @@ header {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   font-family: var(--font-family);
 }
 
@@ -560,7 +566,7 @@ header {
   font-weight: 700;
 }
 
-.modal-export-resume-ligne + .modal-export-resume-ligne {
+.modal-export-resume-ligne+.modal-export-resume-ligne {
   margin-top: 4px;
 }
 
@@ -932,7 +938,7 @@ header {
 .sidebar-header {
   height: 42px;
   padding: 0 16px;
-  background:var(--color-primary);
+  background: var(--color-primary);
   color: #ffffff;
   font-family: var(--font-family);
   font-weight: 700;
@@ -941,7 +947,7 @@ header {
   text-transform: uppercase;
   display: flex;
   align-items: center;
-  border-bottom: 2px solid rgba(255,255,255,0.12);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.12);
   flex-shrink: 0;
 }
 
@@ -968,7 +974,7 @@ details {
   border-bottom: 1px solid #d2ddd8;
 }
 
-details + details {
+details+details {
   margin-top: 2px;
 }
 
@@ -1034,30 +1040,30 @@ details[open] summary::after {
 }
 
 /* Filtres temporels — section mise en avant */
-.details-temporel > summary {
+.details-temporel>summary {
   background: #dde8e3;
   color: #1a3d2f;
   font-size: 11.5px;
   border-bottom: 1px solid #c5d6d0;
 }
 
-.details-temporel > summary::before {
+.details-temporel>summary::before {
   display: none;
 }
 
-.details-temporel > summary::after {
+.details-temporel>summary::after {
   color: #2D6A4F;
 }
 
-.details-temporel > summary:hover {
+.details-temporel>summary:hover {
   background: #cfdfd8;
 }
 
-.details-temporel[open] > summary {
+.details-temporel[open]>summary {
   background: #dde8e3;
 }
 
-.details-temporel > .details-content {
+.details-temporel>.details-content {
   background: #f8faf9;
 
   border-bottom: 1px solid #c5d6d0;
@@ -1097,7 +1103,7 @@ details[open] summary::after {
 .sidebar-input:focus {
   outline: none;
   border-color: #2D6A4F;
-  box-shadow: 0 0 0 2px rgba(45,106,79,0.12);
+  box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.12);
 }
 
 .sidebar-input::placeholder {
@@ -1278,7 +1284,7 @@ input[type="checkbox"] {
   transition: background 0.15s;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 .btn-apply:hover {
@@ -1313,7 +1319,7 @@ input[type="checkbox"] {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 3px 0 8px rgba(0,0,0,0.12);
+  box-shadow: 3px 0 8px rgba(0, 0, 0, 0.12);
   z-index: 1000;
   transition: background 0.15s;
   padding: 12px 0;
@@ -1555,7 +1561,7 @@ input[type="checkbox"] {
 }
 
 /* TomSelect */
-.ts-wrapper ~ select,
+.ts-wrapper~select,
 select:has(+ .ts-wrapper) {
   display: none !important;
 }
@@ -1613,7 +1619,7 @@ select:has(+ .ts-wrapper) {
 
 .ts-wrapper.sidebar-select.focus .ts-control {
   border-color: #2D6A4F;
-  box-shadow: 0 0 0 2px rgba(45,106,79,0.1);
+  box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.1);
 }
 
 .ts-wrapper.sidebar-select .ts-dropdown {
@@ -1621,7 +1627,7 @@ select:has(+ .ts-wrapper) {
   border: 1px solid var(--color-border);
   font-family: var(--font-family);
   font-size: var(--font-size-base);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .ts-wrapper.sidebar-select .ts-dropdown .option:hover,
@@ -1657,7 +1663,7 @@ select:has(+ .ts-wrapper) {
   border-radius: 8px;
   border: 1px solid var(--color-border);
   font-family: var(--font-family);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 9999 !important;
 }
 
@@ -1669,8 +1675,10 @@ select:has(+ .ts-wrapper) {
 
 #loginScreen {
   position: fixed;
-  top: 0; left: 0;
-  width: 100vw; height: 100vh;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   display: flex;
   z-index: 99999;
   background: #2D6A4F;
@@ -1687,7 +1695,7 @@ select:has(+ .ts-wrapper) {
   position: absolute;
   bottom: 12px;
   left: 16px;
-  color: rgba(255,255,255,0.8);
+  color: rgba(255, 255, 255, 0.8);
   font-size: 11px;
   font-style: italic;
 }
@@ -1709,7 +1717,7 @@ select:has(+ .ts-wrapper) {
   align-items: center;
   justify-content: center;
   padding: 48px;
-  box-shadow: -4px 0 24px rgba(0,0,0,0.15);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
 }
 
 .login-logos {
