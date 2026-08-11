@@ -63,19 +63,9 @@ function afficherSession(token) {
   }
 }
 
-async function deconnecter() {
+function deconnecter() {
   sessionStorage.removeItem('bqt_token');
-  currentToken = null;
-
-  afficherLoginScreen();
-  document.getElementById('username').value = '';
-  document.getElementById('password').value = '';
-  document.getElementById('loginError').textContent = '';
-
-  const menu = document.getElementById('sessionMenu');
-  if (menu) menu.style.display = 'none';
-
-  afficherListe();
+  window.location.replace('../index.html');
 }
 
 document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
@@ -108,7 +98,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   errorEl.textContent = '';
   try {
     const token = await login(username, password);
-    await initPage(token);
+    sessionStorage.setItem('bqt_token', token);
+    window.location.replace('../index.html');
   } catch (err) {
     errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';
     console.error(err);

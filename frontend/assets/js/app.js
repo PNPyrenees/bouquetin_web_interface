@@ -2701,51 +2701,10 @@ function resetInactivityTimer() {
   }, INACTIVITY_DELAY);
 }
 
-async function deconnecter() {
+function deconnecter() {
   clearTimeout(inactivityTimer);
   sessionStorage.removeItem('bqt_token');
-
-  // Afficher login immédiatement
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.style.display = 'flex';
-  document.getElementById('username').value = '';
-  document.getElementById('password').value = '';
-  document.getElementById('loginError').textContent = '';
-
-  const userChip = document.getElementById('userChip');
-  if (userChip) userChip.style.display = 'none';
-  const menu = document.getElementById('sessionMenu');
-  if (menu) menu.style.display = 'none';
-
-  clearMapPoints();
-  clearTrajectoire();
-
-  setCurrentToken(null);
-
-  try {
-    // Réinitialiser sans recharger depuis l'API (token null)
-    await reinitialiserTousLesFiltres();
-
-    document.querySelectorAll('details').forEach(d => d.removeAttribute('open'));
-    const detailsTemporel = document.getElementById('detailsTemporel');
-    if (detailsTemporel) detailsTemporel.setAttribute('open', '');
-
-    const sidebarRight = document.getElementById('sidebarRight');
-    const mapScreen = document.getElementById('mapScreen');
-    if (sidebarRight) {
-      sidebarRight.classList.remove('visible');
-      sidebarRight.style.width = '';
-    }
-    if (mapScreen) {
-      mapScreen.style.right = '';
-      mapScreen.classList.remove('panel-open');
-    }
-    const toggleIcon = document.querySelector('#sidebarRightToggle .toggle-icon');
-    if (toggleIcon) toggleIcon.textContent = '‹';
-    setPanneauFermeManuel(false);
-  } finally {
-    loginEnCours = false;
-  }
+  window.location.reload();
 }
 
 document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
@@ -2786,7 +2745,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   errorEl.textContent = '';
   try {
     const token = await login(username, password);
-    await startApp(token);
+    sessionStorage.setItem('bqt_token', token);
+    window.location.reload();
   } catch (err) {
     errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';
     console.error(err);
