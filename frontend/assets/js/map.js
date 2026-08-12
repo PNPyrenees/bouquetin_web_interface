@@ -301,11 +301,12 @@ export function initMap(targetId, popupId) {
   });
 
   // Definition des fonds de carte exclusifs et des overlays superposables, generes
-  // depuis BASEMAPS_CONFIG — category absente ou 'basemap' => fond exclusif
-  // (retrocompatibilite avec les entrees existantes sans ce champ), 'overlay' =>
-  // superposable independamment (cf. toggleOverlay()). basemaps reste un tableau
-  // parallele aux entrees 'basemap' de BASEMAPS_CONFIG, dans le meme ordre — c'est
-  // ce sur quoi switchBasemap(index) s'appuie, inchange.
+  // depuis BASEMAPS_CONFIG — category est toujours explicite ('basemap' ou 'overlay')
+  // sur chaque entree ; le repli || 'basemap' reste un filet de securite si une future
+  // entree omettait ce champ par erreur (sans lui, elle disparaitrait silencieusement
+  // des deux listes plutot que d'atterrir dans les fonds exclusifs). basemaps reste un
+  // tableau parallele aux entrees 'basemap' de BASEMAPS_CONFIG, dans le meme ordre —
+  // c'est ce sur quoi switchBasemap(index) s'appuie, inchange.
   const basemapConfigs = BASEMAPS_CONFIG.filter(bm => (bm.category || 'basemap') === 'basemap');
   const overlayConfigs = BASEMAPS_CONFIG.filter(bm => bm.category === 'overlay');
   basemaps = basemapConfigs.map(creerCoucheFond);
