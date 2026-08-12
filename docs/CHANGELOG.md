@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### Nouvelle page Statistiques (en cours)
+- Mise en place de la structure institutionnelle de la page Statistiques (grille de chiffres cles, separateurs fins, esprit sobre coherent avec le reste de l'application)
+- Premier indicateur dynamique : nombre total d'individus, calcule depuis la base en temps reel
+
 ### Uniformisation de la configuration des fonds de carte
 - Toutes les entrees de BASEMAPS_CONFIG portent desormais explicitement leur categorie (fond exclusif ou superposition), pour une lecture et une maintenance plus simples
 
