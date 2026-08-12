@@ -1447,10 +1447,12 @@ function initBasemapSelector() {
   const overlayOptions = document.getElementById('overlayOptions');
   const btnFondsCarte = document.getElementById('btnFondsCarte');
 
-  // Fonds exclusifs vs overlays superposables — cf. category dans BASEMAPS_CONFIG
-  // (absente ou 'basemap' => fond exclusif, retrocompatibilite ; 'overlay' => case
-  // a cocher independante). L'index passe a switchBasemap() porte sur basemapConfigs
-  // uniquement, coherent avec le tableau basemaps de map.js (meme filtrage cote la).
+  // Fonds exclusifs vs overlays superposables — cf. category dans BASEMAPS_CONFIG,
+  // toujours explicite ('basemap' ou 'overlay' => case a cocher independante) ; le
+  // repli || 'basemap' reste un filet de securite si une future entree omettait ce
+  // champ par erreur (meme raisonnement que dans map.js/initMap). L'index passe a
+  // switchBasemap() porte sur basemapConfigs uniquement, coherent avec le tableau
+  // basemaps de map.js (meme filtrage cote la).
   const basemapConfigs = BASEMAPS_CONFIG.filter(bm => (bm.category || 'basemap') === 'basemap');
   const overlayConfigs = BASEMAPS_CONFIG.filter(bm => bm.category === 'overlay');
 
