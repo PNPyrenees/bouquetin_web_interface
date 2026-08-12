@@ -82,6 +82,34 @@ async function chargerKpiTotalIndividus(token) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Flatpickr — Periode (JJ/MM/AAAA), meme pattern que app.js/individuals.js. Pas
+  // encore d'effet sur les chiffres affiches a cette etape (etape 5 du plan) — seul
+  // le fonctionnement visuel du selecteur est branche ici.
+  if (window.flatpickr) {
+    flatpickr('#reportsDateFrom', {
+      dateFormat: 'd/m/Y',
+      allowInput: true,
+      locale: 'fr',
+      onClose(selectedDates, dateStr) {
+        if (dateStr) {
+          document.getElementById('reportsDateFrom').value = dateStr;
+          document.getElementById('reportsDateFrom').dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    });
+    flatpickr('#reportsDateTo', {
+      dateFormat: 'd/m/Y',
+      allowInput: true,
+      locale: 'fr',
+      onClose(selectedDates, dateStr) {
+        if (dateStr) {
+          document.getElementById('reportsDateTo').value = dateStr;
+          document.getElementById('reportsDateTo').dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    });
+  }
+
   document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
     e.stopPropagation();
     const menu = document.getElementById('sessionMenu');
