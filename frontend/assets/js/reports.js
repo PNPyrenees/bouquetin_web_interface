@@ -102,6 +102,43 @@ function lireFiltresPeriode() {
   };
 }
 
+/**
+ * Charge les 3 indicateurs de stock global (non filtres par periode, cf. etape 6 du
+ * plan) : individus transloques (+ repartition F/M), individus suivis GPS (+ pourcentage),
+ * nombre de zones de translocation. Appelee uniquement au chargement initial — ces
+ * chiffres ne dependent pas du selecteur de periode.
+ */
+async function chargerKpisStock(token) {
+  try {
+    const { fetchTranslocationIds, fetchAnimals, fetchAnimauxSuivis, fetchCountAnimaux, fetchCountZonesTranslocation } = await chargerApi();
+    // "Suivis GPS" = etat ACTUEL (collier actif + derniere position transmise), meme
+    // definition que la page Carte (fetchAnimauxSuivis) — PAS le cumul historique de
+    // tous les individus equipes un jour (colliers aujourd'hui inactifs inclus). Ne
+    // pas comparer ce chiffre a un rapport externe utilisant l'autre definition.
+    const [transloquesIds, animaux, suivisIds, totalIndividus, nombreZones] = await Promise.all([
+      fetchTranslocationIds(token),
+      fetchAnimals(token),
+      fetchAnimauxSuivis(token),
+      fetchCountAnimaux(token),
+      fetchCountZonesTranslocation(token)
+    ]);
+
+    const transloques = animaux.filter(a => transloquesIds.has(a.ani_id));
+    const femelles = transloques.filter(a => a.ani_sexe === 'F').length;
+    const males = transloques.filter(a => a.ani_sexe === 'M').length;
+    document.getElementById('kpiTransloques').textContent = transloques.length.toLocaleString('fr-FR');
+    document.getElementById('kpiTransloquesRepartition').textContent = `${femelles}F / ${males}M`;
+
+    const pourcentageSuivi = totalIndividus > 0 ? Math.round((suivisIds.size / totalIndividus) * 100) : 0;
+    document.getElementById('kpiSuiviGps').textContent = suivisIds.size.toLocaleString('fr-FR');
+    document.getElementById('kpiSuiviGpsPourcentage').textContent = `${pourcentageSuivi}%`;
+
+    document.getElementById('kpiZones').textContent = nombreZones.toLocaleString('fr-FR');
+  } catch (err) {
+    console.error('Échec chargement des indicateurs de stock:', err);
+  }
+}
+
 let periodeRequeteId = 0;
 
 /**
@@ -213,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
     masquerLoginScreen();
     chargerKpiTotalIndividus(tokenAuChargement);
     chargerKpisSensiblesPeriode(tokenAuChargement);
+    chargerKpisStock(tokenAuChargement);
   } else {
     afficherLoginScreen();
   }

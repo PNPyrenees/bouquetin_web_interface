@@ -455,6 +455,28 @@ export async function fetchCountEvenementsTranslocation(token, { date_from, date
 }
 
 /**
+ * Compte le nombre de zones distinctes (relache_zone) parmi les translocations
+ * (translocation=true). Meme approche que fetchPopulations/fetchGestionnaires :
+ * colonne unique, requete legere, deduplication cote client via Set — pas de
+ * COUNT(DISTINCT) natif possible via l'API REST standard.
+ */
+export async function fetchCountZonesTranslocation(token) {
+  const res = await fetch(
+    `${API_URL}/t_capture_relache?select=relache_zone&translocation=eq.true&relache_zone=not.is.null`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchCountZonesTranslocation error: ${res.status}`);
+  const data = await res.json();
+  return new Set(data.map(r => r.relache_zone)).size;
+}
+
+/**
  * Traduit un objet filters au format interne (cf. construireFiltersRPC dans filters.js :
  * ani_id, date_from, saisonFrom, geom...) en corps de requete pour f_get_localisation
  * (parametres var_*). Partagee par fetchLocalisationsRPC (pagination) et
