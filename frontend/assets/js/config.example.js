@@ -134,16 +134,17 @@ export const SAISONS_CONFIG = {
 // la source est construite via ol.source.WMTS.optionsFromCapabilities() a partir du
 // GetCapabilities IGN mis en cache (cf. chargerCapacitesWMTS() dans map.js), jamais
 // reconstruite manuellement (resolutions/matrices/origines/limites de tuiles).
-// category : 'basemap' (fond exclusif, defaut si absent — retrocompatibilite) |
-// 'overlay' (superposable independamment, plusieurs actifs simultanement, cf.
-// toggleOverlay() dans map.js). opacity (overlays uniquement) : opacite initiale,
-// ajustable ensuite via setOverlayOpacity().
+// category : 'basemap' (fond exclusif) | 'overlay' (superposable independamment,
+// plusieurs actifs simultanement, cf. toggleOverlay() dans map.js) — toujours indique
+// explicitement sur chaque entree ci-dessous. opacity (overlays uniquement) : opacite
+// initiale, ajustable ensuite via setOverlayOpacity().
 export const BASEMAPS_CONFIG = [
   {
     id: 'ign_scan25',
     nom: 'IGN SCAN25',
     apercu: 'assets/img/ign.png',
     type: 'xyz',
+    category: 'basemap',
     url: `https://data.geopf.fr/private/wmts?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile&apikey=${IGN_API_KEY}&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN25TOUR&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}`,
     attributions: '©IGN',
     visible: false
@@ -153,6 +154,7 @@ export const BASEMAPS_CONFIG = [
     nom: 'OpenStreetMap',
     apercu: 'assets/img/openstreetmap.png',
     type: 'osm',
+    category: 'basemap',
     url: null,
     attributions: '© OpenStreetMap contributors',
     visible: false
@@ -162,6 +164,7 @@ export const BASEMAPS_CONFIG = [
     nom: 'Satellite ESRI',
     apercu: 'assets/img/esri_satellite.png',
     type: 'xyz',
+    category: 'basemap',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attributions: '© Esri, Maxar, Earthstar Geographics',
     visible: false
@@ -174,6 +177,7 @@ export const BASEMAPS_CONFIG = [
     nom: 'Photos aériennes IGN',
     apercu: 'assets/img/ign_ortho.png',
     type: 'wmts',
+    category: 'basemap',
     layer: 'HR.ORTHOIMAGERY.ORTHOPHOTOS',
     matrixSet: 'PM_6_19',
     style: 'normal',
@@ -186,6 +190,7 @@ export const BASEMAPS_CONFIG = [
     nom: 'Plan IGN',
     apercu: 'assets/img/ign_plan.png',
     type: 'wmts',
+    category: 'basemap',
     layer: 'GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2',
     matrixSet: 'PM_0_19',
     style: 'normal',
@@ -198,6 +203,7 @@ export const BASEMAPS_CONFIG = [
     nom: 'Carte du relief IGN',
     apercu: 'assets/img/ign_relief.png',
     type: 'xyz',
+    category: 'basemap',
     url: 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ELEVATION.ELEVATIONGRIDCOVERAGE.SHADOW&STYLE=estompage_grayscale&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}',
     attributions: '© IGN Géoportail',
     visible: false
@@ -207,6 +213,7 @@ export const BASEMAPS_CONFIG = [
     nom: 'Relief altitude',
     apercu: 'assets/img/ign_relief_slopes.png',
     type: 'wmts',
+    category: 'basemap',
     layer: 'ELEVATION.SLOPES',
     matrixSet: 'PM_6_14',
     style: 'normal',
@@ -219,6 +226,7 @@ export const BASEMAPS_CONFIG = [
     nom: 'Carte historique 1950',
     apercu: 'assets/img/ign_scan50_1950.png',
     type: 'wmts',
+    category: 'basemap',
     layer: 'GEOGRAPHICALGRIDSYSTEMS.MAPS.SCAN50.1950',
     matrixSet: 'PM_3_15',
     style: 'SCAN50_1950',
