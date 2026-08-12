@@ -371,6 +371,90 @@ export async function fetchCaptureRelacheParAnimal(token, aniId) {
 }
 
 /**
+ * Compte les captures "reelles" (hors translocation) sur t_capture_relache, filtrees
+ * sur capture_date. Les lignes de translocation n'ont jamais de capture_date renseignee
+ * (toujours NULL, seule relache_date compte pour elles, confirme en base) — le filtre
+ * capture_date=not.is.null suffit donc a lui seul a les exclure, sans avoir a tester
+ * capture_objectif explicitement.
+ */
+export async function fetchCountCaptures(token, { date_from, date_to } = {}) {
+  const params = new URLSearchParams();
+  params.append('select', 'capture_relache_id');
+  params.append('capture_date', 'not.is.null');
+  if (date_from) params.append('capture_date', `gte.${date_from}`);
+  if (date_to) params.append('capture_date', `lte.${date_to}`);
+
+  const res = await fetch(`${API_URL}/t_capture_relache?${params.toString()}`, {
+    method: 'HEAD',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=exact'
+    }
+  });
+  if (!res.ok) throw new Error(`fetchCountCaptures error: ${res.status}`);
+  const contentRange = res.headers.get('content-range');
+  const total = contentRange ? Number(contentRange.split('/')[1]) : 0;
+  return Number.isFinite(total) ? total : 0;
+}
+
+/**
+ * Compte les captures dont capture_objectif = 'Veille sanitaire', filtrees sur
+ * capture_date (ces lignes ne sont jamais des translocations, capture_date y est
+ * toujours renseignee).
+ */
+export async function fetchCountCapturesSanitaires(token, { date_from, date_to } = {}) {
+  const params = new URLSearchParams();
+  params.append('select', 'capture_relache_id');
+  params.append('capture_objectif', 'eq.Veille sanitaire');
+  if (date_from) params.append('capture_date', `gte.${date_from}`);
+  if (date_to) params.append('capture_date', `lte.${date_to}`);
+
+  const res = await fetch(`${API_URL}/t_capture_relache?${params.toString()}`, {
+    method: 'HEAD',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=exact'
+    }
+  });
+  if (!res.ok) throw new Error(`fetchCountCapturesSanitaires error: ${res.status}`);
+  const contentRange = res.headers.get('content-range');
+  const total = contentRange ? Number(contentRange.split('/')[1]) : 0;
+  return Number.isFinite(total) ? total : 0;
+}
+
+/**
+ * Compte les evenements de translocation = nombre de DATES distinctes de relache_date
+ * parmi les lignes translocation=true. PostgREST (Prefer: count=exact) compte des LIGNES
+ * filtrees, pas des valeurs distinctes d'une colonne — aucun mecanisme natif pour un
+ * COUNT(DISTINCT ...) via l'API REST standard. Meme approche que fetchPopulations/
+ * fetchGestionnaires : on recupere uniquement relache_date (colonne unique, requete
+ * legere - au plus quelques centaines de lignes sur toute la table) et on deduplique
+ * cote client via un Set, sur la partie date seule (relache_date peut inclure une heure).
+ */
+export async function fetchCountEvenementsTranslocation(token, { date_from, date_to } = {}) {
+  const params = new URLSearchParams();
+  params.append('select', 'relache_date');
+  params.append('translocation', 'eq.true');
+  params.append('relache_date', 'not.is.null');
+  if (date_from) params.append('relache_date', `gte.${date_from}`);
+  if (date_to) params.append('relache_date', `lte.${date_to}`);
+
+  const res = await fetch(`${API_URL}/t_capture_relache?${params.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=none'
+    }
+  });
+  if (!res.ok) throw new Error(`fetchCountEvenementsTranslocation error: ${res.status}`);
+  const data = await res.json();
+  const datesDistinctes = new Set(data.map(r => String(r.relache_date).slice(0, 10)));
+  return datesDistinctes.size;
+}
+
+/**
  * Traduit un objet filters au format interne (cf. construireFiltersRPC dans filters.js :
  * ani_id, date_from, saisonFrom, geom...) en corps de requete pour f_get_localisation
  * (parametres var_*). Partagee par fetchLocalisationsRPC (pagination) et

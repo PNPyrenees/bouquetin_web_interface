@@ -81,6 +81,57 @@ async function chargerKpiTotalIndividus(token) {
   }
 }
 
+/**
+ * Convertit une date JJ/MM/AAAA (format Flatpickr/affichage) en ISO AAAA-MM-JJ, format
+ * attendu par les filtres PostgREST (gte./lte. sur capture_date/relache_date). Meme
+ * conversion que getPeriodesActives() dans filters.js, dupliquee ici car reports.js
+ * n'importe pas filters.js (page independante, pas de logique de filtre partagee).
+ */
+function convertirDateFrancaiseEnISO(dateStr) {
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return null;
+  const [j, m, a] = dateStr.split('/');
+  return `${a}-${m}-${j}`;
+}
+
+function lireFiltresPeriode() {
+  const dateFrom = document.getElementById('reportsDateFrom')?.value || '';
+  const dateTo = document.getElementById('reportsDateTo')?.value || '';
+  return {
+    date_from: convertirDateFrancaiseEnISO(dateFrom) || undefined,
+    date_to: convertirDateFrancaiseEnISO(dateTo) || undefined
+  };
+}
+
+let periodeRequeteId = 0;
+
+/**
+ * Charge les 3 indicateurs sensibles a la periode (Captures, Captures sanitaires,
+ * Evenements de translocation) et les affiche. Appelee au chargement initial (periode
+ * vide = historique complet) et a chaque changement des champs Du/Au. Garde de
+ * sequence (periodeRequeteId) : si l'utilisateur modifie Du puis Au rapidement, deux
+ * appels se chevauchent — sans garde, la reponse la plus lente pourrait ecraser
+ * l'affichage avec un resultat perime.
+ */
+async function chargerKpisSensiblesPeriode(token) {
+  const requeteId = ++periodeRequeteId;
+  const filtres = lireFiltresPeriode();
+  try {
+    const { fetchCountCaptures, fetchCountCapturesSanitaires, fetchCountEvenementsTranslocation } = await chargerApi();
+    const [captures, capturesSanitaires, evenementsTranslocation] = await Promise.all([
+      fetchCountCaptures(token, filtres),
+      fetchCountCapturesSanitaires(token, filtres),
+      fetchCountEvenementsTranslocation(token, filtres)
+    ]);
+    if (requeteId !== periodeRequeteId) return;
+    document.getElementById('kpiCaptures').textContent = captures.toLocaleString('fr-FR');
+    document.getElementById('kpiCapturesSanitaires').textContent = capturesSanitaires.toLocaleString('fr-FR');
+    document.getElementById('kpiEvenementsTranslocation').textContent = evenementsTranslocation.toLocaleString('fr-FR');
+  } catch (err) {
+    if (requeteId !== periodeRequeteId) return;
+    console.error('Échec chargement des indicateurs sensibles à la période:', err);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   // Flatpickr — Periode (JJ/MM/AAAA), meme pattern que app.js/individuals.js. Pas
   // encore d'effet sur les chiffres affiches a cette etape (etape 5 du plan) — seul
@@ -109,6 +160,13 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  document.getElementById('reportsDateFrom')?.addEventListener('input', () => {
+    if (tokenAuChargement) chargerKpisSensiblesPeriode(tokenAuChargement);
+  });
+  document.getElementById('reportsDateTo')?.addEventListener('input', () => {
+    if (tokenAuChargement) chargerKpisSensiblesPeriode(tokenAuChargement);
+  });
 
   document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -154,6 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tokenAuChargement) {
     masquerLoginScreen();
     chargerKpiTotalIndividus(tokenAuChargement);
+    chargerKpisSensiblesPeriode(tokenAuChargement);
   } else {
     afficherLoginScreen();
   }
