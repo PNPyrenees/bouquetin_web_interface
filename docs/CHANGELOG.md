@@ -1,5 +1,8 @@
 # CHANGELOG
 
+### Uniformisation de la configuration des fonds de carte
+- Toutes les entrees de BASEMAPS_CONFIG portent desormais explicitement leur categorie (fond exclusif ou superposition), pour une lecture et une maintenance plus simples
+
 ### Surbrillance de la position selectionnee
 - Au clic sur une ligne du tableau de localisations, la position correspondante est desormais mise en surbrillance sur la carte (halo + leger agrandissement), sans jamais alterer la couleur ou le contour d'origine du point
 - Le clic direct sur un point de la carte applique la meme surbrillance et synchronise la selection dans le tableau
