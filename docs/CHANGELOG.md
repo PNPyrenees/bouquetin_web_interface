@@ -1,5 +1,10 @@
 # CHANGELOG
 
+### Page Statistiques - chiffres cles complets
+- Ajout du selecteur de periode (Du/Au)
+- Tous les chiffres cles sont desormais dynamiques et calcules depuis la base : individus au total, suivis GPS, transloques (avec repartition hommes/femmes), evenements de translocation, zones de translocation, captures, captures sanitaires
+- Les indicateurs lies aux captures et evenements de translocation se recalculent selon la periode selectionnee ; les indicateurs de stock (transloques, suivis GPS, zones) refletent l'etat global
+
 ### Nouvelle page Statistiques (en cours)
 - Mise en place de la structure institutionnelle de la page Statistiques (grille de chiffres cles, separateurs fins, esprit sobre coherent avec le reste de l'application)
 - Premier indicateur dynamique : nombre total d'individus, calcule depuis la base en temps reel
