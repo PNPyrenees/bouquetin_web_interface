@@ -96,6 +96,7 @@ body {
    independamment de sa classe .show). L'opacite d'un enfant ne peut pas annuler celle
    d'un parent (meme avec !important) — d'ou un ciblage explicite plutot qu'une regle sur
    body avec contre-regle sur #header. */
+#reportsScreen,
 #mapScreen,
 #indivScreen,
 .sidebar-right {

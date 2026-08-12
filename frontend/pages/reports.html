@@ -3,6 +3,13 @@
 
 <head>
   <meta charset="UTF-8">
+  <!-- Script classique (pas de module/defer) volontairement — doit s'executer de facon
+       synchrone avant le premier paint pour eviter tout flash de #loginScreen. -->
+  <script>
+    if (sessionStorage.getItem('bqt_token')) {
+      document.documentElement.classList.add('has-session');
+    }
+  </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="Plateforme de suivi des bouquetins - Parc National des Pyrénées">
   <title>Statistiques - Suivi des bouquetins</title>
@@ -30,6 +37,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=Bebas+Neue&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="../assets/css/main.css">
+  <link rel="stylesheet" href="../assets/css/reports.css">
 </head>
 
 <body>
@@ -73,55 +81,91 @@
       </div>
     </div>
   </header>
-  <script>
-    (() => {
-      const token = sessionStorage.getItem('bqt_token');
-      if (!token) return;
+  <!-- Script classique synchrone : initialise la session avant le premier rendu du header. -->
+  <script src="../assets/js/reports.js"></script>
 
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const role = payload.role || payload.sub || 'Utilisateur';
-        const initiales = {
-          pnp_bqt_reader: 'LC',
-          pnp_bqt_writer: 'AD'
-        }[role] || role.slice(0, 2).toUpperCase();
-        const libelle = {
-          pnp_bqt_reader: 'Lecteur',
-          pnp_bqt_writer: 'Administrateur'
-        }[role] || role;
+  <main id="reportsScreen">
+    <div class="reports-content">
+      <div class="reports-toolbar">
+        <div class="reports-periode">
+          <div class="input-group">
+            <label for="reportsDateFrom">Du</label>
+            <input type="text" class="sidebar-input" id="reportsDateFrom" placeholder="JJ/MM/AAAA" autocomplete="off">
+          </div>
+          <div class="input-group">
+            <label for="reportsDateTo">Au</label>
+            <input type="text" class="sidebar-input" id="reportsDateTo" placeholder="JJ/MM/AAAA" autocomplete="off">
+          </div>
+        </div>
+      </div>
 
-        document.getElementById('sessionAvatar').textContent = initiales;
-        document.getElementById('sessionRole').textContent = libelle;
-        document.getElementById('userChip').style.display = 'flex';
-      } catch {
-        return;
-      }
-
-      const menu = document.getElementById('sessionMenu');
-      const chevron = document.getElementById('sessionChevron');
-
-      document.getElementById('sessionTrigger').addEventListener('click', (event) => {
-        event.stopPropagation();
-        const ouverture = menu.style.display === 'none';
-        menu.style.display = ouverture ? 'block' : 'none';
-        chevron.style.transform = ouverture ? 'rotate(180deg)' : 'rotate(0deg)';
-      });
-
-      document.addEventListener('click', () => {
-        menu.style.display = 'none';
-        chevron.style.transform = 'rotate(0deg)';
-      });
-
-      document.getElementById('btnDeconnexion').addEventListener('click', () => {
-        sessionStorage.removeItem('bqt_token');
-        window.location.replace('../index.html');
-      });
-    })();
-  </script>
-  <main style="padding: 40px; font-family: var(--font-family); color: var(--color-text);">
-    <h1 style="color: var(--color-primary); margin-bottom: 16px;">Hello</h1>
-    <p style="color: var(--color-text-muted);">World</p>
+      <!-- Grille de chiffres cles — peuplee par reports.js a partir de l'etape 2, jamais de
+           valeur codee en dur ici. "—" = etat initial/chargement. -->
+      <div class="reports-kpi-grid" id="reportsKpiGrid">
+        <div class="reports-kpi-cell">
+          <div class="reports-kpi-value" id="kpiTotalIndividus">-</div>
+          <div class="reports-kpi-label">Individus au total</div>
+        </div>
+        <div class="reports-kpi-cell">
+          <div class="reports-kpi-value" id="kpiSuiviGps">-</div>
+          <div class="reports-kpi-label">Suivis GPS</div>
+          <div class="reports-kpi-sub" id="kpiSuiviGpsPourcentage"></div>
+        </div>
+        <div class="reports-kpi-cell">
+          <div class="reports-kpi-value" id="kpiTransloques">-</div>
+          <div class="reports-kpi-label">Individus transloqués</div>
+          <div class="reports-kpi-sub" id="kpiTransloquesRepartition"></div>
+        </div>
+        <div class="reports-kpi-cell">
+          <div class="reports-kpi-value" id="kpiEvenementsTranslocation">-</div>
+          <div class="reports-kpi-label">Événements de translocation</div>
+        </div>
+        <div class="reports-kpi-cell">
+          <div class="reports-kpi-value" id="kpiZones">-</div>
+          <div class="reports-kpi-label">Zones de translocation</div>
+        </div>
+        <div class="reports-kpi-cell">
+          <div class="reports-kpi-value" id="kpiCaptures">-</div>
+          <div class="reports-kpi-label">Captures</div>
+        </div>
+        <div class="reports-kpi-cell">
+          <div class="reports-kpi-value" id="kpiCapturesSanitaires">-</div>
+          <div class="reports-kpi-label">Captures sanitaires</div>
+        </div>
+      </div>
+    </div>
   </main>
+
+  <div id="loginScreen">
+    <div class="login-left">
+      <img src="../assets/img/pnp.jpg" alt="Bouquetin ibérique" class="login-bg-img">
+      <div class="login-photo-credit">
+        © Jean-Paul Crampe
+      </div>
+    </div>
+    <div class="login-right">
+      <div class="login-logos">
+        <img src="../assets/img/logo-parc.svg" alt="Parc National des Pyrénées" class="login-logo-pnp">
+        <img src="../assets/img/Logo_-_République_française.svg" alt="République Française" class="login-logo-rf">
+      </div>
+      <div class="login-card">
+        <h2>Suivi des Bouquetins Ibériques</h2>
+        <p>Parc National des Pyrénées</p>
+        <form id="loginForm">
+          <div class="login-field">
+            <label for="username">Identifiant</label>
+            <input id="username" type="text" autocomplete="username">
+          </div>
+          <div class="login-field">
+            <label for="password">Mot de passe</label>
+            <input id="password" type="password" autocomplete="current-password">
+          </div>
+          <div id="loginError"></div>
+          <button type="submit">Se connecter</button>
+        </form>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

@@ -44,6 +44,29 @@ export async function fetchAnimals(token) {
 }
 
 /**
+ * Compte le nombre total d'animaux (t_animal) via une requete HEAD — aucune ligne
+ * transferee, meme pas une seule. Different de fetchCountLocations() (qui lit
+ * count dans le corps JSON via select=count sur la fonction RPC f_get_localisation) :
+ * t_animal est une table classique, pas une fonction SQL personnalisee — le mecanisme
+ * standard PostgREST pour une table est Prefer: count=exact + lecture du total dans
+ * l'entete de reponse Content-Range (format "0-0/348"), pas dans le corps.
+ */
+export async function fetchCountAnimaux(token) {
+  const res = await fetch(`${API_URL}/t_animal?select=ani_id`, {
+    method: 'HEAD',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=exact'
+    }
+  });
+  if (!res.ok) throw new Error(`fetchCountAnimaux error: ${res.status}`);
+  const contentRange = res.headers.get('content-range');
+  const total = contentRange ? Number(contentRange.split('/')[1]) : 0;
+  return Number.isFinite(total) ? total : 0;
+}
+
+/**
  * Récupère uniquement les ani_id distincts ayant des positions sur une période.
  * Une seule requête au lieu de N requêtes par animal.
  */

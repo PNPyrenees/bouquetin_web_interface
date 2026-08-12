@@ -1,0 +1,105 @@
+/* ============================================
+   PAGE STATISTIQUES — esprit institutionnel (VA Design System / grille type Tabler) :
+   gros chiffres, libelles secondaires discrets, separateurs fins plutot que des cards
+   a ombres. Reutilise uniquement les variables globales de main.css (--color-*,
+   --font-family) — aucune nouvelle palette introduite.
+   ============================================ */
+
+#reportsScreen {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  background: var(--color-bg);
+}
+
+.reports-content {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 40px 64px;
+}
+
+.reports-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 32px;
+}
+
+.reports-periode {
+  display: flex;
+  gap: 16px;
+}
+
+.reports-periode .input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.reports-periode label {
+  font-family: var(--font-family);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.reports-periode .sidebar-input {
+  width: 140px;
+}
+
+/* Separateurs fins obtenus via gap+background plutot que des bordures par cellule —
+   robuste quel que soit le nombre de colonnes affichees par ligne (repli responsive
+   naturel du grid, aucun calcul JS necessaire pour les bordures). */
+.reports-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+}
+
+.reports-kpi-cell {
+  background: var(--color-bg);
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reports-kpi-value {
+  font-family: var(--font-family);
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.1;
+}
+
+.reports-kpi-label {
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.reports-kpi-sub {
+  font-family: var(--font-family);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  min-height: 1em;
+}
+
+@media (max-width: 640px) {
+  .reports-content {
+    padding: 32px 20px 48px;
+  }
+
+  .reports-toolbar {
+    justify-content: flex-start;
+  }
+}
