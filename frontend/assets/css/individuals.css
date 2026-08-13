@@ -963,7 +963,7 @@ select.indiv-col-filtre {
    main.css + individuals.css) — meme apparence recreee ici plutot qu'importee. */
 .fiche-map-popup {
   display: none;
-  position: absolute;
+  position: relative;
   z-index: 2000;
   background: white;
   padding: 6px 10px;
@@ -973,6 +973,18 @@ select.indiv-col-filtre {
   max-width: 220px;
   font-family: var(--font-family);
   font-size: 12px;
+}
+
+/* La pointe matérialise l'ancrage sans que la bulle recouvre le point. */
+.fiche-map-popup::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 7px solid white;
 }
 
 .fiche-map-popup strong {

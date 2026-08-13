@@ -42,7 +42,9 @@
    ======================================== */
 #popup {
   display: none;
-  position: absolute;
+  /* Le conteneur créé par OpenLayers assure le positionnement absolu. Le popup doit
+     rester dans son flux pour que bottom-center puisse mesurer sa largeur/hauteur. */
+  position: relative;
   z-index: 2000;
   background: white;
   padding: 6px 10px;
@@ -54,6 +56,19 @@
   font-size: 12px;
 }
 
+/* Pointe de bulle — relie visuellement le popup (deporte au-dessus du point via
+   l'offset de popupOverlay, cf. map.js) au point GPS concerne. left:50% + translateX
+   centre la pointe quelle que soit la largeur reelle du popup (120-180px, cf. min/max-width). */
+#popup::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid white;
+}
 
 .popup-content strong {
   display: block;

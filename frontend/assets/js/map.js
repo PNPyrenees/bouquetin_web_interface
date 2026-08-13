@@ -317,7 +317,11 @@ export function initMap(targetId, popupId) {
   popupOverlay = new ol.Overlay({
     element: popupEl,
     positioning: 'bottom-center',
-    offset: [0, -16]
+    offset: [0, -28],
+    autoPan: {
+      margin: 16,
+      animation: { duration: 250 }
+    }
   });
 
   // Création de l'objet Map principal
@@ -445,7 +449,7 @@ export function initMap(targetId, popupId) {
         hit = true;
         aniId = String(feature.get('ani_id'));
         locDatetime = feature.get('loc_datetime_local') || feature.get('loc_date_local');
-        showPopup(feature, evt.coordinate, popupEl);
+        showPopup(feature, feature.getGeometry().getCoordinates(), popupEl);
       }, {
         layerFilter: layer => layer === gpsLayer
       });
@@ -733,8 +737,8 @@ function showPopup(feature, coordinate, popupEl) {
   content.appendChild(info);
   popupEl.appendChild(content);
 
-  popupOverlay.setPosition(coordinate);
   popupEl.style.display = 'block';
+  popupOverlay.setPosition(coordinate);
   isAnimating = true;
   map.getView().animate({ center: coordinate, duration: 400 }, () => {
     isAnimating = false;

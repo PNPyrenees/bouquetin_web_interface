@@ -1443,7 +1443,11 @@ function initCarteLocalisations() {
   _popupOverlayLocalisations = new ol.Overlay({
     element: popupEl,
     positioning: 'bottom-center',
-    offset: [0, -12]
+    offset: [0, -22],
+    autoPan: {
+      margin: 12,
+      animation: { duration: 250 }
+    }
   });
 
   _carteLocalisations = new ol.Map({
@@ -1484,8 +1488,8 @@ function initCarteLocalisations() {
       ligneAltitude.textContent = `Altitude : ${altitude != null ? altitude + ' m' : '-'}`;
       popupEl.appendChild(ligneAltitude);
 
-      _popupOverlayLocalisations.setPosition(evt.coordinate);
       popupEl.style.display = 'block';
+      _popupOverlayLocalisations.setPosition(feature.getGeometry().getCoordinates());
     });
     if (!hit) popupEl.style.display = 'none';
   });
@@ -1655,7 +1659,11 @@ function initCarteSites() {
   _popupOverlaySites = new ol.Overlay({
     element: popupEl,
     positioning: 'bottom-center',
-    offset: [0, -12]
+    offset: [0, -24],
+    autoPan: {
+      margin: 12,
+      animation: { duration: 250 }
+    }
   });
 
   _carteSites = new ol.Map({
@@ -1715,8 +1723,8 @@ function initCarteSites() {
         popupEl.appendChild(div);
       });
 
-      _popupOverlaySites.setPosition(evt.coordinate);
       popupEl.style.display = 'block';
+      _popupOverlaySites.setPosition(feature.getGeometry().getCoordinates());
     });
     if (!hit) popupEl.style.display = 'none';
   });
