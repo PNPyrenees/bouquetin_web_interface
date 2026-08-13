@@ -3,6 +3,9 @@
 ### Changement de police
 - La police de texte courant de toute l'application passe de Source Sans 3 a Public Sans, pour un rendu plus sobre et institutionnel
 
+### Amelioration du popup carte
+- Le popup affiche desormais une pointe de bulle reliant clairement l'information au point GPS concerne, et ne masque plus le point ni sa surbrillance au clic
+
 ### Page Statistiques - finalisation des chiffres cles
 - Indicateur visuel discret pendant le recalcul des chiffres lies a la periode selectionnee
 - En cas d'echec de chargement d'un indicateur, un marqueur distinct (avec explication au survol) remplace l'etat neutre, pour rendre une panne detectable
