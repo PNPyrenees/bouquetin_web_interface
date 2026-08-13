@@ -1,5 +1,8 @@
 # CHANGELOG
 
+### Changement de police
+- La police de texte courant de toute l'application passe de Source Sans 3 a Public Sans, pour un rendu plus sobre et institutionnel
+
 ### Page Statistiques - finalisation des chiffres cles
 - Indicateur visuel discret pendant le recalcul des chiffres lies a la periode selectionnee
 - En cas d'echec de chargement d'un indicateur, un marqueur distinct (avec explication au survol) remplace l'etat neutre, pour rendre une panne detectable
