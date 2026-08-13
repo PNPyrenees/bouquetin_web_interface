@@ -2000,7 +2000,7 @@ function construireLegendeColliers(capteurs, couleurParCorId, identifiants) {
   if (triees.length === 0) return;
 
   const titre = document.createElement('span');
-  titre.textContent = 'Colliers :';
+  titre.textContent = 'Colliers :';
   titre.style.fontWeight = '600';
   conteneur.appendChild(titre);
 

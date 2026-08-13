@@ -726,7 +726,7 @@ function showPopup(feature, coordinate, popupEl) {
     info.appendChild(span);
   } else {
     const labelEl = document.createElement('span');
-    labelEl.textContent = 'Dernière position :';
+    labelEl.textContent = 'Dernière position :';
     const dateDiv = document.createElement('div');
     dateDiv.className = 'date-value';
     dateDiv.textContent = dateStr;
