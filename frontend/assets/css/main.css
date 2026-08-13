@@ -13,7 +13,7 @@
   --color-text-muted: #666666;
 
   /* Typographie globale */
-  --font-family: 'Source Sans 3', sans-serif;
+  --font-family: 'Public Sans', sans-serif;
   --font-size-base: 14px;
   --font-size-small: 14px;
   --font-size-label: 12.5px;
@@ -83,7 +83,7 @@ html {
 }
 
 body {
-  font-family: 'Source Sans 3', 'Source Sans Pro', system-ui, sans-serif;
+  font-family: var(--font-family);
   background: #f0f0f0;
   min-height: 100vh;
   overflow: hidden;
@@ -1340,7 +1340,7 @@ input[type="checkbox"] {
   writing-mode: vertical-lr;
   text-orientation: mixed;
   transform: rotate(180deg);
-  font-family: 'Source Sans 3', sans-serif;
+  font-family: var(--font-family);
   font-weight: 700;
   font-size: 13px;
   letter-spacing: 2px;
@@ -1552,7 +1552,7 @@ input[type="checkbox"] {
   padding: 10px 20px;
   border-radius: 6px;
   font-size: 13px;
-  font-family: 'Source Sans 3', sans-serif;
+  font-family: var(--font-family);
   z-index: 9999;
   opacity: -1;
   transition: opacity 0.3s ease;

@@ -50,7 +50,7 @@
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   min-width: 120px;
   max-width: 180px;
-  font-family: 'Source Sans 3', sans-serif;
+  font-family: var(--font-family);
   font-size: 12px;
 }
 
@@ -84,7 +84,7 @@
   align-items: center;
   justify-content: center;
   z-index: 2000;
-  font-family: 'Source Sans 3', sans-serif;
+  font-family: var(--font-family);
   font-size: 14px;
   color: #2D6A4F;
   font-weight: 600;
