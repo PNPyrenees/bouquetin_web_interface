@@ -76,6 +76,7 @@
   font-weight: 700;
   color: var(--color-text);
   line-height: 1.1;
+  transition: opacity 0.15s ease;
 }
 
 .reports-kpi-label {
@@ -92,6 +93,15 @@
   font-size: 13px;
   color: var(--color-text-muted);
   min-height: 1em;
+  transition: opacity 0.15s ease;
+}
+
+/* Etat de chargement des KPI rafraichis a chaque changement de periode (cf.
+   setChargementPeriode(), reports.js) — signal discret qu'un chiffre affiche ne
+   correspond plus forcement a la periode actuellement selectionnee. */
+.reports-kpi-value.loading,
+.reports-kpi-sub.loading {
+  opacity: 0.4;
 }
 
 @media (max-width: 640px) {

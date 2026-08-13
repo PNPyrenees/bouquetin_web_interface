@@ -67,8 +67,21 @@ function chargerApi() {
 }
 
 /**
+ * Marque un KPI en echec de chargement — "?" discret + title explicatif au survol,
+ * pour qu'un echec silencieux (permission RPC, timeout...) reste au moins detectable
+ * sans ouvrir la console, sans pour autant afficher un message intrusif (cf. audit
+ * durcissement, point 2).
+ */
+function marquerErreur(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = '?';
+  el.title = 'Échec du chargement de cet indicateur — voir la console pour le détail.';
+}
+
+/**
  * Charge le nombre total d'individus (t_animal) et l'affiche dans la grille — le "-"
- * deja present dans le HTML sert d'etat de chargement, puis d'etat degrade en cas
+ * deja present dans le HTML sert d'etat de chargement, puis marquerErreur() en cas
  * d'echec (pas de message intrusif pour un simple chiffre non critique).
  */
 async function chargerKpiTotalIndividus(token) {
@@ -78,6 +91,7 @@ async function chargerKpiTotalIndividus(token) {
     document.getElementById('kpiTotalIndividus').textContent = total.toLocaleString('fr-FR');
   } catch (err) {
     console.error('Échec chargement du nombre total d\'individus:', err);
+    marquerErreur('kpiTotalIndividus');
   }
 }
 
@@ -136,10 +150,27 @@ async function chargerKpisStock(token) {
     document.getElementById('kpiZones').textContent = nombreZones.toLocaleString('fr-FR');
   } catch (err) {
     console.error('Échec chargement des indicateurs de stock:', err);
+    marquerErreur('kpiTransloques');
+    marquerErreur('kpiSuiviGps');
+    marquerErreur('kpiZones');
   }
 }
 
 let periodeRequeteId = 0;
+
+const ID_KPIS_PERIODE = ['kpiCaptures', 'kpiCapturesSanitaires', 'kpiEvenementsTranslocation', 'kpiSuiviGpsPeriode'];
+
+/**
+ * Bascule la classe .loading (opacite reduite, cf. reports.css) sur les KPI sensibles
+ * a la periode pendant qu'une requete de rafraichissement est en vol — sans ca, un
+ * changement rapide de periode laisse un ancien chiffre affiche sans aucun signal
+ * qu'il ne correspond plus a la periode selectionnee (cf. audit durcissement, point 1).
+ */
+function setChargementPeriode(enCours) {
+  ID_KPIS_PERIODE.forEach(id => {
+    document.getElementById(id)?.classList.toggle('loading', enCours);
+  });
+}
 
 /**
  * Charge les 3 indicateurs sensibles a la periode (Captures, Captures sanitaires,
@@ -152,20 +183,38 @@ let periodeRequeteId = 0;
 async function chargerKpisSensiblesPeriode(token) {
   const requeteId = ++periodeRequeteId;
   const filtres = lireFiltresPeriode();
+  const periodeComplete = Boolean(filtres.date_from && filtres.date_to);
+  setChargementPeriode(true);
   try {
-    const { fetchCountCaptures, fetchCountCapturesSanitaires, fetchCountEvenementsTranslocation } = await chargerApi();
-    const [captures, capturesSanitaires, evenementsTranslocation] = await Promise.all([
+    const { fetchCountCaptures, fetchCountCapturesSanitaires, fetchCountEvenementsTranslocation, fetchAnimalIdsParPeriode } = await chargerApi();
+    // idsEquipesPeriode reste null si la periode n'est pas complete (Du et Au tous les
+    // deux renseignes) — evite une requete inutile et garde le sous-texte invisible,
+    // pour ne pas dérouter l'utilisateur sur ce que represente "la periode" a vide.
+    const [captures, capturesSanitaires, evenementsTranslocation, idsEquipesPeriode] = await Promise.all([
       fetchCountCaptures(token, filtres),
       fetchCountCapturesSanitaires(token, filtres),
-      fetchCountEvenementsTranslocation(token, filtres)
+      fetchCountEvenementsTranslocation(token, filtres),
+      periodeComplete ? fetchAnimalIdsParPeriode(token, filtres) : Promise.resolve(null)
     ]);
     if (requeteId !== periodeRequeteId) return;
+    setChargementPeriode(false);
     document.getElementById('kpiCaptures').textContent = captures.toLocaleString('fr-FR');
     document.getElementById('kpiCapturesSanitaires').textContent = capturesSanitaires.toLocaleString('fr-FR');
     document.getElementById('kpiEvenementsTranslocation').textContent = evenementsTranslocation.toLocaleString('fr-FR');
+
+    const kpiSuiviGpsPeriode = document.getElementById('kpiSuiviGpsPeriode');
+    if (kpiSuiviGpsPeriode) {
+      kpiSuiviGpsPeriode.textContent = periodeComplete
+        ? `${idsEquipesPeriode.length.toLocaleString('fr-FR')} équipés sur la période`
+        : '';
+    }
   } catch (err) {
     if (requeteId !== periodeRequeteId) return;
+    setChargementPeriode(false);
     console.error('Échec chargement des indicateurs sensibles à la période:', err);
+    marquerErreur('kpiCaptures');
+    marquerErreur('kpiCapturesSanitaires');
+    marquerErreur('kpiEvenementsTranslocation');
   }
 }
 

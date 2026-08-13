@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### Page Statistiques - finalisation des chiffres cles
+- Indicateur visuel discret pendant le recalcul des chiffres lies a la periode selectionnee
+- En cas d'echec de chargement d'un indicateur, un marqueur distinct (avec explication au survol) remplace l'etat neutre, pour rendre une panne detectable
+
 ### Page Statistiques - chiffres cles complets
 - Ajout du selecteur de periode (Du/Au)
 - Tous les chiffres cles sont desormais dynamiques et calcules depuis la base : individus au total, suivis GPS, transloques (avec repartition hommes/femmes), evenements de translocation, zones de translocation, captures, captures sanitaires
