@@ -3,6 +3,7 @@ import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANU
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
+import { rendreVisibleDansSidebar, activerDefilementAccordeons } from './sidebar-scroll.js';
 
 /**
  * VARIABLES GLOBALES
@@ -27,6 +28,17 @@ let toolbarCarteInitialized = false;
 let mapListenersInitialized = false;
 let mapInitialized = false;
 let temporelInitialized = false;
+
+const accordionSidebar = document.querySelector('#vueFiltres .accordion');
+activerDefilementAccordeons(accordionSidebar);
+
+function rendreTomSelectCarteVisible(dropdown) {
+  const wrapper = this.wrapper;
+  requestAnimationFrame(() => {
+    const aDefile = rendreVisibleDansSidebar(accordionSidebar, wrapper, dropdown);
+    if (aDefile) requestAnimationFrame(() => this.positionDropdown());
+  });
+}
 
 // N partage entre les modes Positions et Trajectoire — un seul champ visuel
 // (#inputNDernieres), plus de valeur "swappee" silencieusement selon le mode actif.
@@ -1108,6 +1120,7 @@ async function startApp(token) {
             placeholder: 'Ajouter une année...',
             plugins: ['remove_button'],
             hideSelected: false,
+            onDropdownOpen: rendreTomSelectCarteVisible,
             render: {
               option(data, escape) {
                 return `<div>${escape(data.text)}</div>`;
@@ -1138,6 +1151,7 @@ async function startApp(token) {
         new TomSelect(el, {
           create: false,
           allowEmptyOption: true,
+          onDropdownOpen: rendreTomSelectCarteVisible,
           onChange(value) {
             el.value = value;
             el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2647,6 +2661,15 @@ async function reinitialiserTousLesFiltres() {
         // donnees perimees, cf. rebasculerModeAffichage(). Appele apres filtrerListeIndividus()
         // ci-dessus pour que idsAChercher corresponde a l'etat de visibilite post-reset.
         enregistrerChargementInitial(locationsSuiviesRaw, n);
+
+        // La modale d'export lit ce snapshot, et non les champs courants de la sidebar.
+        // Sans sa reinitialisation, elle conservait les anciens filtres apres un clic sur
+        // "Reinitialiser", alors que la carte affichait deja son etat par defaut.
+        window._derniersFiltresAppliques = {
+          ani_is_followed: true,
+          limit_par_animal: n
+        };
+
         mettreAJourEtatBoutonTrajectoire();
 
         setTimeout(() => {

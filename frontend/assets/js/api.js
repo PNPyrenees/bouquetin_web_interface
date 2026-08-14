@@ -221,6 +221,31 @@ export async function fetchTranslocationIds(token) {
   return new Set(data.map(r => r.ani_id));
 }
 
+/**
+ * Compte le nombre d'evenements t_capture_relache par animal, toutes categories
+ * confondues (capture_objectif quelconque — translocation, veille sanitaire, probleme
+ * collier, etc.). Utilise pour le filtre "Captures/Relaches" de la page Individus.
+ * Meme approche que fetchColliersActifs/fetchTranslocationIds : une seule colonne
+ * (ani_id) recuperee en bulk, agregation cote client (ici un comptage, pas un Set).
+ */
+export async function fetchNombreCaptureRelacheParAnimal(token) {
+  const res = await fetch(`${API_URL}/t_capture_relache?select=ani_id`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=none'
+    }
+  });
+  if (!res.ok) throw new Error(`fetchNombreCaptureRelacheParAnimal error: ${res.status}`);
+  const data = await res.json();
+  const counts = new Map();
+  data.forEach(r => {
+    const cle = String(r.ani_id);
+    counts.set(cle, (counts.get(cle) || 0) + 1);
+  });
+  return counts;
+}
+
 export async function fetchPopulations(token) {
   const res = await fetch(
     `${API_URL}/t_animal?select=ani_pop_rattach&ani_pop_rattach=not.is.null&order=ani_pop_rattach.asc`,
@@ -371,16 +396,15 @@ export async function fetchCaptureRelacheParAnimal(token, aniId) {
 }
 
 /**
- * Compte les captures "reelles" (hors translocation) sur t_capture_relache, filtrees
- * sur capture_date. Les lignes de translocation n'ont jamais de capture_date renseignee
- * (toujours NULL, seule relache_date compte pour elles, confirme en base) — le filtre
- * capture_date=not.is.null suffit donc a lui seul a les exclure, sans avoir a tester
- * capture_objectif explicitement.
+ * Compte les captures "reelles" sur t_capture_relache, filtrees sur capture_date.
+ * Le filtre translocation=false rend leur exclusion explicite et robuste, meme si les
+ * lignes de translocation actuelles ont toujours une capture_date NULL.
  */
 export async function fetchCountCaptures(token, { date_from, date_to } = {}) {
   const params = new URLSearchParams();
   params.append('select', 'capture_relache_id');
   params.append('capture_date', 'not.is.null');
+  params.append('translocation', 'eq.false');
   if (date_from) params.append('capture_date', `gte.${date_from}`);
   if (date_to) params.append('capture_date', `lte.${date_to}`);
 

@@ -1,11 +1,13 @@
-import { login, fetchAnimals, fetchColliersActifs, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal, fetchLocalisationsRPC } from './api.js';
+import { login, fetchAnimals, fetchColliersActifs, fetchNombreCaptureRelacheParAnimal, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal, fetchLocalisationsRPC } from './api.js';
 import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, COULEURS_MARQUAGE, GLASBEY_32, getCouleurParIndex, SEUILS_FRAICHEUR_POSITION } from './config.js';
+import { rendreVisibleDansSidebar } from './sidebar-scroll.js';
 
 let currentToken = null;
 let currentAniId = null;
 let animals = [];
 let colliersActifs = new Set();
 let dernierePositionParAnimal = new Map();
+let captureRelacheCountParAnimal = new Map();
 let loginEnCours = false;
 let pageCourante = 1;
 let filtresListeAvantFiche = null;
@@ -330,7 +332,7 @@ function peuplerFiltresDynamiques() {
 }
 
 const IDS_FILTRES_TEXTE = ['filtreColNom'];
-const IDS_FILTRES_SELECT = ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'];
+const IDS_FILTRES_SELECT = ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut', 'filtreColCaptures'];
 
 function lireValeurFiltre(id) {
   return document.getElementById(id)?.value || '';
@@ -367,8 +369,17 @@ function obtenirCriteresFiltres({ inclureNom = true } = {}) {
     sexe: lireValeurFiltre('filtreColSexe'),
     population: lireValeurFiltre('filtreColPopulation'),
     gestionnaire: lireValeurFiltre('filtreColGestionnaire'),
-    statut: lireValeurFiltre('filtreColStatut')
+    statut: lireValeurFiltre('filtreColStatut'),
+    captures: lireValeurFiltre('filtreColCaptures')
   };
+}
+
+// '3+' regroupe tout au-dela de 3 (evite une liste de valeurs trop longue dans le
+// select) — comparaison numerique >=, les autres valeurs comparent le compte exact.
+function captureCorrespondCritere(nbCaptures, critere) {
+  if (!critere) return true;
+  if (critere === '3+') return nbCaptures >= 3;
+  return String(nbCaptures) === critere;
 }
 
 function animalCorrespondAuxFiltres(ani, criteres) {
@@ -376,13 +387,15 @@ function animalCorrespondAuxFiltres(ani, criteres) {
   const population = ani.ani_pop_rattach || '';
   const gestionnaire = ani.ani_gestionnaire || '';
   const statut = computeStatut(ani, colliersActifs);
+  const nbCaptures = captureRelacheCountParAnimal.get(String(ani.ani_id)) || 0;
 
   return (
     (!criteres.nom || nom.includes(criteres.nom)) &&
     (!criteres.sexe || ani.ani_sexe === criteres.sexe) &&
     (!criteres.population || population === criteres.population) &&
     (!criteres.gestionnaire || gestionnaire === criteres.gestionnaire) &&
-    (!criteres.statut || statut === criteres.statut)
+    (!criteres.statut || statut === criteres.statut) &&
+    captureCorrespondCritere(nbCaptures, criteres.captures)
   );
 }
 
@@ -452,13 +465,20 @@ function reinitialiserFiltresListe() {
 // classList.add ci-dessous recree le ciblage CSS perdu par ce deplacement hors de
 // #indivScreen (cf. .indiv-col-filtre-dropdown, individuals.css).
 function initTomSelectFiltresColonnes() {
-  ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'].forEach(id => {
+  ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut', 'filtreColCaptures'].forEach(id => {
     const el = document.getElementById(id);
     if (!el || el.tomselect) return;
     const ts = new TomSelect(el, {
       create: false,
       allowEmptyOption: true,
       dropdownParent: 'body',
+      onDropdownOpen(dropdown) {
+        const sidebarBody = document.querySelector('#indivSidebar .indiv-sidebar-body');
+        requestAnimationFrame(() => {
+          const aDefile = rendreVisibleDansSidebar(sidebarBody, this.wrapper, dropdown);
+          if (aDefile) requestAnimationFrame(() => this.positionDropdown());
+        });
+      },
       onChange() {
         el.dispatchEvent(new Event('change', { bubbles: true }));
       }
@@ -473,7 +493,7 @@ function initTomSelectFiltresColonnes() {
 // (overflow-y:auto, un evenement scroll sur un conteneur ne remonte pas jusqu'a window).
 // Sans ca, le dropdown reste fige a l'ecran pendant que le select defile en dessous.
 document.getElementById('indivScreen')?.addEventListener('scroll', () => {
-  ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut'].forEach(id => {
+  ['filtreColSexe', 'filtreColPopulation', 'filtreColGestionnaire', 'filtreColStatut', 'filtreColCaptures'].forEach(id => {
     document.getElementById(id)?.tomselect?.close();
   });
 }, { passive: true });
@@ -1958,6 +1978,30 @@ function agregerDistanceParMois(locations, capteurs) {
   return { categories, valeurs, corIds };
 }
 
+// Un collier sans aucune position transmise sur toute sa periode d'activite (panne
+// terrain des la pose, cf. cas Sandro/Beas confirmes en base le 2026-08-14) ne doit
+// apparaitre ni dans la legende ni sur l'axe du graphique Distance — sinon la legende
+// affiche un collier sans aucune courbe correspondante, source de confusion visuelle.
+// Croise les dates de pose (cor_date_debut/cor_date_fin) avec les positions deja
+// chargees par initGraphiquesSynthese (locations, fetchLocalisationsAnimal) — aucun
+// appel reseau supplementaire. N'affecte que ce pipeline (legende + axe du graphique
+// Distance) : capteurs reste inchange partout ailleurs (identite, cartes captures/relaches).
+function filtrerCapteursAvecPositions(capteurs, locations) {
+  const datesPositions = (locations || [])
+    .map(l => l.loc_datetime_local || l.loc_date_local)
+    .filter(Boolean)
+    .map(d => new Date(d))
+    .filter(d => !isNaN(d.getTime()));
+
+  return (capteurs || []).filter(c => {
+    if (!c.cor_date_debut) return false;
+    const debut = new Date(c.cor_date_debut);
+    const fin = c.cor_date_fin ? new Date(c.cor_date_fin) : new Date();
+    fin.setHours(23, 59, 59, 999); // inclut les positions du jour meme de fin de pose
+    return datesPositions.some(d => d >= debut && d <= fin);
+  });
+}
+
 // Couleur par pose de collier (cor_id distinct) — meme principe que
 // construireCouleursCaptureRelache() (palette Glasbey claire partagee, cf. config.js) :
 // index independant par cor_id, dans l'ordre chronologique des poses.
@@ -2082,7 +2126,12 @@ async function initGraphiquesSynthese(aniId, capteurs) {
   // pas de graphique pour un individu qui n'est plus celui affiché a l'ecran.
   if (String(currentAniId) !== String(aniId)) return;
 
-  const { categories, valeurs, corIds } = agregerDistanceParMois(locations, capteurs);
+  // Colliers sans aucune position sur toute leur periode — exclus de la legende ET de
+  // l'axe (cf. filtrerCapteursAvecPositions) ; capteurs (parametre) reste inchange pour
+  // les autres cartes de la fiche (identite, captures/relaches).
+  const capteursAvecPositions = filtrerCapteursAvecPositions(capteurs, locations);
+
+  const { categories, valeurs, corIds } = agregerDistanceParMois(locations, capteursAvecPositions);
 
   // Sous-titre de periode — periode complete desormais (plus de fenetre glissante 12 mois).
   const elPeriodeDistance = document.getElementById('periodeDistanceMois');
@@ -2094,8 +2143,8 @@ async function initGraphiquesSynthese(aniId, capteurs) {
 
   const ctx = document.getElementById('chartDistanceMois');
   if (ctx) {
-    const couleurParCorId = construireCouleursColliers(capteurs);
-    const identifiants = identifiantsColliersParCorId(capteurs);
+    const couleurParCorId = construireCouleursColliers(capteursAvecPositions);
+    const identifiants = identifiantsColliersParCorId(capteursAvecPositions);
     const couleurs = corIds.map(corId => couleurParCorId.get(corId) || '#9e9e9e');
 
     _chartDistanceMois = new Chart(ctx, {
@@ -2124,7 +2173,7 @@ async function initGraphiquesSynthese(aniId, capteurs) {
       }
     });
     observerRedimensionnementGraphique('chartDistanceMoisWrapper');
-    construireLegendeColliers(capteurs, couleurParCorId, identifiants);
+    construireLegendeColliers(capteursAvecPositions, couleurParCorId, identifiants);
   }
 }
 
@@ -2259,9 +2308,10 @@ async function initPage(token) {
   afficherSession(token);
 
   try {
-    [animals, colliersActifs] = await Promise.all([
+    [animals, colliersActifs, captureRelacheCountParAnimal] = await Promise.all([
       fetchAnimals(token),
-      fetchColliersActifs(token)
+      fetchColliersActifs(token),
+      fetchNombreCaptureRelacheParAnimal(token)
     ]);
 
     // Derniere position par animal en suivi actif — un seul appel RPC (limit_par_animal:1),
