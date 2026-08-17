@@ -1,5 +1,11 @@
 # CHANGELOG
 
+### Page Statistiques - refonte des chiffres cles et filtres
+- Simplification a 3 indicateurs principaux : individus recenses, individus equipes d'un collier au moins une fois, individus actuellement suivis par GPS
+- Ajout d'une sidebar de filtres cumulatifs (Periode, Population, Gestionnaire, Sexe), coherente avec les pages Carte et Individus
+- Les filtres se recalculent en temps reel, sans rechargement de page
+- Le filtre de periode s'applique differemment selon l'indicateur : les individus recenses restent un chiffre global, tandis que les colliers poses et le suivi GPS se recalculent selon l'intervalle de dates choisi
+
 ### Changement de police
 - La police de texte courant de toute l'application passe de Source Sans 3 a Public Sans, pour un rendu plus sobre et institutionnel
 
