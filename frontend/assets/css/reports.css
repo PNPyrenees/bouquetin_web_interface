@@ -8,7 +8,7 @@
 #reportsScreen {
   position: fixed;
   top: 60px;
-  left: 0;
+  left: var(--sidebar-width);
   right: 0;
   bottom: 0;
   overflow-y: auto;
@@ -21,34 +21,111 @@
   padding: 48px 40px 64px;
 }
 
-.reports-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 32px;
-}
-
-.reports-periode {
-  display: flex;
-  gap: 16px;
-}
-
-.reports-periode .input-group {
+/* ============================================
+   SIDEBAR DE FILTRES — coherente visuellement avec les sidebars des pages Carte/Individus
+   (main.css : .sidebar/.sidebar-content/.sidebar-header/.sidebar-footer/.input-group/
+   .sidebar-input, tous reutilises tels quels). Filtres non connectes a cette
+   etape (structure visuelle uniquement, cf. discussion prealable).
+   ============================================ */
+.reports-sidebar-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 14px;
+  background: #e8efec;
 }
 
-.reports-periode label {
+/* Meme rendu que les selects de la page Carte (main.css : .ts-wrapper.sidebar-select
+   .ts-control) — bordure/hauteur/typo identiques, alors que ces selects-ci restent
+   natifs avant l'init TomSelect (etat transitoire tres bref, cf. select.reports-col-filtre
+   plus bas qui les masque de toute facon). border-radius:0 est de toute facon impose
+   globalement a tout <select> par main.css (regle "Remove rounded corners", !important) ;
+   redeclare ici pour rester explicite si cette regle globale venait a changer.
+   Scope a select.reports-col-filtre (pas juste .reports-col-filtre) — sinon ce style
+   s'applique aussi au .ts-wrapper (meme classe recopiee par TomSelect sur son wrapper),
+   qui affiche alors sa propre bordure en plus de celle du .ts-control interne (effet
+   "double case", meme piege deja documente sur select.indiv-col-filtre/individuals.css). */
+select.reports-col-filtre {
+  width: 100%;
+  height: 30px;
+  padding: 3px 10px;
+  border: 1px solid #9ab5ac;
+  border-radius: 0;
   font-family: var(--font-family);
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 13px;
+  background: #ffffff;
+  color: #1a3d2f;
+  cursor: pointer;
 }
 
-.reports-periode .sidebar-input {
-  width: 140px;
+select.reports-col-filtre:focus {
+  outline: none;
+  border-color: #2D6A4F;
+  box-shadow: 0 0 0 2px rgba(45, 106, 79, 0.1);
+}
+
+/* Les <select class="reports-col-filtre"> sont remplaces par TomSelect (cf. reports.js,
+   initTomSelectFiltresReports) — masque des le CSS pour eviter le flash du select natif
+   brut le temps que le fetch (peuplerFiltresReportsDynamiques) resolve et que TomSelect
+   injecte son wrapper. Meme principe que select.sidebar-select (page Carte, main.css)
+   et select.indiv-col-filtre (page Individus, individuals.css). */
+select.reports-col-filtre {
+  display: none;
+}
+
+/* Rendu identique a .ts-wrapper.sidebar-select (page Carte, main.css) — border-radius:0
+   et box-shadow:none sont de toute facon imposes globalement a tout .ts-control/.ts-dropdown
+   par la regle "Remove rounded corners" de main.css (!important), donc pas redeclares ici. */
+.ts-wrapper.reports-col-filtre {
+  width: 100%;
+}
+
+.ts-wrapper.reports-col-filtre .ts-control {
+  height: 30px;
+  min-height: 0;
+  padding: 3px 10px;
+  border: 1px solid #9ab5ac;
+  font-family: var(--font-family);
+  font-size: 13px;
+  color: #1a3d2f;
+  background: #ffffff;
+  cursor: pointer;
+  flex-wrap: nowrap;
+}
+
+.ts-wrapper.reports-col-filtre .ts-control > input {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.ts-wrapper.reports-col-filtre.focus .ts-control {
+  border-color: #2D6A4F;
+}
+
+/* Le dropdown est deplace vers <body> par dropdownParent:'body' (reports.js,
+   initTomSelectFiltresReports) — plus un descendant de #reportsSidebar une fois ouvert,
+   d'ou le ciblage par classe dediee (ts.dropdown.classList.add), meme principe que
+   .indiv-col-filtre-dropdown sur la page Individus. */
+.reports-col-filtre-dropdown {
+  border: 1px solid #9ab5ac;
+  font-family: var(--font-family);
+  font-size: 13px;
+}
+
+.reports-lien-reinitialiser {
+  color: #2D6A4F;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reports-lien-reinitialiser:hover {
+  text-decoration: underline;
 }
 
 /* Separateurs fins obtenus via gap+background plutot que des bordures par cellule —
@@ -96,20 +173,24 @@
   transition: opacity 0.15s ease;
 }
 
-/* Etat de chargement des KPI rafraichis a chaque changement de periode (cf.
-   setChargementPeriode(), reports.js) — signal discret qu'un chiffre affiche ne
-   correspond plus forcement a la periode actuellement selectionnee. */
+/* Etat de chargement des KPI filtrables rafraichis a chaque changement de filtre (cf.
+   setChargementFiltresReports(), reports.js) — signal discret qu'un chiffre affiche ne
+   correspond plus forcement aux filtres actuellement selectionnes. */
 .reports-kpi-value.loading,
 .reports-kpi-sub.loading {
   opacity: 0.4;
 }
 
+/* Indicateurs mis en veille (cf. retour Ludovic, simplification a 3 KPI) — masques,
+   pas supprimes du HTML, reactivables plus tard sous forme de graphiques. auto-fit
+   (ci-dessus) retire ces cellules du calcul de colonnes, la grille se recompose
+   naturellement. */
+.reports-masque {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .reports-content {
     padding: 32px 20px 48px;
-  }
-
-  .reports-toolbar {
-    justify-content: flex-start;
   }
 }

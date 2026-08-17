@@ -39,8 +39,10 @@
   <link rel="stylesheet" href="../assets/css/main.css">
   <link rel="stylesheet" href="../assets/css/reports.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/fr.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 </head>
 
 <body>
@@ -87,10 +89,11 @@
   <!-- Script classique synchrone : initialise la session avant le premier rendu du header. -->
   <script src="../assets/js/reports.js"></script>
 
-  <main id="reportsScreen">
-    <div class="reports-content">
-      <div class="reports-toolbar">
-        <div class="reports-periode">
+  <aside class="sidebar" id="reportsSidebar">
+    <div class="sidebar-content">
+      <div class="sidebar-header">FILTRES</div>
+      <div class="reports-sidebar-body">
+        <div class="date-row">
           <div class="input-group">
             <label for="reportsDateFrom">Du</label>
             <input type="text" class="sidebar-input" id="reportsDateFrom" placeholder="JJ/MM/AAAA" autocomplete="off">
@@ -100,14 +103,46 @@
             <input type="text" class="sidebar-input" id="reportsDateTo" placeholder="JJ/MM/AAAA" autocomplete="off">
           </div>
         </div>
+        <div class="input-group">
+          <label>Population</label>
+          <select id="filtreReportsPopulation" class="reports-col-filtre">
+            <option value="">Tous</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Gestionnaire</label>
+          <select id="filtreReportsGestionnaire" class="reports-col-filtre">
+            <option value="">Tous</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Sexe</label>
+          <select id="filtreReportsSexe" class="reports-col-filtre">
+            <option value="">Tous</option>
+            <option value="M">M</option>
+            <option value="F">F</option>
+          </select>
+        </div>
       </div>
+      <div class="sidebar-footer">
+        <a id="btnReinitialiserFiltresReports" class="reports-lien-reinitialiser">Réinitialiser</a>
+      </div>
+    </div>
+  </aside>
 
+  <main id="reportsScreen">
+    <div class="reports-content">
       <!-- Grille de chiffres cles — peuplee par reports.js a partir de l'etape 2, jamais de
            valeur codee en dur ici. "—" = etat initial/chargement. -->
       <div class="reports-kpi-grid" id="reportsKpiGrid">
         <div class="reports-kpi-cell">
           <div class="reports-kpi-value" id="kpiTotalIndividus">-</div>
-          <div class="reports-kpi-label">Individus capturés enregistrés</div>
+          <div class="reports-kpi-label">Individus recensés</div>
+        </div>
+        <div class="reports-kpi-cell">
+          <div class="reports-kpi-value" id="kpiEquipes">-</div>
+          <div class="reports-kpi-label">Équipés d'un collier</div>
+          <div class="reports-kpi-sub" id="kpiEquipesSub">Cumul historique</div>
         </div>
         <div class="reports-kpi-cell">
           <div class="reports-kpi-value" id="kpiSuiviGps">-</div>
@@ -115,24 +150,24 @@
           <div class="reports-kpi-sub" id="kpiSuiviGpsPourcentage"></div>
           <div class="reports-kpi-sub" id="kpiSuiviGpsPeriode"></div>
         </div>
-        <div class="reports-kpi-cell">
+        <div class="reports-kpi-cell reports-masque">
           <div class="reports-kpi-value" id="kpiTransloques">-</div>
           <div class="reports-kpi-label">Individus transloqués</div>
           <div class="reports-kpi-sub" id="kpiTransloquesRepartition"></div>
         </div>
-        <div class="reports-kpi-cell">
+        <div class="reports-kpi-cell reports-masque">
           <div class="reports-kpi-value" id="kpiEvenementsTranslocation">-</div>
           <div class="reports-kpi-label">Événements de translocation</div>
         </div>
-        <div class="reports-kpi-cell">
+        <div class="reports-kpi-cell reports-masque">
           <div class="reports-kpi-value" id="kpiZones">-</div>
           <div class="reports-kpi-label">Zones de translocation</div>
         </div>
-        <div class="reports-kpi-cell">
+        <div class="reports-kpi-cell reports-masque">
           <div class="reports-kpi-value" id="kpiCaptures">-</div>
           <div class="reports-kpi-label">Captures</div>
         </div>
-        <div class="reports-kpi-cell">
+        <div class="reports-kpi-cell reports-masque">
           <div class="reports-kpi-value" id="kpiCapturesSanitaires">-</div>
           <div class="reports-kpi-label">Captures sanitaires</div>
         </div>
