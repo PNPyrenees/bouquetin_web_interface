@@ -80,26 +80,10 @@ function marquerErreur(id) {
 }
 
 /**
- * Charge le nombre total d'individus (t_animal) et l'affiche dans la grille — le "-"
- * deja present dans le HTML sert d'etat de chargement, puis marquerErreur() en cas
- * d'echec (pas de message intrusif pour un simple chiffre non critique).
- */
-async function chargerKpiTotalIndividus(token) {
-  try {
-    const { fetchCountAnimaux } = await chargerApi();
-    const total = await fetchCountAnimaux(token);
-    document.getElementById('kpiTotalIndividus').textContent = total.toLocaleString('fr-FR');
-  } catch (err) {
-    console.error('Échec chargement du nombre total d\'individus:', err);
-    marquerErreur('kpiTotalIndividus');
-  }
-}
-
-/**
  * Convertit une date JJ/MM/AAAA (format Flatpickr/affichage) en ISO AAAA-MM-JJ, format
- * attendu par les filtres PostgREST (gte./lte. sur capture_date/relache_date). Meme
- * conversion que getPeriodesActives() dans filters.js, dupliquee ici car reports.js
- * n'importe pas filters.js (page independante, pas de logique de filtre partagee).
+ * attendu par les filtres PostgREST (gte./lte.). Meme conversion que getPeriodesActives()
+ * dans filters.js, dupliquee ici car reports.js n'importe pas filters.js (page
+ * independante, pas de logique de filtre partagee).
  */
 function convertirDateFrancaiseEnISO(dateStr) {
   if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return null;
@@ -107,121 +91,173 @@ function convertirDateFrancaiseEnISO(dateStr) {
   return `${a}-${m}-${j}`;
 }
 
-function lireFiltresPeriode() {
+/**
+ * FILTRES SIDEBAR (Population/Gestionnaire/Sexe/Periode) — filtrage cumulatif (ET
+ * logique) en temps reel des 3 KPI filtrables, meme pattern que la page Individus. La
+ * periode ne s'applique PAS a Individus recenses : fetchCountAnimaux ignore
+ * date_from/date_to par construction (cf. api.js).
+ */
+function lireFiltresReports() {
   const dateFrom = document.getElementById('reportsDateFrom')?.value || '';
   const dateTo = document.getElementById('reportsDateTo')?.value || '';
   return {
+    population: document.getElementById('filtreReportsPopulation')?.value || '',
+    gestionnaire: document.getElementById('filtreReportsGestionnaire')?.value || '',
+    sexe: document.getElementById('filtreReportsSexe')?.value || '',
     date_from: convertirDateFrancaiseEnISO(dateFrom) || undefined,
     date_to: convertirDateFrancaiseEnISO(dateTo) || undefined
   };
 }
 
-/**
- * Charge les 3 indicateurs de stock global (non filtres par periode, cf. etape 6 du
- * plan) : individus transloques (+ repartition F/M), individus suivis GPS (+ pourcentage),
- * nombre de zones de translocation. Appelee uniquement au chargement initial — ces
- * chiffres ne dependent pas du selecteur de periode.
- */
-async function chargerKpisStock(token) {
-  try {
-    const { fetchTranslocationIds, fetchAnimals, fetchAnimauxSuivis, fetchCountAnimaux, fetchCountZonesTranslocation } = await chargerApi();
-    // "Suivis GPS" = etat ACTUEL (collier actif + derniere position transmise), meme
-    // definition que la page Carte (fetchAnimauxSuivis) — PAS le cumul historique de
-    // tous les individus equipes un jour (colliers aujourd'hui inactifs inclus). Ne
-    // pas comparer ce chiffre a un rapport externe utilisant l'autre definition.
-    const [transloquesIds, animaux, suivisIds, totalIndividus, nombreZones] = await Promise.all([
-      fetchTranslocationIds(token),
-      fetchAnimals(token),
-      fetchAnimauxSuivis(token),
-      fetchCountAnimaux(token),
-      fetchCountZonesTranslocation(token)
-    ]);
+const ID_KPIS_FILTRABLES = ['kpiTotalIndividus', 'kpiEquipes', 'kpiSuiviGps'];
 
-    const transloques = animaux.filter(a => transloquesIds.has(a.ani_id));
-    const femelles = transloques.filter(a => a.ani_sexe === 'F').length;
-    const males = transloques.filter(a => a.ani_sexe === 'M').length;
-    document.getElementById('kpiTransloques').textContent = transloques.length.toLocaleString('fr-FR');
-    document.getElementById('kpiTransloquesRepartition').textContent = `${femelles}F / ${males}M`;
+function setChargementFiltresReports(enCours) {
+  ID_KPIS_FILTRABLES.forEach(id => {
+    document.getElementById(id)?.classList.toggle('loading', enCours);
+  });
+}
+
+let filtresReportsRequeteId = 0;
+
+/**
+ * Charge les 3 KPI filtrables (Individus recenses, Equipes d'un collier, Suivis GPS)
+ * selon les criteres actuels de la sidebar. Appelee au chargement initial (filtres
+ * vides) et a chaque changement d'un des 3 selects. Garde de sequence
+ * (filtresReportsRequeteId) : evite qu'une reponse perimee (changement rapide de
+ * filtre) ecrase un resultat plus recent.
+ */
+async function chargerKpisFiltrablesReports(token) {
+  const requeteId = ++filtresReportsRequeteId;
+  const filtres = lireFiltresReports();
+  const periodeActive = Boolean(filtres.date_from || filtres.date_to);
+  setChargementFiltresReports(true);
+  try {
+    const { fetchCountAnimaux, fetchCountAnimauxEquipes, fetchAnimauxSuivis } = await chargerApi();
+    // "Suivis GPS" = etat ACTUEL (collier actif + derniere position transmise) SAUF si
+    // une periode est active, auquel cas fetchAnimauxSuivis bascule sur "au moins une
+    // position transmise PENDANT la periode" (cf. api.js). "Equipes d'un collier" =
+    // cumul historique SAUF periode active (alors poses dont cor_date_debut tombe dans
+    // l'intervalle). Ne pas comparer ces chiffres a un rapport externe utilisant une
+    // autre definition.
+    const [totalIndividus, totalEquipes, suivisIds] = await Promise.all([
+      fetchCountAnimaux(token, filtres),
+      fetchCountAnimauxEquipes(token, filtres),
+      fetchAnimauxSuivis(token, filtres)
+    ]);
+    if (requeteId !== filtresReportsRequeteId) return;
+    setChargementFiltresReports(false);
+
+    document.getElementById('kpiTotalIndividus').textContent = totalIndividus.toLocaleString('fr-FR');
+    document.getElementById('kpiEquipes').textContent = totalEquipes.toLocaleString('fr-FR');
+
+    const kpiEquipesSub = document.getElementById('kpiEquipesSub');
+    if (kpiEquipesSub) kpiEquipesSub.textContent = periodeActive ? 'Sur la période sélectionnée' : 'Cumul historique';
 
     const pourcentageSuivi = totalIndividus > 0 ? Math.round((suivisIds.size / totalIndividus) * 100) : 0;
     document.getElementById('kpiSuiviGps').textContent = suivisIds.size.toLocaleString('fr-FR');
     document.getElementById('kpiSuiviGpsPourcentage').textContent = `${pourcentageSuivi}%`;
 
-    document.getElementById('kpiZones').textContent = nombreZones.toLocaleString('fr-FR');
+    const kpiSuiviGpsPeriode = document.getElementById('kpiSuiviGpsPeriode');
+    if (kpiSuiviGpsPeriode) kpiSuiviGpsPeriode.textContent = periodeActive ? 'Sur la période sélectionnée' : '';
   } catch (err) {
-    console.error('Échec chargement des indicateurs de stock:', err);
-    marquerErreur('kpiTransloques');
+    if (requeteId !== filtresReportsRequeteId) return;
+    setChargementFiltresReports(false);
+    console.error('Échec chargement des KPI filtrables:', err);
+    marquerErreur('kpiTotalIndividus');
+    marquerErreur('kpiEquipes');
     marquerErreur('kpiSuiviGps');
-    marquerErreur('kpiZones');
   }
 }
 
-let periodeRequeteId = 0;
-
-const ID_KPIS_PERIODE = ['kpiCaptures', 'kpiCapturesSanitaires', 'kpiEvenementsTranslocation', 'kpiSuiviGpsPeriode'];
-
 /**
- * Bascule la classe .loading (opacite reduite, cf. reports.css) sur les KPI sensibles
- * a la periode pendant qu'une requete de rafraichissement est en vol — sans ca, un
- * changement rapide de periode laisse un ancien chiffre affiche sans aucun signal
- * qu'il ne correspond plus a la periode selectionnee (cf. audit durcissement, point 1).
+ * Peuple dynamiquement les selects Population/Gestionnaire (fetchPopulations/
+ * fetchGestionnaires, deja utilisees sur la page Carte) — appelee une seule fois au
+ * chargement initial. L'option "Tous" (value="") est deja presente en dur dans le HTML.
  */
-function setChargementPeriode(enCours) {
-  ID_KPIS_PERIODE.forEach(id => {
-    document.getElementById(id)?.classList.toggle('loading', enCours);
+async function peuplerFiltresReportsDynamiques(token) {
+  try {
+    const { fetchPopulations, fetchGestionnaires } = await chargerApi();
+    const [populations, gestionnaires] = await Promise.all([
+      fetchPopulations(token),
+      fetchGestionnaires(token)
+    ]);
+
+    const selectPopulation = document.getElementById('filtreReportsPopulation');
+    if (selectPopulation) {
+      populations.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        selectPopulation.appendChild(opt);
+      });
+    }
+
+    const selectGestionnaire = document.getElementById('filtreReportsGestionnaire');
+    if (selectGestionnaire) {
+      gestionnaires.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g;
+        opt.textContent = g;
+        selectGestionnaire.appendChild(opt);
+      });
+    }
+  } catch (err) {
+    console.error('Échec peuplement des filtres Population/Gestionnaire:', err);
+  } finally {
+    // Dans le finally : les 3 selects doivent etre remplaces par TomSelect meme si le
+    // peuplement Population/Gestionnaire a echoue (Sexe reste utilisable, options
+    // statiques deja dans le HTML) — un echec reseau partiel ne doit pas priver
+    // l'utilisateur du filtre Sexe.
+    initTomSelectFiltresReports();
+  }
+}
+
+// TomSelect — meme mecanisme que initTomSelectFiltresColonnes() (individuals.js) :
+// remplace le rendu natif (popup non stylable de facon fiable/coherente entre
+// navigateurs) par un composant HTML entierement stylable (cf. .ts-wrapper.reports-col-filtre
+// dans reports.css), pour un rendu identique a la page Carte y compris a l'ouverture.
+// dropdownParent: 'body' evite que le popup soit coupe par un overflow parent —
+// meme choix defensif que sur la page Individus.
+function initTomSelectFiltresReports() {
+  ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el || el.tomselect) return;
+    const ts = new TomSelect(el, {
+      create: false,
+      allowEmptyOption: true,
+      dropdownParent: 'body',
+      onChange() {
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+    ts.dropdown.classList.add('reports-col-filtre-dropdown');
   });
 }
 
-/**
- * Charge les 3 indicateurs sensibles a la periode (Captures, Captures sanitaires,
- * Evenements de translocation) et les affiche. Appelee au chargement initial (periode
- * vide = historique complet) et a chaque changement des champs Du/Au. Garde de
- * sequence (periodeRequeteId) : si l'utilisateur modifie Du puis Au rapidement, deux
- * appels se chevauchent — sans garde, la reponse la plus lente pourrait ecraser
- * l'affichage avec un resultat perime.
- */
-async function chargerKpisSensiblesPeriode(token) {
-  const requeteId = ++periodeRequeteId;
-  const filtres = lireFiltresPeriode();
-  const periodeComplete = Boolean(filtres.date_from && filtres.date_to);
-  setChargementPeriode(true);
-  try {
-    const { fetchCountCaptures, fetchCountCapturesSanitaires, fetchCountEvenementsTranslocation, fetchAnimalIdsParPeriode } = await chargerApi();
-    // idsEquipesPeriode reste null si la periode n'est pas complete (Du et Au tous les
-    // deux renseignes) — evite une requete inutile et garde le sous-texte invisible,
-    // pour ne pas dérouter l'utilisateur sur ce que represente "la periode" a vide.
-    const [captures, capturesSanitaires, evenementsTranslocation, idsEquipesPeriode] = await Promise.all([
-      fetchCountCaptures(token, filtres),
-      fetchCountCapturesSanitaires(token, filtres),
-      fetchCountEvenementsTranslocation(token, filtres),
-      periodeComplete ? fetchAnimalIdsParPeriode(token, filtres) : Promise.resolve(null)
-    ]);
-    if (requeteId !== periodeRequeteId) return;
-    setChargementPeriode(false);
-    document.getElementById('kpiCaptures').textContent = captures.toLocaleString('fr-FR');
-    document.getElementById('kpiCapturesSanitaires').textContent = capturesSanitaires.toLocaleString('fr-FR');
-    document.getElementById('kpiEvenementsTranslocation').textContent = evenementsTranslocation.toLocaleString('fr-FR');
+// Ferme les dropdowns TomSelect ouverts au scroll du contenu principal —
+// dropdownParent:'body' ne recalcule la position qu'au scroll/resize de la fenetre,
+// jamais au scroll interne de #reportsScreen (meme raison que sur la page Individus).
+document.getElementById('reportsScreen')?.addEventListener('scroll', () => {
+  ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
+    document.getElementById(id)?.tomselect?.close();
+  });
+}, { passive: true });
 
-    const kpiSuiviGpsPeriode = document.getElementById('kpiSuiviGpsPeriode');
-    if (kpiSuiviGpsPeriode) {
-      kpiSuiviGpsPeriode.textContent = periodeComplete
-        ? `${idsEquipesPeriode.length.toLocaleString('fr-FR')} équipés sur la période`
-        : '';
-    }
-  } catch (err) {
-    if (requeteId !== periodeRequeteId) return;
-    setChargementPeriode(false);
-    console.error('Échec chargement des indicateurs sensibles à la période:', err);
-    marquerErreur('kpiCaptures');
-    marquerErreur('kpiCapturesSanitaires');
-    marquerErreur('kpiEvenementsTranslocation');
-  }
+// Vide les 3 selects + la periode puis recharge les KPI — equivaut a "tout afficher".
+function reinitialiserFiltresReports(token) {
+  ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const dateFrom = document.getElementById('reportsDateFrom');
+  const dateTo = document.getElementById('reportsDateTo');
+  if (dateFrom) { dateFrom.value = ''; dateFrom._flatpickr?.clear(); }
+  if (dateTo) { dateTo.value = ''; dateTo._flatpickr?.clear(); }
+  chargerKpisFiltrablesReports(token);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Flatpickr — Periode (JJ/MM/AAAA), meme pattern que app.js/individuals.js. Pas
-  // encore d'effet sur les chiffres affiches a cette etape (etape 5 du plan) — seul
-  // le fonctionnement visuel du selecteur est branche ici.
+  // Flatpickr — Periode (JJ/MM/AAAA), meme pattern que app.js/individuals.js.
   if (window.flatpickr) {
     flatpickr('#reportsDateFrom', {
       dateFormat: 'd/m/Y',
@@ -248,10 +284,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('reportsDateFrom')?.addEventListener('input', () => {
-    if (tokenAuChargement) chargerKpisSensiblesPeriode(tokenAuChargement);
+    if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
   });
   document.getElementById('reportsDateTo')?.addEventListener('input', () => {
-    if (tokenAuChargement) chargerKpisSensiblesPeriode(tokenAuChargement);
+    if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
+  });
+
+  ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
+    });
+  });
+
+  document.getElementById('btnReinitialiserFiltresReports')?.addEventListener('click', () => {
+    if (tokenAuChargement) reinitialiserFiltresReports(tokenAuChargement);
   });
 
   document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
@@ -297,9 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (tokenAuChargement) {
     masquerLoginScreen();
-    chargerKpiTotalIndividus(tokenAuChargement);
-    chargerKpisSensiblesPeriode(tokenAuChargement);
-    chargerKpisStock(tokenAuChargement);
+    peuplerFiltresReportsDynamiques(tokenAuChargement);
+    chargerKpisFiltrablesReports(tokenAuChargement);
   } else {
     afficherLoginScreen();
   }
