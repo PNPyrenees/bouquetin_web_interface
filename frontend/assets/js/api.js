@@ -51,8 +51,14 @@ export async function fetchAnimals(token) {
  * standard PostgREST pour une table est Prefer: count=exact + lecture du total dans
  * l'entete de reponse Content-Range (format "0-0/348"), pas dans le corps.
  */
-export async function fetchCountAnimaux(token) {
-  const res = await fetch(`${API_URL}/t_animal?select=ani_id`, {
+export async function fetchCountAnimaux(token, filters = {}) {
+  const params = new URLSearchParams();
+  params.append('select', 'ani_id');
+  if (filters.population) params.append('ani_pop_rattach', `eq.${filters.population}`);
+  if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
+  if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
+
+  const res = await fetch(`${API_URL}/t_animal?${params.toString()}`, {
     method: 'HEAD',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -163,20 +169,53 @@ export async function fetchProgrammations(token) {
 }
 
 /**
- * Récupère les ani_id "suivis" au sens de la page Carte : collier actif
- * (cor_date_fin IS NULL) ET au moins une position GPS transmise — dérivé du
- * résultat de f_get_localisation (var_ani_is_followed=true, var_limit_par_animal=1),
- * pas d'une requête directe sur cor_animal_capteur. Construction identique à
- * activeIds (app.js:543-545), pour que la page Individus retombe exactement sur
- * la même source de vérité que la page Carte. Un animal avec collier actif mais
- * 0 position (ex. capteur récemment posé ou en panne) n'apparaît PAS dans ce
- * Set — il reste 'non_suivi' côté page Individus, cohérent avec son absence de
- * la liste des individus suivis sur la page Carte.
+ * Récupère les ani_id "suivis". Sans période (filters.date_from/date_to absents) : au
+ * sens de la page Carte — collier actif (cor_date_fin IS NULL) ET au moins une position
+ * GPS transmise, dérivé de f_get_localisation (var_ani_is_followed=true,
+ * var_limit_par_animal=1) — état ACTUEL, pas d'exigence de date. Construction identique
+ * à activeIds (app.js:543-545), pour que la page Individus retombe exactement sur la
+ * même source de vérité que la page Carte. Un animal avec collier actif mais 0 position
+ * n'apparaît PAS dans ce Set.
+ *
+ * Avec période : bascule sur une sémantique différente — "au moins une position
+ * transmise PENDANT la période", indépendamment du statut actuel du collier
+ * (cor_date_fin). var_limit_par_animal=1 ne garde que la DERNIÈRE position de chaque
+ * animal, qui peut tomber hors période même si l'animal a transmis PENDANT la période
+ * (sous-comptage silencieux) — donc pas question de juste ajouter date_from/date_to au
+ * chemin RPC ci-dessus. Réutilise fetchAnimalIdsParPeriode (même fonction que l'ancien
+ * indicateur "équipés sur la période" de la page Statistiques, retiré puis réintroduit
+ * ici) puis croise avec Population/Gestionnaire/Sexe via t_animal — même mécanisme que
+ * fetchCountAnimauxEquipes, nécessaire car v_localisation n'expose pas les attributs de
+ * l'animal. fetchAnimauxSuivis n'est appelée que par reports.js (vérifié — non partagée
+ * avec app.js/individuals.js), ce branchement est donc sans impact sur la page Carte.
  */
-export async function fetchAnimauxSuivis(token) {
+export async function fetchAnimauxSuivis(token, filters = {}) {
+  const periodeActive = Boolean(filters.date_from || filters.date_to);
+
+  if (periodeActive) {
+    const idsPeriode = await fetchAnimalIdsParPeriode(token, { date_from: filters.date_from, date_to: filters.date_to });
+    const aFiltresAttributs = Boolean(filters.population || filters.gestionnaire || filters.sexe);
+    if (!aFiltresAttributs) return new Set(idsPeriode);
+
+    const params = new URLSearchParams();
+    params.append('select', 'ani_id');
+    if (filters.population) params.append('ani_pop_rattach', `eq.${filters.population}`);
+    if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
+    if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
+    const res = await fetch(`${API_URL}/t_animal?${params.toString()}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept-Profile': 'bouquetin', 'Prefer': 'count=none' }
+    });
+    if (!res.ok) throw new Error(`fetchAnimauxSuivis error (filtre animaux): ${res.status}`);
+    const idsAutorises = new Set((await res.json()).map(a => String(a.ani_id)));
+    return new Set(idsPeriode.filter(id => idsAutorises.has(id)));
+  }
+
   const locations = await fetchLocalisationsRPC(token, {
     ani_is_followed: true,
-    limit_par_animal: 1
+    limit_par_animal: 1,
+    sexe: filters.sexe,
+    gestionnaire: filters.gestionnaire,
+    population: filters.population
   });
   return new Set(locations.map(l => l.ani_id));
 }
@@ -202,6 +241,54 @@ export async function fetchColliersActifs(token) {
   if (!res.ok) throw new Error(`fetchColliersActifs error: ${res.status}`);
   const data = await res.json();
   return new Set(data.map(r => r.ani_id));
+}
+
+/**
+ * Compte les individus ayant ete equipes d'au moins un collier. Sans periode : cumul
+ * historique complet (COUNT(DISTINCT ani_id) sur cor_animal_capteur, toutes poses
+ * confondues, actives ou terminees) — distinct de fetchAnimauxSuivis (etat COURANT :
+ * collier actif + position recente). Avec date_from/date_to : restreint aux poses dont
+ * cor_date_debut tombe dans l'intervalle (combien de colliers ont ete POSES durant la
+ * periode — pas une notion d'activite GPS). Une requete HEAD ne peut pas exprimer un
+ * COUNT(DISTINCT ...) via PostgREST, d'ou le meme mecanisme que
+ * fetchCountZonesTranslocation : colonne unique recuperee en bulk, deduplication cote
+ * client via Set.
+ */
+export async function fetchCountAnimauxEquipes(token, filters = {}) {
+  const aFiltres = Boolean(filters.population || filters.gestionnaire || filters.sexe);
+  let idsAutorises = null;
+
+  if (aFiltres) {
+    const params = new URLSearchParams();
+    params.append('select', 'ani_id');
+    if (filters.population) params.append('ani_pop_rattach', `eq.${filters.population}`);
+    if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
+    if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
+    const resAnimaux = await fetch(`${API_URL}/t_animal?${params.toString()}`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept-Profile': 'bouquetin', 'Prefer': 'count=none' }
+    });
+    if (!resAnimaux.ok) throw new Error(`fetchCountAnimauxEquipes error (filtre animaux): ${resAnimaux.status}`);
+    idsAutorises = new Set((await resAnimaux.json()).map(a => a.ani_id));
+    // Court-circuit : aucun animal ne correspond aux filtres, inutile d'interroger cor_animal_capteur.
+    if (idsAutorises.size === 0) return 0;
+  }
+
+  const params = new URLSearchParams();
+  params.append('select', 'ani_id');
+  if (filters.date_from) params.append('cor_date_debut', `gte.${filters.date_from}`);
+  if (filters.date_to) params.append('cor_date_debut', `lte.${filters.date_to}`);
+
+  const res = await fetch(`${API_URL}/cor_animal_capteur?${params.toString()}`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=none'
+    }
+  });
+  if (!res.ok) throw new Error(`fetchCountAnimauxEquipes error: ${res.status}`);
+  const data = await res.json();
+  const lignes = aFiltres ? data.filter(r => idsAutorises.has(r.ani_id)) : data;
+  return new Set(lignes.map(r => r.ani_id)).size;
 }
 
 /**
