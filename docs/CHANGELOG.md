@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### Blocage de l'indexation par les moteurs de recherche
+- Ajout d'un fichier robots.txt interdisant le crawl de toute l'application
+- Ajout d'une balise meta robots noindex/nofollow sur les 3 pages, en protection complementaire
+
 ### Page Statistiques - refonte des chiffres cles et filtres
 - Simplification a 3 indicateurs principaux : individus recenses, individus equipes d'un collier au moins une fois, individus actuellement suivis par GPS
 - Ajout d'une sidebar de filtres cumulatifs (Periode, Population, Gestionnaire, Sexe), coherente avec les pages Carte et Individus
