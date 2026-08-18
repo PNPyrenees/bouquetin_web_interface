@@ -27,34 +27,16 @@ function formatSaisonPourAPI(dateJJMM) {
 
 const BATCH_SIZE = 10000;
 
-// Cache de positions decouple du rendu (gpsSource peut n'afficher qu'un sous-ensemble du
-// cache, cf. sur-chargement preventif ci-dessous) — source de verite pour la reutilisation
-// client entre modes Positions/Trajectoire, y compris "Toutes les positions". Mis a jour a
-// chaque chargement reseau reussi dans applyFilters() (les deux branches).
 let _cachePositions = [];
 
-// Instantane du dernier chargement reussi (Positions ou Trajectoire) — { portee, limitParAnimal }.
-// limitParAnimal: nombre de positions/animal reellement presentes dans _cachePositions, ou
-// null si _cachePositions contient TOUTES les positions correspondant a la portee (mode
-// "Toutes les positions"). Cf. peutReutiliser()/deriverPourBesoin().
 let _dernierChargement = null;
 
-// AbortController du chargement applyFilters() en cours — permet au bouton Annuler
-// (#btnAnnulerChargement, cf. index.html) d'interrompre une requete f_get_localisation
-// en vol ou d'arreter la pagination entre deux lots. Recree a chaque appel a
-// applyFilters(), remis a null dans son bloc finally.
 let _controllerChargementActuel = null;
 
 document.getElementById('btnAnnulerChargement')?.addEventListener('click', () => {
   _controllerChargementActuel?.abort();
 });
 
-/**
- * Assemble l'objet de portee de filtres compare pour decider d'une reutilisation client —
- * meme perimetre que window._derniersFiltresAppliques, plus include_outliers (absent de ce
- * dernier) : une bascule de "Inclure les outliers" entre deux chargements doit invalider
- * la reutilisation, sinon des positions filtrees par erreur resteraient affichees.
- */
 function construirePorteeComparaison(idsAChercher, dateFrom, dateTo, saisonFrom, saisonTo, annees, filters, suivisSeulement) {
   return {
     ani_id: idsAChercher,
@@ -75,16 +57,6 @@ function construirePorteeComparaison(idsAChercher, dateFrom, dateTo, saisonFrom,
   };
 }
 
-/**
- * Enregistre le chargement initial de startApp() (mode Positions, n positions/animal,
- * ani_is_followed=true, aucun autre filtre) dans le meme cache que applyFilters(). Sans
- * cela, startApp() — qui fait son propre fetch reseau hors de applyFilters() — ne peuple
- * jamais _cachePositions, et le premier basculement vers Trajectoire repart toujours en
- * reseau meme si les N sont identiques. A appeler apres resolution de fetchAniCalendrier()
- * (donc apres le flaggage sansGeom sur #listeIndividus) pour que idsAChercher calcule
- * exactement la meme liste qu'un futur appel a applyFilters() — sinon la comparaison de
- * portee echoue et le cache n'est jamais reutilise (pas d'erreur, juste sans le gain).
- */
 export function enregistrerChargementInitial(locations, n) {
   const idsAChercher = Array.from(document.querySelectorAll('#listeIndividus .checkbox-label'))
     .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
@@ -103,23 +75,8 @@ export function enregistrerChargementInitial(locations, n) {
   _dernierChargement = { portee, limitParAnimal: n, partiel: false };
 }
 
-/**
- * Determine si le chargement demande (besoinLimitParAnimal positions/animal, ou null pour
- * "Toutes") peut etre derive de _cachePositions plutot que de relancer une requete reseau.
- * Condition generale (pas restreinte a un sens Positions<->Trajectoire particulier) : le
- * dernier chargement reussi doit porter sur exactement la meme portee de filtres, et son
- * volume doit couvrir le besoin — un cache "Toutes" (limitParAnimal null) couvre n'importe
- * quel besoin ; un cache limite ne couvre un besoin "Toutes" sous aucune condition (on ne
- * sait pas s'il manque des positions au-dela de ce qui a ete charge).
- */
 function peutReutiliser(porteeActuelle, besoinLimitParAnimal) {
   if (!_dernierChargement) return false;
-  // Un cache marque partiel (chargement interrompu par le bouton Annuler, cf. applyFilters)
-  // n'est jamais reutilise — on ne peut pas garantir que les positions recues avant
-  // l'annulation soient bien les plus recentes de chaque animal (ordre de pagination
-  // cote f_get_localisation non verifiable depuis ce depot), donc aucune reutilisation,
-  // meme pour un besoin numerique plus petit. Il sert uniquement a conserver l'affichage
-  // deja rendu a l'ecran, jamais de base a un futur chargement.
   if (_dernierChargement.partiel) return false;
   if (JSON.stringify(_dernierChargement.portee) !== JSON.stringify(porteeActuelle)) return false;
   if (_dernierChargement.limitParAnimal === null) return true;
@@ -127,28 +84,11 @@ function peutReutiliser(porteeActuelle, besoinLimitParAnimal) {
   return _dernierChargement.limitParAnimal >= besoinLimitParAnimal;
 }
 
-/**
- * Extrait de _cachePositions exactement ce qu'il faut afficher pour le besoin courant.
- */
 function deriverPourBesoin(besoinLimitParAnimal) {
   if (besoinLimitParAnimal === null) return _cachePositions;
   return deriverNDernieresPositionsParAnimal(_cachePositions, besoinLimitParAnimal);
 }
 
-/**
- * Le N reellement valide par l'utilisateur (champ partage, cf. getDernierNTrajectoire())
- * couvre-t-il le minimum de positions par animal necessaire pour tracer une trajectoire
- * (un segment necessite >= 2 points) ? Sert a griser #btnTrajectoire (app.js) quand ce
- * n'est pas le cas, plutot que de le laisser afficher une trajectoire tronquee a un seul
- * point.
- *
- * Teste le N partage plutot que _dernierChargement.limitParAnimal : ce dernier reflete le
- * volume reellement rapatrie du reseau, qui peut etre PLUS GRAND que ce que l'utilisateur
- * a demande a cause du sur-chargement preventif (calculerNEffectifPositions/Trajectoire,
- * qui pre-charge aussi le N de l'autre mode) — un cache a limitParAnimal=5 alors que
- * l'utilisateur vient de valider N=1 rendait ce test faussement positif (bug confirme le
- * 22/07 : bouton Trajectoire pas grise avec N=1, trajectoire affichee a 1 point).
- */
 export function peutAfficherTrajectoire() {
   if (!_dernierChargement) return false;
   const nPartage = getDernierNTrajectoire();
@@ -159,20 +99,6 @@ export function peutAfficherTrajectoire() {
   return _dernierChargement.limitParAnimal === null || _dernierChargement.limitParAnimal >= N_POSITIONS_MIN_TRAJECTOIRE;
 }
 
-/**
- * Bascule pure Positions <-> Trajectoire, sans jamais lire le DOM des filtres ni faire
- * d'appel reseau — re-rend uniquement le sous-ensemble derive de _cachePositions
- * (dernieres donnees reellement validees par un applyFilters() reussi, cf.
- * #btnApplyFilters, seul point d'entree pour un vrai chargement filtre). Rejoue le
- * post-traitement d'affichage necessaire (legende, libelle date, panneau, liste
- * individus) mais jamais le zoom automatique ni window._derniersFiltresAppliques —
- * ceux-ci restent le reflet exclusif du dernier chargement reellement applique.
- * Retourne false (sans rien modifier) si aucun chargement valide n'existe encore, si le
- * mode Trajectoire est demande avec moins de N_POSITIONS_MIN_TRAJECTOIRE positions/animal
- * (garde-fou independant de l'etat — grise ou non — de #btnTrajectoire, cf.
- * peutAfficherTrajectoire() en amont pour le cas nominal), ou si besoinLimitParAnimal
- * depasse ce que le cache couvre.
- */
 export function rebasculerModeAffichage(mode, besoinLimitParAnimal) {
   if (!_dernierChargement) return false;
   if (mode === 'trajectoire' && besoinLimitParAnimal !== null && besoinLimitParAnimal < N_POSITIONS_MIN_TRAJECTOIRE) return false;
@@ -206,13 +132,6 @@ export function rebasculerModeAffichage(mode, besoinLimitParAnimal) {
   return true;
 }
 
-/**
- * Sur-chargement preventif — quand on charge n positions/animal pour un mode, demande aussi
- * au moins le N couramment utilise par l'autre mode (si c'est un nombre fixe, pas 'toutes')
- * pour pre-alimenter _cachePositions et eviter une requete lors d'un futur basculement de
- * mode. N'affecte jamais ce qui est affiche — le rendu est toujours tronque a n apres coup
- * (cf. applyFilters), seul le volume mis en cache change.
- */
 function calculerNEffectifPositions(n) {
   const autre = getDernierNTrajectoire();
   const autreNombre = autre && autre !== 'toutes' ? parseInt(autre) : null;
@@ -332,15 +251,6 @@ export function getPeriodesActives() {
   return [];
 }
 
-/**
- * Masque dans #listeIndividus les animaux qui ne passent pas les filtres attributaires
- * actifs (suivis, sexe, gestionnaire, population), et — quand la requete couvrait tous
- * les animaux filtres (pas seulement des individus coches manuellement) — ceux absents
- * des resultats retournes par l API lorsqu un filtre temporel (periode, saison, annee)
- * est actif. requeteRestreinte indique que locations ne contient que les positions des
- * individus coches manuellement : dans ce cas on ne peut pas s en servir pour juger de
- * la presence de positions des autres individus, donc on ne les masque pas sur ce critere.
- */
 function masquerIndividusSansPositions(locations, requeteRestreinte = false) {
   const aniIdsAvecPositions = new Set(locations.map(l => String(l.ani_id)));
   const suivisSeulement = document.getElementById('checkSuivis')?.checked;
@@ -403,10 +313,6 @@ function masquerIndividusSansPositions(locations, requeteRestreinte = false) {
   });
 }
 
-/**
- * Construit l'objet de filtres attendu par fetchLocalisationsRPC() depuis l'etat
- * courant des filtres UI (deja resolus : ids, dates/saisons consolidees, attributs).
- */
 function construireFiltersRPC(token, idsAnimaux, filters, suivisSeulement) {
   const rpcFilters = {};
 
@@ -459,15 +365,6 @@ function construireFiltersRPC(token, idsAnimaux, filters, suivisSeulement) {
   return rpcFilters;
 }
 
-/**
- * APPLICATION DES FILTRES
- * Récupère les données filtrées depuis l'API et met à jour la carte.
- * @param {boolean} sansZoomAuto - Si vrai, ne recentre/zoome pas automatiquement sur
- *   l'etendue des points apres chargement. Utilise par les basculements de mode
- *   (Positions <-> Trajectoire, cf. app.js) pour preserver le cadrage courant de
- *   l'utilisateur — le clic sur "Appliquer les filtres" continue de zoomer (valeur
- *   par defaut false).
- */
 export async function applyFilters(token, modeForce = null, nOverride = null, sansZoomAuto = false) {
   const btnApply = document.getElementById('btnApplyFilters');
   showMapLoading();
@@ -527,10 +424,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
           .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
           .map(l => l.querySelector('input')?.value)
           .filter(Boolean);
-      // Ids transmis a la RPC uniquement — a la difference de idsAChercher (utilise pour le
-      // zoom et _derniersFiltresAppliques.ani_id, cf. export CSV dans panel.js), on n'envoie
-      // pas explicitement la totalite des individus visibles quand rien n'est coche : dans ce
-      // cas construireFiltersRPC() retombe sur ani_is_followed (ou aucun filtre animal).
       const idsPourRPC = selectedIds.length > 0 ? selectedIds : [];
 
       // Extraire les années sélectionnées précisément (si source annee ou saisonnalite)
@@ -560,16 +453,9 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
       );
       const besoinLimitParAnimal = toutesPositions ? null : n;
 
-      // Capture AVANT toute mutation de _dernierChargement (qui a lieu plus bas en cas de
-      // chargement reseau) — sert a sauter le fit()/animate() automatique si seul le N a
-      // change, la portee de filtres restant strictement identique au dernier chargement.
       const porteeIdentique = _dernierChargement !== null &&
         JSON.stringify(_dernierChargement.portee) === JSON.stringify(porteeActuelle);
 
-      // Reutilisation client — les positions deja en cache (_cachePositions) couvrent-elles
-      // deja ce besoin (meme portee de filtres, volume >= besoin, ou cache "Toutes") ? Si
-      // oui, on evite l'aller-retour reseau (et le modal de volume si le besoin est
-      // "Toutes"), cf. peutReutiliser().
       let reutiliseSansReseau = false;
       if (peutReutiliser(porteeActuelle, besoinLimitParAnimal)) {
         locations = deriverPourBesoin(besoinLimitParAnimal);
@@ -589,10 +475,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
         }, suivisSeulement);
 
         if (!toutesPositions && n) {
-          // Chemin A — N dernieres positions par animal via RPC (un seul batch attendu).
-          // Sur-chargement preventif : demande aussi le N couramment utilise par le mode
-          // Trajectoire (si fixe) pour pre-alimenter le cache, sans changer ce qui est affiche
-          // (troncature a besoinLimitParAnimal plus bas).
           limitParAnimalCharge = calculerNEffectifPositions(n);
           rpcFilters.limit_par_animal = limitParAnimalCharge;
           locations = await fetchLocalisationsRPC(token, rpcFilters, () => {
@@ -656,10 +538,9 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
           );
         }
 
-        if (controller.signal.aborted && locations.length === 0) {
-          // Annulation avant tout premier lot recu (pendant le comptage ou l'attente du
-          // modal volume) — rien de nouveau n'a ete rendu, on garde la carte/le cache
-          // precedents tels quels, meme comportement que l'annulation du modal volume.
+        if (controller.signal.aborted) {
+          const restaure = rebasculerModeAffichage('positions', _dernierChargement?.limitParAnimal ?? null);
+          if (!restaure) { clearMapPoints(); clearTrajectoire(); }
           hideMapLoading();
           unlockSidebar();
           if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
@@ -812,10 +693,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
         }, suivisSeulement);
 
         if (!toutesPositionsTraj && nTraj) {
-          // Chemin C — N dernieres positions par animal via RPC (un seul batch attendu).
-          // Sur-chargement preventif : demande aussi le N couramment utilise par le mode
-          // Positions (si fixe) pour pre-alimenter le cache, sans changer ce qui est affiche
-          // (troncature a besoinLimitParAnimalTraj plus bas).
           limitParAnimalChargeTraj = calculerNEffectifTrajectoire(nTraj);
           rpcFiltersTraj.limit_par_animal = limitParAnimalChargeTraj;
           locations = await fetchLocalisationsRPC(token, rpcFiltersTraj, () => {
@@ -887,10 +764,9 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
           );
         }
 
-        if (controller.signal.aborted && locations.length === 0) {
-          // Annulation avant tout premier lot recu (pendant le comptage ou l'attente du
-          // modal volume) — rien de nouveau n'a ete rendu, on garde la carte/le cache
-          // precedents tels quels, meme comportement que l'annulation du modal volume.
+        if (controller.signal.aborted) {
+          const restaure = rebasculerModeAffichage('trajectoire', _dernierChargement?.limitParAnimal ?? null);
+          if (!restaure) { clearMapPoints(); clearTrajectoire(); }
           hideMapLoading();
           unlockSidebar();
           if (btnApply) { btnApply.textContent = 'Appliquer les filtres'; }
@@ -1073,10 +949,6 @@ let _derniereRequeteId = 0;
 let _derniereCleperiode = null;
 let _dernierIdsperiode = null;
 
-/**
- * Met à jour la liste des individus selon les dates sélectionnées
- * sans recharger la carte — appelée au changement de date
- */
 export async function mettreAJourListeParDate() {
   if (window._filtreListeDirectIds) {
     const ids = window._filtreListeDirectIds;
@@ -1101,10 +973,6 @@ export async function mettreAJourListeParDate() {
     if (df || dt) {
       console.warn('[mettreAJourListeParDate] Périodes vides malgré dateFrom/dateTo :', df, dt);
     }
-    // Reinitialiser un eventuel grisage residuel laisse par une requete precedente
-    // (en vol ou perimee, cf. bloc finally plus bas) — ce chemin ne lance aucune
-    // requete, la liste ne doit jamais rester grisee en attendant une reponse qui
-    // ne viendra pas.
     document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
       label.style.opacity = '';
     });
@@ -1182,10 +1050,6 @@ export async function mettreAJourListeParDate() {
     const results = await Promise.all(promises);
     results.forEach(ids => ids.forEach(id => idsUnion.add(String(id))));
 
-    // Guard anti-peremption — n'applique les donnees que si aucune requete plus
-    // recente n'a demarre entretemps (evite d'ecraser un resultat plus a jour deja
-    // affiche). Ne gouverne plus le nettoyage de l'opacity, cf. finally ci-dessous :
-    // une requete perimee doit quand meme lever son propre grisage.
     if (requeteId === _derniereRequeteId) {
       // Mettre en cache le résultat
       _derniereCleperiode = cleperiode;
@@ -1244,10 +1108,6 @@ function _appliquerFiltreListeAvecIds(idsAvecDonnees) {
   });
 }
 
-/**
- * Réapplique le dernier résultat de période en cache si disponible, sans requête réseau —
- * sinon retombe sur le filtrage attributaire pur (aucune période active).
- */
 export function appliquerFiltreAvecCachePeriode() {
   if (_dernierIdsperiode !== null) {
     _appliquerFiltreListeAvecIds(_dernierIdsperiode);
