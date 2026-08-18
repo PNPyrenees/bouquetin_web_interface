@@ -1,5 +1,15 @@
 # CHANGELOG
 
+### Correctifs de stabilite - Carte et Individus
+- Correction du sens de rotation du spinner de chargement
+- Page Individus : la colonne ID est desormais masquee par defaut ; ajout de filtres et colonnes pour le marquage (oreille droite, oreille gauche, couleur du collier)
+- Page Individus : correction d'un bug empechant l'initialisation des filtres TomSelect de l'accordeon Marquage lorsqu'il etait ferme au chargement
+- Carte : import de couches GeoJSON par l'utilisateur (bouton dedie, remplacement silencieux d'un import par le suivant, bouton de retrait)
+- Carte : masquage des boutons devenus inutiles (filtres, fonds de carte, export, bascule sidebar) en mode plein ecran
+- Carte : le bouton Annuler pendant un chargement volumineux ne conserve plus les donnees partielles deja recues - l'affichage revient a son etat precedent
+- Ecran de connexion : correction d'un decalage d'affichage sur mobile (hauteur de viewport instable a cause de la barre d'adresse du navigateur)
+- Extraction du script d'affichage de l'avatar de session dans un fichier partage (etait duplique en inline dans 2 pages)
+
 ### Blocage de l'indexation par les moteurs de recherche
 - Ajout d'un fichier robots.txt interdisant le crawl de toute l'application
 - Ajout d'une balise meta robots noindex/nofollow sur les 3 pages, en protection complementaire
