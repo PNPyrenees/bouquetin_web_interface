@@ -1,8 +1,3 @@
-/**
- * PANNEAU DONNÉES ATTRIBUTAIRES
- * Gère le tableau de données, les colonnes configurables,
- * la recherche et la pagination.
- */
 
 // Définition de toutes les colonnes disponibles
 const colonnesDisponibles = [
@@ -52,16 +47,10 @@ let pageCouranteIndividus = 1;
 let colonneTrieeIndividus = null;
 let sensTrieeIndividus = 'asc';
 
-/**
- * Initialise la structure HTML du panneau données dans #sidebarRightBody
- */
 export function initPanneau() {
   const sidebarRightBody = document.getElementById('sidebarRightBody');
   if (!sidebarRightBody) return;
 
-  // Liste des checkboxes colonnes — seule partie encore generee dynamiquement,
-  // car derivee des tableaux de config colonnesDisponibles/colonnesIndividus.
-  // Le reste du markup (onglets, toolbar, tableau, pagination) est statique dans index.html.
   document.getElementById('panelColonnesItems').innerHTML = colonnesDisponibles.map(c => `
     <label class="panel-colonnes-item">
       <input type="checkbox" value="${c.key}" ${c.defaut ? 'checked' : ''}>
@@ -197,9 +186,6 @@ export function initPanneau() {
   });
 }
 
-/**
- * Met à jour les colonnes visibles dans l'en-tête du tableau
- */
 function mettreAJourColonnes() {
   const thead = document.getElementById('panelTableHead');
   if (!thead) return;
@@ -247,9 +233,6 @@ function mettreAJourColonnes() {
   thead.appendChild(tr);
 }
 
-/**
- * Initialise la logique du dropdown Filtres colonnes
- */
 function initFiltresColonnes() {
   const btnFiltres = document.getElementById('panelBtnFiltres');
   const dropdown = document.getElementById('panelColonnesDropdown');
@@ -287,24 +270,14 @@ function initFiltresColonnes() {
   });
 }
 
-/**
- * Exporte colonnesActives pour usage externe (ex: chargement des données)
- */
 export function getColonnesActives() {
   return colonnesActives;
 }
 
-/**
- * Expose colonnesDisponibles (cles + labels) pour la construction de la liste de
- * cocher independante de la modal d'export (cf. app.js ouvrirModalExport()).
- */
 export function getColonnesDisponibles() {
   return colonnesDisponibles;
 }
 
-/**
- * Reçoit les locations depuis app.js et met à jour le tableau
- */
 export function mettreAJourPanneau(locations) {
   donneesTableau = locations || [];
   donneesFiltrees = [...donneesTableau];
@@ -367,9 +340,6 @@ function rendrePage() {
     const loc = page[index];
     if (!loc) return;
 
-    // Survol — désactivé (incompatible WebGLPointsLayer)
-    // tr.addEventListener('mouseenter', () => { ... window._highlightPoint(loc.ani_id, true) });
-    // tr.addEventListener('mouseleave', () => { ... window._highlightPoint(loc.ani_id, false) });
 
     tr.style.cursor = 'pointer';
     tr.addEventListener('click', () => {
@@ -377,11 +347,6 @@ function rendrePage() {
       tr.classList.add('selected-carte');
       aniIdSelectionne = String(loc.ani_id);
 
-      // Recentrer la carte sur ce point GPS precis — pas d'appel a
-      // window._afficherPositionsIndividu() ici (contrairement a rendrePageIndividus()) :
-      // cette fonction cherche par ani_id seul (premiere feature trouvee, sans tenir
-      // compte de la date), ce qui entrait en course avec ce recentrage precis et
-      // provoquait un recentrage erratique au clic (2 view.animate() concurrents).
       if (loc?.geom?.coordinates) {
         const wgs84 = proj4('EPSG:2154', 'EPSG:4326', loc.geom.coordinates);
         const coord = ol.proj.fromLonLat(wgs84);
@@ -605,14 +570,6 @@ function appliquerFiltresColonnes() {
   }
 }
 
-/**
- * Exporte en CSV les localisations des animaux donnes — colonnes issues du tableau
- * attributaire (colonnesDisponibles, ou sous-ensemble choisi via options.colonnes),
- * via f_get_localisation (RPC paginee par batches de 10 000 positions), coherent avec
- * le reste des filtres carte.
- * @param {Object} options - projection ('wgs84'|'lambert93'|'etrs89'), nomFichier (sans
- *   extension), colonnes (tableau de cles colonnesDisponibles, repli sur toutes si absent/vide).
- */
 export async function exporterCSV(token, filters = {}, options = {}) {
   const aniIds = filters.ani_id || [];
   const hasAniIds = Array.isArray(aniIds) && aniIds.length > 0;
@@ -686,11 +643,6 @@ export async function exporterCSV(token, filters = {}, options = {}) {
       return;
     }
 
-    // Generer le CSV — colonnes choisies dans la modal (options.colonnes, repli sur
-    // colonnesDisponibles complet si absent), plus 2 colonnes de coordonnees dont le
-    // libelle et le contenu dependent de la projection choisie (options.projection) :
-    // Lambert-93 et ETRS89 (coordonnees metriques X/Y, EPSG:2154 brut ou conversion
-    // proj4 vers EPSG:3035) ou WGS84 (conversion proj4 vers EPSG:4326, lat/lon degres).
     const colonnesCoord = projection === 'lambert93'
       ? ['loc_x_lambert93', 'loc_y_lambert93']
       : projection === 'etrs89'
@@ -766,10 +718,6 @@ export async function exporterCSV(token, filters = {}, options = {}) {
   }
 }
 
-/**
- * Masque sur la carte les points dont la localisation n'est pas visible
- * dans le tableau apres filtrage colonnes.
- */
 export function filtrerCarteDepuisTableau(locs) {
   const visiblesSet = new Set(
     locs.map(l => `${l.ani_id}__${l.loc_datetime_local || l.loc_date_local}`)
@@ -853,9 +801,6 @@ function rendrePageIndividus() {
   tbody.querySelectorAll('.panel-individu-row').forEach(tr => {
     const aniId = tr.dataset.aniId;
 
-    // Survol — désactivé (incompatible WebGLPointsLayer)
-    // tr.addEventListener('mouseenter', () => { ... window._highlightPoint(aniId, true) });
-    // tr.addEventListener('mouseleave', () => { ... window._highlightPoint(aniId, false) });
 
     tr.addEventListener('click', () => {
       document.querySelectorAll('.panel-table-row.selected-carte').forEach(r => r.classList.remove('selected-carte'));

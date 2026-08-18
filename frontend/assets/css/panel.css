@@ -1,6 +1,3 @@
-/* ========================================
-   PANNEAU ATTRIBUTAIRE (bas - futur usage)
-   ======================================== */
 
 .panneau-attributaire {
     position: absolute;
@@ -74,9 +71,6 @@
     font-family: var(--font-family);
 }
 
-/* ========================================
-   SIDEBAR DROITE — DONNÉES ATTRIBUTAIRES
-   ======================================== */
 
 .sidebar-right {
     position: fixed;
@@ -191,9 +185,6 @@
   background: rgba(45, 106, 79, 0.3);
 }
 
-/* ========================================
-   PANNEAU DONNÉES — TABLEAU
-   ======================================== */
 
 .panel-toolbar {
   position: sticky;

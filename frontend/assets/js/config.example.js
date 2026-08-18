@@ -9,31 +9,8 @@ export const LAMBERT93 =
   '+x_0=700000 +y_0=6600000 +ellps=GRS80 ' +
   '+towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
 
-// ETRS89-LAEA Europe (EPSG:3035) - projection metrique paneuropeenne (pas geographique),
-// demandee explicitement par Ludovic. Non connue nativement par proj4js, doit etre
-// enregistree explicitement via proj4.defs() (cf. map.js initMap()), sur le meme modele
-// que LAMBERT93 ci-dessus. Definition verifiee aupres d'epsg.io/3035.
 export const ETRS89 = '+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs';
 
-// Projections disponibles pour l'affichage des coordonnees curseur (#mouseCoordsTarget,
-// cf. map.js) — pattern config-driven, coherent avec BASEMAPS_CONFIG plus bas. proj4def
-// est la chaine proj4 a enregistrer via proj4.defs() avant utilisation (null si la
-// projection est deja connue nativement par proj4js, ex. EPSG:4326). parDefaut identifie
-// l'entree active au chargement — une seule doit valoir true.
-//
-// Pour ajouter une nouvelle projection :
-// 1. Recuperer la chaine proj4 sur epsg.io/[code] (ex. epsg.io/2154), onglet "Export" →
-//    "Proj4js". La coller telle quelle dans proj4def.
-// 2. proj4def = null uniquement pour les projections deja connues nativement par proj4js
-//    (WGS84/EPSG:4326, Web Mercator/EPSG:3857) — toute autre projection necessite cette
-//    chaine explicite, sinon proj4.defs() ne peut pas l'enregistrer et la conversion echoue.
-// 3. Determiner le format d'affichage (X/Y en metres, ou Lat/Lon en degres) : verifier
-//    l'unite affichee sur epsg.io ("metre" vs "degree"), ou directement dans la chaine
-//    proj4 — si elle commence par "+proj=longlat", la projection est geographique
-//    (degres, format Lat/Lon). Tout autre "+proj=..." (lcc, laea, utm, merc, etc.) est
-//    une projection metrique projetee (metres, format X/Y).
-//    Exemples ci-dessous : LAMBERT93 (+proj=lcc) et ETRS89 (+proj=laea) sont toutes deux
-//    en X/Y ; seule WGS84 (EPSG:4326, geographique, proj4def null) est en Lat/Lon.
 export const PROJECTIONS_COORDONNEES_CONFIG = [
   {
     code: 'EPSG:2154',
@@ -81,17 +58,9 @@ export const ROLE_INITIALES = {
 
 export const SEUIL_ALERTE_VOLUME = 40000;
 
-// Nombre de positions par defaut (champ #inputNDernieres, partage entre les modes
-// Positions et Trajectoire) et minimum impose au mode Trajectoire — une trajectoire
-// necessite au moins 2 points pour tracer un segment.
 export const N_POSITIONS_DEFAUT = 5;
 export const N_POSITIONS_MIN_TRAJECTOIRE = 2;
 
-// Seuils de fraicheur des positions GPS pour les animaux en suivi actif (page Individus) —
-// alerte visuelle (pastille) sur le tableau liste quand la derniere position remonte a
-// plus de X heures. Demande explicite de Ludovic. En heures (comparaison directe avec
-// l'ecart calcule entre la derniere position et maintenant, pas de conversion jours->heures
-// necessaire a l'usage).
 export const SEUILS_FRAICHEUR_POSITION = {
   jaune: 24,   // pas de position depuis 24h
   orange: 48,  // pas de position depuis 2 jours
@@ -129,15 +98,6 @@ export const SAISONS_CONFIG = {
   rut:       { label: 'Rut',       from: '16/10', to: '31/12' }
 };
 
-// Types pris en charge : 'xyz' | 'osm' | 'wms' | 'wmts'. Les entrees 'wmts' utilisent
-// layer/matrixSet/style/format (identifiants IGN Geoplateforme exacts) au lieu de url —
-// la source est construite via ol.source.WMTS.optionsFromCapabilities() a partir du
-// GetCapabilities IGN mis en cache (cf. chargerCapacitesWMTS() dans map.js), jamais
-// reconstruite manuellement (resolutions/matrices/origines/limites de tuiles).
-// category : 'basemap' (fond exclusif) | 'overlay' (superposable independamment,
-// plusieurs actifs simultanement, cf. toggleOverlay() dans map.js) — toujours indique
-// explicitement sur chaque entree ci-dessous. opacity (overlays uniquement) : opacite
-// initiale, ajustable ensuite via setOverlayOpacity().
 export const BASEMAPS_CONFIG = [
   {
     id: 'ign_scan25',
@@ -318,10 +278,6 @@ export const BASEMAPS_CONFIG = [
     attributions: '© IGN Géoportail',
     visible: false
   },
-  // Couverture "tous parcs nationaux de France" — pas de couche IGN specifique au Parc
-  // national des Pyrenees (verifie dans le GetCapabilities, aucun identifiant dedie).
-  // Patrinat_PN affiche l'ensemble des parcs nationaux francais simultanement, sans
-  // filtrage possible en WMTS — a valider a l'usage (cf. echange precedent).
   {
     id: 'ign_parcs_nationaux',
     nom: 'Parcs nationaux (France)',
@@ -348,9 +304,6 @@ export const BASEMAPS_CONFIG = [
     attributions: '© IGN Géoportail',
     visible: false
   },
-  // Couverture LiDAR HD potentiellement partielle sur les Pyrenees a la date de cet
-  // ajout (campagne nationale progressive) — a valider visuellement (cf. echange
-  // precedent), retirer si la zone du parc n'est pas encore couverte.
   {
     id: 'ign_lidar_hd',
     nom: 'Estompage LiDAR HD',
@@ -367,11 +320,6 @@ export const BASEMAPS_CONFIG = [
   }
 ];
 
-// Couleurs de marquage (collier/oreilles) — mapping temporaire cote client : le texte
-// libre en base (t_animal, ex. "rouge", "jaune / bleu") n'a pas de code couleur associe.
-// Migration vers une table dediee prevue plus tard — garde isole de sa consommation
-// (individuals.js: normaliserCouleur/appliquerCouleursMarquage) pour rester remplaçable
-// facilement (ex. par un fetch API) sans toucher a cette logique.
 export const COULEURS_MARQUAGE = {
   blanc: '#ffffff',
   bleu: '#2563eb',
@@ -384,11 +332,6 @@ export const COULEURS_MARQUAGE = {
   violet: '#7b2d8e'
 };
 
-// Palette Glasbey 32 — concue pour maximiser la distance perceptuelle entre couleurs
-// (Glasbey et al., 2007). Partagee entre map.js (couleur par individu, carte principale)
-// et individuals.js (couleur par evenement/objectif, carte Sites de la fiche individu) —
-// centralisee ici pour que individuals.js n'ait jamais a importer map.js (singleton de
-// la page Carte, decision architecturale documentee dans individuals.js).
 export const GLASBEY_32 = [
   '#0000FF', '#FF0000', '#00FF00', '#000033', '#FF00B6', '#005300', '#FFD300', '#009FFF',
   '#9A4D42', '#00FFBE', '#783FC1', '#1F9698', '#FFACFD', '#B1CC71', '#F1085C', '#FE8F42',
@@ -399,4 +342,3 @@ export const GLASBEY_32 = [
 export function getCouleurParIndex(index) {
   return GLASBEY_32[index % GLASBEY_32.length];
 }
-
