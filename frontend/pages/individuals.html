@@ -47,7 +47,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/ol@v10.9.0/dist/ol.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -96,43 +95,29 @@
     </div>
   </header>
 
-  <script>
-    (() => {
-      const token = sessionStorage.getItem('bqt_token');
-      if (!token) return;
-
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const role = payload.role || payload.sub || 'Utilisateur';
-        const initiales = {
-          pnp_bqt_reader: 'LC',
-          pnp_bqt_writer: 'AD'
-        }[role] || role.slice(0, 2).toUpperCase();
-
-        document.getElementById('sessionAvatar').textContent = initiales;
-        document.getElementById('userChip').style.display = 'flex';
-      } catch {
-        // Le traitement normal de la session prendra le relais.
-      }
-    })();
-  </script>
+  <script src="../assets/js/session-chip.js"></script>
 
   <aside class="sidebar" id="indivSidebar">
     <div class="sidebar-content">
       <div class="sidebar-header" id="indivSidebarHeader">FILTRES</div>
       <div class="indiv-sidebar-body">
-        <div class="input-group indiv-filtre-liste">
-          <label for="filtreColNom">Nom</label>
-          <input type="text" id="filtreColNom" class="sidebar-input" placeholder="Rechercher..." autocomplete="off">
-        </div>
-        <div class="input-group indiv-filtre-liste">
-          <label>Sexe</label>
-          <select id="filtreColSexe" class="indiv-col-filtre">
-            <option value="">Tous</option>
-            <option value="M">M</option>
-            <option value="F">F</option>
-          </select>
-        </div>
+        <details open>
+          <summary>Individus</summary>
+          <div class="details-content">
+            <div class="input-group indiv-filtre-liste">
+              <label for="filtreColNom">Nom</label>
+              <input type="text" id="filtreColNom" class="sidebar-input" placeholder="Rechercher..." autocomplete="off">
+            </div>
+            <div class="input-group indiv-filtre-liste">
+              <label>Sexe</label>
+              <select id="filtreColSexe" class="indiv-col-filtre">
+                <option value="">Tous</option>
+                <option value="M">M</option>
+                <option value="F">F</option>
+              </select>
+            </div>
+          </div>
+        </details>
         <div class="input-group indiv-filtre-liste">
           <label>Population</label>
           <select id="filtreColPopulation" class="indiv-col-filtre">
@@ -164,6 +149,29 @@
             <option value="3+">3+</option>
           </select>
         </div>
+        <details>
+          <summary>Marquage</summary>
+          <div class="details-content">
+            <div class="input-group indiv-filtre-liste">
+              <label>Oreille droite</label>
+              <select id="filtreColOreilleDroite" class="indiv-col-filtre">
+                <option value="">Tous</option>
+              </select>
+            </div>
+            <div class="input-group indiv-filtre-liste">
+              <label>Oreille gauche</label>
+              <select id="filtreColOreilleGauche" class="indiv-col-filtre">
+                <option value="">Tous</option>
+              </select>
+            </div>
+            <div class="input-group indiv-filtre-liste">
+              <label>Couleur du collier</label>
+              <select id="filtreColCouleurCollier" class="indiv-col-filtre">
+                <option value="">Tous</option>
+              </select>
+            </div>
+          </div>
+        </details>
       </div>
       <div class="sidebar-footer">
         <a id="btnReinitialiserFiltres" class="indiv-lien-reinitialiser">Réinitialiser</a>
@@ -203,15 +211,19 @@
     <!-- VUE LISTE -->
     <div id="vueListe">
       <div class="indiv-liste">
-        <div class="indiv-row indiv-liste-entete">
-          <div class="indiv-col indiv-col-triable" data-colonne="nom"><span class="indiv-col-label">Nom</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
-          <div class="indiv-col indiv-col-triable" data-colonne="fraicheur"><span class="indiv-col-label">Dernière position</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
-          <div class="indiv-col indiv-col-triable" data-colonne="id"><span class="indiv-col-label">ID animal</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
-          <div class="indiv-col indiv-col-triable" data-colonne="sexe"><span class="indiv-col-label">Sexe</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
-          <div class="indiv-col indiv-col-triable" data-colonne="annee"><span class="indiv-col-label">Année naissance</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
-          <div class="indiv-col indiv-col-triable" data-colonne="population"><span class="indiv-col-label">Population</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
-          <div class="indiv-col indiv-col-triable" data-colonne="gestionnaire"><span class="indiv-col-label">Gestionnaire</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
-          <div class="indiv-col indiv-col-triable" data-colonne="statut"><span class="indiv-col-label">Statut</span><span class="indiv-tri-icone"><span class="indiv-sort-up">▲</span><span class="indiv-sort-down">▼</span></span></div>
+        <div class="indiv-liste-toolbar">
+          <div class="indiv-colonnes-wrapper">
+            <button type="button" id="btnFiltresColonnesIndividus" class="indiv-btn-filtres-colonnes">Colonnes</button>
+            <div id="dropdownFiltresColonnesIndividus" class="indiv-colonnes-dropdown" style="display:none">
+              <div id="itemsFiltresColonnesIndividus">
+                <!-- Peuplée en JS par initFiltresColonnesListe() -->
+              </div>
+              <a id="resetFiltresColonnesIndividus" class="indiv-colonnes-reset">Réinitialiser</a>
+            </div>
+          </div>
+        </div>
+        <div class="indiv-row indiv-liste-entete" id="indivListeEntete">
+          <!-- Peuplée en JS par mettreAJourEnteteListe() -->
         </div>
         <div id="indivTableBody">
           <!-- Peuplée en JS par rendrePageIndividus() -->

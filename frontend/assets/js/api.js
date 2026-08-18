@@ -31,7 +31,7 @@ export async function login(username, password) {
 export async function fetchAnimals(token) {
   // On sélectionne uniquement les colonnes nécessaires pour alléger la réponse
   const res = await fetch(
-    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_code,ani_annee_naissance,ani_date_relache,ani_date_mort,ani_sexe,ani_gestionnaire,ani_pop_rattach&order=ani_nom`,
+    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_code,ani_annee_naissance,ani_date_relache,ani_date_mort,ani_sexe,ani_gestionnaire,ani_pop_rattach,ani_marquage_oreille_droite,ani_marquage_oreille_gauche&order=ani_nom`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -51,7 +51,7 @@ export async function fetchAnimals(token) {
  * standard PostgREST pour une table est Prefer: count=exact + lecture du total dans
  * l'entete de reponse Content-Range (format "0-0/348"), pas dans le corps.
  */
-export async function fetchCountAnimaux(token, filters = {}) {
+export async function fetchCountAnimaux(token, filters = {}, signal = null) {
   const params = new URLSearchParams();
   params.append('select', 'ani_id');
   if (filters.population) params.append('ani_pop_rattach', `eq.${filters.population}`);
@@ -64,7 +64,8 @@ export async function fetchCountAnimaux(token, filters = {}) {
       'Authorization': `Bearer ${token}`,
       'Accept-Profile': 'bouquetin',
       'Prefer': 'count=exact'
-    }
+    },
+    signal
   });
   if (!res.ok) throw new Error(`fetchCountAnimaux error: ${res.status}`);
   const contentRange = res.headers.get('content-range');
@@ -76,7 +77,7 @@ export async function fetchCountAnimaux(token, filters = {}) {
  * Récupère uniquement les ani_id distincts ayant des positions sur une période.
  * Une seule requête au lieu de N requêtes par animal.
  */
-export async function fetchAnimalIdsParPeriode(token, filters = {}) {
+export async function fetchAnimalIdsParPeriode(token, filters = {}, signal = null) {
   const params = new URLSearchParams();
 
   params.append('select', 'ani_id');
@@ -106,7 +107,8 @@ export async function fetchAnimalIdsParPeriode(token, filters = {}) {
       'Authorization': `Bearer ${token}`,
       'Accept-Profile': 'bouquetin',
       'Prefer': 'count=none'
-    }
+    },
+    signal
   });
 
   if (!res.ok) throw new Error('Échec récupération IDs par période');
@@ -189,11 +191,11 @@ export async function fetchProgrammations(token) {
  * l'animal. fetchAnimauxSuivis n'est appelée que par reports.js (vérifié — non partagée
  * avec app.js/individuals.js), ce branchement est donc sans impact sur la page Carte.
  */
-export async function fetchAnimauxSuivis(token, filters = {}) {
+export async function fetchAnimauxSuivis(token, filters = {}, signal = null) {
   const periodeActive = Boolean(filters.date_from || filters.date_to);
 
   if (periodeActive) {
-    const idsPeriode = await fetchAnimalIdsParPeriode(token, { date_from: filters.date_from, date_to: filters.date_to });
+    const idsPeriode = await fetchAnimalIdsParPeriode(token, { date_from: filters.date_from, date_to: filters.date_to }, signal);
     const aFiltresAttributs = Boolean(filters.population || filters.gestionnaire || filters.sexe);
     if (!aFiltresAttributs) return new Set(idsPeriode);
 
@@ -203,7 +205,8 @@ export async function fetchAnimauxSuivis(token, filters = {}) {
     if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
     if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
     const res = await fetch(`${API_URL}/t_animal?${params.toString()}`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept-Profile': 'bouquetin', 'Prefer': 'count=none' }
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept-Profile': 'bouquetin', 'Prefer': 'count=none' },
+      signal
     });
     if (!res.ok) throw new Error(`fetchAnimauxSuivis error (filtre animaux): ${res.status}`);
     const idsAutorises = new Set((await res.json()).map(a => String(a.ani_id)));
@@ -216,7 +219,7 @@ export async function fetchAnimauxSuivis(token, filters = {}) {
     sexe: filters.sexe,
     gestionnaire: filters.gestionnaire,
     population: filters.population
-  });
+  }, null, signal);
   return new Set(locations.map(l => l.ani_id));
 }
 
@@ -244,6 +247,35 @@ export async function fetchColliersActifs(token) {
 }
 
 /**
+ * Recupere la couleur du collier ACTIF (t_capteur.capt_couleur_collier, via embedding
+ * PostgREST sur cor_animal_capteur, cor_date_fin IS NULL) pour chaque animal concerne —
+ * meme definition de "collier actif" que fetchColliersActifs. Un animal sans collier
+ * actif n'apparait pas dans la Map retournee : coherent avec la fiche individu
+ * (remplirIdentite, individuals.js) qui n'affiche deja capt_couleur_collier que si
+ * collierActif est vrai, jamais pour un ancien collier retire.
+ */
+export async function fetchCouleursCollierParAnimal(token) {
+  const res = await fetch(
+    `${API_URL}/cor_animal_capteur?select=ani_id,t_capteur(capt_couleur_collier)&cor_date_fin=is.null`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchCouleursCollierParAnimal error: ${res.status}`);
+  const data = await res.json();
+  const couleurs = new Map();
+  data.forEach(r => {
+    const couleur = r.t_capteur?.capt_couleur_collier;
+    if (couleur) couleurs.set(String(r.ani_id), couleur);
+  });
+  return couleurs;
+}
+
+/**
  * Compte les individus ayant ete equipes d'au moins un collier. Sans periode : cumul
  * historique complet (COUNT(DISTINCT ani_id) sur cor_animal_capteur, toutes poses
  * confondues, actives ou terminees) — distinct de fetchAnimauxSuivis (etat COURANT :
@@ -254,7 +286,7 @@ export async function fetchColliersActifs(token) {
  * fetchCountZonesTranslocation : colonne unique recuperee en bulk, deduplication cote
  * client via Set.
  */
-export async function fetchCountAnimauxEquipes(token, filters = {}) {
+export async function fetchCountAnimauxEquipes(token, filters = {}, signal = null) {
   const aFiltres = Boolean(filters.population || filters.gestionnaire || filters.sexe);
   let idsAutorises = null;
 
@@ -265,7 +297,8 @@ export async function fetchCountAnimauxEquipes(token, filters = {}) {
     if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
     if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
     const resAnimaux = await fetch(`${API_URL}/t_animal?${params.toString()}`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept-Profile': 'bouquetin', 'Prefer': 'count=none' }
+      headers: { 'Authorization': `Bearer ${token}`, 'Accept-Profile': 'bouquetin', 'Prefer': 'count=none' },
+      signal
     });
     if (!resAnimaux.ok) throw new Error(`fetchCountAnimauxEquipes error (filtre animaux): ${resAnimaux.status}`);
     idsAutorises = new Set((await resAnimaux.json()).map(a => a.ani_id));
@@ -283,7 +316,8 @@ export async function fetchCountAnimauxEquipes(token, filters = {}) {
       'Authorization': `Bearer ${token}`,
       'Accept-Profile': 'bouquetin',
       'Prefer': 'count=none'
-    }
+    },
+    signal
   });
   if (!res.ok) throw new Error(`fetchCountAnimauxEquipes error: ${res.status}`);
   const data = await res.json();

@@ -1,8 +1,3 @@
-/* ============================================
-   PAGE INDIVIDUS — layout general
-   Header reutilise les classes de main.css (#header...). Pas de sidebar sur
-   cette page — #indivScreen occupe toute la largeur.
-   ============================================ */
 
 #indivScreen {
   position: fixed;
@@ -18,11 +13,6 @@
   background: var(--color-bg-light);
 }
 
-/* ============================================
-   SIDEBAR DE FILTRES — coherente visuellement avec la sidebar de la page Carte
-   (main.css : .sidebar/.sidebar-content/.sidebar-header/.sidebar-footer/.btn-apply/
-   .sidebar-input/.input-group, tous reutilises tels quels, aucune classe redefinie ici).
-   ============================================ */
 .indiv-sidebar-body {
   flex: 1;
   overflow-y: auto;
@@ -122,23 +112,7 @@
   border-radius: 0;
 }
 
-/* ============================================
-   VUE LISTE
-   ============================================ */
 
-/* Watermark discret derriere la liste des individus — pseudo-element plutot que
-   background-image direct sur #vueListe, pour controler l'opacite en CSS
-   independamment de la transparence reelle (inconnue) du PNG source, et garantir
-   que le texte des lignes reste au-dessus via z-index (pas juste l'ordre de
-   peinture implicite d'un background). position:fixed (et non absolute) car
-   #vueListe fait toute la hauteur de la liste (potentiellement tres grande) —
-   en absolute, background-position:center centrerait le logo au milieu de cette
-   hauteur totale, hors du viewport visible en haut de liste. En fixed, calee sur
-   la zone visible sous le header (#indivScreen commence a top:60px), le logo
-   reste centre a l'ecran quel que soit le defilement. #vueListe sert d'ancre de
-   contexte (masque avec #vueFiche via display:none, donc le pseudo-element
-   disparait aussi en vue fiche) ; .indiv-liste (unique enfant, contenu reel de
-   la liste) passe au-dessus via z-index. */
 #vueListe {
   position: relative;
   display: flex;
@@ -163,9 +137,6 @@
   z-index: 0;
 }
 
-/* Tableau inspire du rendu INSEE : aucune bordure exterieure ni separation
-   verticale. Les lignes de donnees alternent un voile discret et sont separees
-   par un trait fin ; l'entete conserve sa separation plus marquee. */
 .indiv-liste {
   position: relative;
   z-index: 1;
@@ -179,6 +150,83 @@
   background: #ffffff;
 }
 
+.indiv-liste-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding: 10px 22px 0 10px;
+}
+
+.indiv-colonnes-wrapper {
+  position: relative;
+}
+
+.indiv-btn-filtres-colonnes {
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: #ffffff;
+  font-family: var(--font-family);
+  font-size: 12px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.indiv-btn-filtres-colonnes:hover {
+  background: var(--color-bg-light);
+}
+
+.indiv-colonnes-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+  z-index: 500;
+  min-width: 200px;
+  padding: 8px 0;
+}
+
+.indiv-colonnes-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-family: var(--font-family);
+  font-size: 12px;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.indiv-colonnes-item:hover {
+  background: var(--color-bg-light);
+}
+
+.indiv-colonnes-item input[type=checkbox] {
+  accent-color: #2D6A4F;
+  cursor: pointer;
+}
+
+.indiv-colonnes-reset {
+  display: block;
+  margin-top: 4px;
+  padding: 6px 12px 2px;
+  border-top: 1px solid var(--color-border);
+  color: #2D6A4F;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.indiv-colonnes-reset:hover {
+  text-decoration: underline;
+}
+
 #indivTableBody {
   flex: 1;
   min-height: 0;
@@ -188,7 +236,7 @@
 
 .indiv-row {
   display: grid;
-  grid-template-columns: 1.3fr 0.9fr 0.8fr 0.6fr 1fr 1fr 1fr 1.2fr;
+  grid-template-columns: var(--indiv-grid-columns, repeat(9, minmax(0, 1fr)));
   gap: 0;
   align-items: center;
   padding: 0;
@@ -236,7 +284,7 @@
 }
 
 .indiv-liste-entete .indiv-col {
-  padding: 10px 22px 10px 10px;
+  padding: 8px 20px 8px 8px;
 }
 
 .indiv-col-triable {
@@ -289,8 +337,11 @@
 .indiv-col-label {
   min-width: 0;
   max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--font-family);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1.2;
   text-transform: uppercase;
@@ -298,10 +349,6 @@
   color: var(--color-text-muted);
 }
 
-/* Scope aux <input>/<select> reels — sinon ce style s'applique aussi au
-   .ts-wrapper (meme classe indiv-col-filtre recopiee par TomSelect), qui
-   affiche alors sa propre bordure en plus de celle du .ts-control interne
-   (effet "double case"). */
 select.indiv-col-filtre {
   width: 100%;
   padding: 6px 8px;
@@ -313,21 +360,10 @@ select.indiv-col-filtre {
   color: var(--color-text);
 }
 
-/* Les <select class="indiv-col-filtre"> sont remplaces par TomSelect (cf.
-   individuals.js, initTomSelectFiltresColonnes) — masque des le CSS, meme
-   principe que select.sidebar-select plus haut, pour eviter le flash du
-   select natif brut le temps que le fetch (Promise.all dans initPage) resolve
-   et que TomSelect injecte son wrapper. La regle ".ts-wrapper ~ select"
-   (plus bas) prend le relais une fois le wrapper present, mais ne couvre pas
-   la fenetre avant l'init JS — d'ou ce masquage inconditionnel en complement. */
 select.indiv-col-filtre {
   display: none;
 }
 
-/* Le dropdown est deplace vers <body> par dropdownParent:'body' (individuals.js,
-   initTomSelectFiltresColonnes) — plus un descendant de #indivScreen/.ts-wrapper une
-   fois ouvert, d'ou le ciblage par classe dediee (ts.dropdown.classList.add) plutot
-   que par selecteur imbrique comme le reste des regles TomSelect de ce fichier. */
 .indiv-col-filtre-dropdown {
   border: 1px solid var(--color-border);
   font-family: var(--font-family);
@@ -352,10 +388,6 @@ select.indiv-col-filtre {
   font-weight: 500;
 }
 
-/* Pastille de statut compacte (colonne Statut de la liste) — meme icone/palette
-   que .fiche-illustration-statut (pastille sur la photo de la fiche individu),
-   juste plus petite pour le contexte d'une ligne de tableau. Le title (tooltip
-   natif, cf. creerPastilleStatut) porte l'accessibilite en l'absence de texte. */
 .indiv-statut-pastille {
   display: inline-flex;
   align-items: center;
@@ -383,11 +415,6 @@ select.indiv-col-filtre {
   background: #c0392b;
 }
 
-/* Pastille de la colonne Fraicheur — 10px, sans marge (premiere piece de
-   .indiv-fraicheur-cellule, l'espacement vient du gap du conteneur). Couleurs :
-   jaune/orange/rouge deja definies pour SEUILS_FRAICHEUR_POSITION (config.js),
-   aucune = gris (identique a .indiv-statut-non-suivi), a-jour = vert institutionnel
-   (identique a .indiv-statut-actif). */
 .indiv-fraicheur-pastille {
   display: inline-flex;
   width: 10px;
@@ -512,9 +539,6 @@ select.indiv-col-filtre {
   color: #1f5f46;
 }
 
-/* ============================================
-   VUE FICHE
-   ============================================ */
 
 .indiv-btn-retour {
   background: none;
@@ -567,10 +591,6 @@ select.indiv-col-filtre {
   overflow-y: auto;
 }
 
-/* Overlay de chargement fiche individu — reprend le pattern de #mapLoading (map.css,
-   page Carte, non chargee ici), en noir plutot que vert pour se distinguer visuellement
-   de ce contexte. Couvre #vueFiche pendant le fetch d'une nouvelle fiche (cf.
-   afficherFiche()) pour qu'aucune donnee de l'individu precedent ne reste visible. */
 #ficheLoading {
   position: absolute;
   inset: 0;
@@ -603,8 +623,8 @@ select.indiv-col-filtre {
 }
 
 @keyframes ficheSpin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% { transform: rotate(360deg); }
+  100% { transform: rotate(0deg); }
 }
 
 .fiche-illustration-bloc {
@@ -642,10 +662,6 @@ select.indiv-col-filtre {
   display: none;
 }
 
-/* Illustration composee — photo fixe + collier/oreilles SVG recolores en JS
-   (normaliserCouleur/appliquerCouleursMarquage) + capteur PNG fixe par-dessus.
-   Un seul visuel de base pour tous les individus — positions calees ici en %,
-   valeurs de depart approximatives a ajuster visuellement. */
 .fiche-illustration {
   position: relative;
   width: 180px;
@@ -680,11 +696,6 @@ select.indiv-col-filtre {
   width: 41%;
 }
 
-/* Masque temporairement une piece de l'illustration sans la retirer du DOM — le JS de
-   colorisation (appliquerCouleursMarquage) continue de tourner sans erreur sur un
-   element cache. Collier + badge capteur masques en attendant une decision de Ludovic
-   sur la fiabilite de ani_marquage_couleur_collier (cf. analyse fiche individu) —
-   retirer cette classe en HTML pour reactiver l'affichage. */
 .fiche-illustration-masque {
   display: none;
 }
@@ -710,14 +721,6 @@ select.indiv-col-filtre {
   width: 23%;
 }
 
-/* Positions femelle — cadrage photo different (femelle.jpg vs bqt_profil_normal.jpg,
-   cf. analyse fiche individu), classe appliquee dynamiquement en JS sur .fiche-illustration
-   selon ani_sexe (cf. appliquerCouleursMarquage). Valeurs calibrees visuellement (collier
-   et capteur inclines pour suivre l'angle du cou sur femelle.jpg — cadrage different du
-   male). .fiche-illustration-oreille-gauche ne redefinit pas transform ici : elle herite
-   du scaleX(-1) de la regle de base (.fiche-illustration-oreille-gauche plus haut), le
-   flip horizontal anatomique reste donc actif — la cascade CSS resout chaque propriete
-   independamment, pas bloc de regle entier. */
 
 .fiche-illustration--femelle .fiche-illustration-collier {
   left: 37.5%;
@@ -746,10 +749,6 @@ select.indiv-col-filtre {
   transform: rotate(-11deg);
 }
 
-/* Pastille de statut superposee en bas a droite de la photo — reutilise les cles
-   de statut (STATUT_CLASSES en JS : indiv-statut-actif/non-suivi/mort), couleurs
-   propres a cette pastille (cf. demande : rouge pour "mort", distinct du point noir
-   utilise ailleurs dans les badges liste/entete). */
 .fiche-illustration-statut {
   position: absolute;
   right: 3px;
@@ -788,11 +787,6 @@ select.indiv-col-filtre {
   padding: 20px 0;
 }
 
-/* Grille 2x2 symetrique — 4 cellules de meme hauteur fixe, totalement independantes
-   les unes des autres. Seule #carteCapturesRelaches defile en interne si son contenu
-   depasse (evenements + sous-blocs Collier) ; les 3 autres (cartes OpenLayers,
-   graphique) remplissent exactement leur espace fixe, pas de scroll. Layout
-   definitif 2026-07-30 (v2, grille 2x2). */
 .fiche-grid-2x2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -836,9 +830,6 @@ select.indiv-col-filtre {
   flex-shrink: 0;
 }
 
-/* Sous-titre indiquant la periode couverte par un graphique (Distance/Altitude) —
-   evite de laisser croire que les deux graphiques couvrent la meme fenetre
-   temporelle (Distance = 12 mois roulants, Altitude = historique complet). */
 .fiche-carte-periode {
   padding: 6px 14px 0;
   font-family: var(--font-family);
@@ -932,17 +923,11 @@ select.indiv-col-filtre {
   width: 82px;
 }
 
-/* Hauteur explicite sur les select — le padding seul ne suffit pas a aligner un <select>
-   natif sur la hauteur des <input> voisins (metriques de rendu natif differentes entre
-   les deux elements malgre un padding identique). */
 .fiche-carte-controles select {
   height: 30px;
   box-sizing: border-box;
 }
 
-/* #btnActualiserFiche herite de .btn-apply (main.css), dimensionne pour la sidebar de
-   la page Carte (min-width:180px, padding:10px 28px) — trop massif ici. Cible l'ID
-   directement (pas .btn-apply) pour ne pas toucher son usage d'origine sur la page Carte. */
 #btnActualiserFiche {
   min-width: 0;
   width: auto;
@@ -958,9 +943,6 @@ select.indiv-col-filtre {
   border: 1px solid var(--color-border);
 }
 
-/* Popup carte (Localisations/Sites) — classe partagee. map.css (style du #popup de la
-   carte principale) n'est pas charge sur cette page (individuals.html ne charge que
-   main.css + individuals.css) — meme apparence recreee ici plutot qu'importee. */
 .fiche-map-popup {
   display: none;
   position: relative;
@@ -1001,10 +983,6 @@ select.indiv-col-filtre {
   margin: 2px 0 0;
 }
 
-/* Conteneur positionne pour la carte Localisations (meme pattern que .capture-map-conteneur
-   deja existant pour Sites) — necessaire pour superposer toolbar zoom + compteur.
-   Remplace l'ancienne regle #ficheMapLocalisations { flex:1 } — la carte remplit
-   desormais ce conteneur en position absolue plutot que directement le flex parent. */
 .fiche-map-conteneur {
   position: relative;
   flex: 1;
@@ -1016,9 +994,6 @@ select.indiv-col-filtre {
   inset: 0;
 }
 
-/* Toolbar zoom/recentrer sur les cartes Localisations et Sites — reprend l'apparence de
-   #toolbarZoom (map.css, non charge sur cette page) via les variables --map-ui-* deja
-   definies globalement dans main.css (charge ici). */
 .fiche-map-toolbar-zoom {
   position: absolute;
   top: 10px;
@@ -1051,9 +1026,6 @@ select.indiv-col-filtre {
   background: var(--map-ui-bg-active);
 }
 
-/* icon-zoom-in/icon-zoom-out utilisent fill="currentColor" dans le sprite (heritent
-   directement de .fiche-toolbar-btn color) — icon-recentrer non, meme filtre que
-   .icon-svg-map (map.css) recree ici en scope. */
 .fiche-icon-recentrer {
   width: 16px;
   height: 16px;
@@ -1075,9 +1047,6 @@ select.indiv-col-filtre {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* Bouton Fonds de carte + panneau liste verticale compacte — remplace le <select> de
-   .fiche-carte-controles (juge trop volumineux/incoherent avec le reste des controles
-   compacts, cf. discussion 2026-07-30). Ancre pres du bouton dans le toolbar zoom. */
 .fiche-basemap-panel {
   display: none;
   position: absolute;
@@ -1131,9 +1100,6 @@ select.indiv-col-filtre {
   font-weight: 700;
 }
 
-/* Legende de la carte Sites (capture-map-legende) — .legende-panel et ses enfants
-   sont definis dans map.css, non charge sur individuals.html. On redeclare ici les
-   regles strictement necessaires, scopees au conteneur pour eviter tout conflit. */
 .capture-map-conteneur .legende-panel {
   background: var(--map-ui-bg);
   border-radius: 8px;
@@ -1168,11 +1134,6 @@ select.indiv-col-filtre {
   flex-shrink: 0;
 }
 
-/* Liste dynamique couleurs (deux entrees rondes par evenement transloque - capture
-   bordure noire, relache bordure blanche, meme couleur - et une entree carree par
-   objectif distinct de capture simple) — meme principe que #legendeIndividusList
-   (page Carte, app.js) : conteneur scrollable si la liste est longue plutot que de
-   faire grandir le panneau indefiniment. */
 .legende-sites-couleurs {
   display: flex;
   flex-direction: column;
@@ -1201,9 +1162,6 @@ select.indiv-col-filtre {
   border-radius: 0;
 }
 
-/* Bordure blanche (role relache) — lisere sombre toujours visible, meme technique que
-   les points de la carte (une bordure blanche seule se fondrait dans le fond clair du
-   panneau legende). */
 .legende-site-pastille-relache {
   border-color: #ffffff;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
@@ -1217,11 +1175,6 @@ select.indiv-col-filtre {
   color: var(--map-ui-text);
 }
 
-/* ============================================
-   GRILLE 2x2 — rangee 1 : cartes Localisations/Sites ; rangee 2 : Captures & Relaches
-   (scroll interne) / Graphique Distance. Cf. .fiche-grid-2x2 plus haut pour la
-   mecanique de hauteur fixe partagee.
-   ============================================ */
 
 .capture-relache-liste {
   display: flex;
@@ -1230,11 +1183,6 @@ select.indiv-col-filtre {
   min-height: 0;
 }
 
-/* Conteneur relatif pour superposer la legende a la carte, meme principe que
-   .legende-wrapper/#map sur la page Carte (main.css) : la carte OL remplit tout
-   l'espace (position absolute + inset:0) et la legende, positionnee en absolu par
-   dessus, ne capte les clics que sur sa propre boite (coin bas-gauche, libre des
-   controles de zoom OL par defaut situes en haut-gauche). */
 .capture-map-conteneur {
   position: relative;
   flex: 1;
@@ -1307,10 +1255,6 @@ select.indiv-col-filtre {
   flex-shrink: 0;
 }
 
-/* Carre (capture sans translocation, cf. forme carree sur la carte Sites) — #vueFiche
-   ajoute ici aussi pour egaler la specificite de la regle #vueFiche .capture-event-
-   pastille-couleur (border-radius:50% !important, exceptions plus bas dans le fichier)
-   et l'emporter, independamment de l'ordre des regles dans le fichier. */
 #vueFiche .capture-event-pastille-couleur.carre {
   border-radius: 0 !important;
 }
@@ -1393,9 +1337,6 @@ select.indiv-col-filtre {
   }
 }
 
-/* ==========================================================================
-   INDIVIDUALS & FICHE OVERRIDES (Sober, flat, no rounded corners, no traits/borders)
-   ========================================================================= */
 
 /* Remove rounded corners and shadows from all inputs, selects, textareas, and buttons in indivScreen */
 #indivScreen input,
@@ -1417,9 +1358,6 @@ select.indiv-col-filtre {
   box-shadow: none !important;
 }
 
-/* Legend dots must stay round — the blanket #vueFiche * border-radius:0 above would
-   otherwise square them. .fiche-illustration-statut vit desormais dans la sidebar
-   (hors #vueFiche) — son radius:50% de base (cf. .fiche-illustration-statut) suffit. */
 #vueFiche .legende-pastille,
 #vueFiche .legende-pastille-creux,
 #vueFiche .capture-event-pastille-couleur,
@@ -1427,9 +1365,6 @@ select.indiv-col-filtre {
   border-radius: 50% !important;
 }
 
-/* Remove borders on fiche card containers and maps for a clean layout — l'illustration
-   (desormais dans la sidebar, hors #vueFiche) a son propre override, cf.
-   .indiv-sidebar-identite .fiche-illustration. */
 #vueFiche .fiche-carte,
 #vueFiche .capture-event-carte,
 #vueFiche .fiche-map {
