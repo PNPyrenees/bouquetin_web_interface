@@ -1,6 +1,6 @@
 :root {
   /* Layout */
-  --sidebar-width: 360px;
+  --sidebar-width: 310px;
 
   /* Couleurs principales */
   --color-primary: #099469;
@@ -49,12 +49,6 @@
   --select-width: 85%;
 }
 
-/* ============================================
-   THEME CARTE — variables partagees entre la page Carte et la fiche individu.
-   Definies ici (main.css charge partout) plutot que dans map.css (non charge sur
-   individuals.html) pour que .fiche-map-toolbar-zoom, .fiche-map-compteur et
-   .capture-map-legende recoivent bien le fond vert translucide.
-   ============================================ */
 :root {
   --map-ui-color-rgb: 9, 148, 105;
   /* vert pur (--color-primary) en RGB */
@@ -89,13 +83,6 @@ body {
   overflow: hidden;
 }
 
-/* Fondu au chargement — applique uniquement aux conteneurs de contenu de page (sidebar +
-   zone principale), jamais a #header (doit rester fixe, sans transition) ni aux
-   elements ajoutes dynamiquement en JS (#toast notamment, deja pilote par sa propre
-   transition opacity — un animation:forwards ici l'aurait fait apparaitre de force,
-   independamment de sa classe .show). L'opacite d'un enfant ne peut pas annuler celle
-   d'un parent (meme avec !important) — d'ou un ciblage explicite plutot qu'une regle sur
-   body avec contre-regle sur #header. */
 #reportsScreen,
 #mapScreen,
 #indivScreen,
@@ -719,12 +706,6 @@ header {
   pointer-events: none;
 }
 
-/* ========================================
-   SIDEBAR — bascule glissante Filtres / Fonds de carte
-   ======================================== */
-/* Deux vues empilees dans .sidebar-content (position:relative + overflow:hidden deja
-   en place ci-dessus), qui glissent horizontalement via transform — largeur de
-   .sidebar-content inchangee pendant toute la transition, #mapScreen jamais touche. */
 .sidebar-vue {
   position: absolute;
   inset: 0;
@@ -795,6 +776,59 @@ header {
   text-transform: uppercase;
   color: #1a3d2f;
   margin-bottom: 4px;
+}
+
+.sidebar-fonds-import {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.sidebar-fonds-import-link {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-family: var(--font-family);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: underline;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sidebar-fonds-import-link:hover {
+  color: var(--color-primary-hover);
+}
+
+.sidebar-fonds-import-fichier {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text);
+  max-width: 100%;
+}
+
+.sidebar-fonds-import-fichier span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-fonds-import-retirer {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sidebar-fonds-import-retirer:hover {
+  color: var(--color-text);
 }
 
 .sidebar-fonds-separateur {
@@ -868,9 +902,6 @@ header {
   gap: 12px;
 }
 
-/* Ligne unique : nom a gauche (tronque si besoin), curseur d'opacite fige a droite
-   (flex-shrink:0 — reste toujours pleinement utilisable, c'est le nom qui cede la
-   place en priorite). */
 .sidebar-fonds-overlay-item {
   display: flex;
   align-items: center;
@@ -1202,12 +1233,6 @@ select.sidebar-select {
   display: flex;
   align-items: center;
   gap: 7px;
-  /* Sans ca, le <label> (display:flex = boite block par defaut) s'etire sur toute la
-     largeur de son conteneur — cliquer n'importe ou sur la ligne (meme loin du texte)
-     coche la case/le radio. width:fit-content le limite a son contenu reel. Meme bug
-     et meme correctif que .sidebar-fonds-overlay-label — .checkbox-label est partage
-     par "Tout cocher", "Individus en cours de suivi", chaque ligne de #listeIndividus,
-     le mode Positions/Trajectoire et "Inclure les outliers". */
   width: fit-content;
   font-size: 13px;
   font-family: var(--font-family);
@@ -1680,8 +1705,9 @@ select:has(+ .ts-wrapper) {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
+  width: 100%;
   height: 100vh;
+  height: 100dvh; /* suit la hauteur reelle sur mobile (barre d'adresse) */
   display: flex;
   z-index: 99999;
   background: #2D6A4F;
@@ -1870,9 +1896,6 @@ html.has-session #loginScreen {
   cursor: pointer;
 }
 
-/* ==========================================================================
-   GLOBAL SELECT & TOMSELECT OVERRIDES (Sober, flat design without rounded corners or shadows)
-   ========================================================================== */
 
 /* Remove rounded corners and shadows from all native selects and TomSelect elements */
 select,

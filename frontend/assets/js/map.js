@@ -15,11 +15,6 @@ const indicesIndividus = new Map();
 const couleursPopulations = new Map();
 const couleursAnnees = new Map();
 
-// Drapeau de perte de contexte WebGL — positionne a true par le handler
-// webglcontextlost, repasse a false sur webglcontextrestored.
-// Les listeners pointermove et singleclick le testent avant tout appel
-// a hasFeatureAtPixel / forEachFeatureAtPixel pour ne pas appeler des
-// methodes WebGL sur un contexte invalide (evite le crash en cascade).
 let _webglContextLost = false;
 
 // Contours variables — 4 styles pour differencier les individus avec couleurs proches
@@ -30,11 +25,6 @@ const CONTOURS = [
   { strokeR: 0,   strokeG: 200, strokeB: 255, strokeA: 1, strokeWidth: 2 }, // Cyan
 ];
 
-// Styles de ligne de trajectoire, mis en cache par couleur — evite de recreer un
-// ol.style.Style/ol.style.Stroke par run partage entre plusieurs individus/annees
-// (cf. renderTrajectoire, regroupement MultiLineString par couleur). Cardinalite
-// bornee (palette GLASBEY_32 + quelques couleurs fixes Sexe/Gestionnaire) — jamais
-// videe, comme _rgbaCache plus bas.
 const _stylesLigneParCouleur = new Map();
 function getStyleLigne(couleur) {
   let style = _stylesLigneParCouleur.get(couleur);
@@ -47,12 +37,6 @@ function getStyleLigne(couleur) {
   return style;
 }
 
-// Override — couleurs de remplissage de GLASBEY_32 assez sombres (luminance percue
-// ITU-R BT.601 <= 58, seuil fixe par #00478E) pour que le contour cyclique (Blanc/Noir/
-// Jaune/Cyan, cf. CONTOURS) tombe parfois sur Noir et rende le point quasi invisible sur
-// fond satellite avec ombrage de montagne — signale par Ludovic sur #00478E (bleu marine).
-// Contour force en Blanc (coherent avec le contour par defaut du 1er cycle), quel que
-// soit le rang d'apparition de l'individu, pour ces couleurs uniquement.
 const CONTOUR_OVERRIDE_PAR_COULEUR = {
   '#0000FF': CONTOURS[0], // Bleu
   '#000033': CONTOURS[0], // Bleu nuit
@@ -76,9 +60,6 @@ export function getContourParIndex(index) {
   return CONTOURS[Math.floor(index / GLASBEY_32.length) % CONTOURS.length];
 }
 
-/**
- * Analyse les données avant rendu : palettes Individu/Population/Année.
- */
 function preparerCouleurs(locations) {
   couleursIndividus.clear();
   indicesIndividus.clear();
@@ -92,11 +73,6 @@ function preparerCouleurs(locations) {
   const populations = [...new Set(locations.map(l => l.ani_pop_rattach).filter(Boolean))].sort();
   populations.forEach((pop, i) => couleursPopulations.set(pop, getCouleurParIndex(i)));
 
-  // Palette Année — plausibilite dynamique (relative a l'annee courante, jamais figee
-  // en dur) pour ecarter les valeurs aberrantes connues en base (annee 2000, et 2068
-  // sur Arbizon — coquille de saisie), qui creeraient sinon une entree de legende
-  // parasite. Combine avec le scope existant de cette fonction (donnees affichees
-  // uniquement).
   couleursAnnees.clear();
   const anneeCourante = new Date().getFullYear();
   const ANNEE_MIN_PLAUSIBLE = anneeCourante - 20;
@@ -109,9 +85,6 @@ function preparerCouleurs(locations) {
   anneesDistinctes.forEach((annee, i) => couleursAnnees.set(annee, getCouleurParIndex(i)));
 }
 
-/**
- * Retourne la couleur d'un point selon le mode de coloration.
- */
 export function getCouleur(loc, mode) {
   switch (mode) {
     case 'individu':
@@ -145,12 +118,6 @@ let _projectionCoordonnees = PROJECTIONS_COORDONNEES_CONFIG.find(p => p.parDefau
   ?? PROJECTIONS_COORDONNEES_CONFIG[0]?.code;
 let _derniereCoordonneeSouris = null; // derniere coordonnee brute (EPSG:3857) recue
 
-/**
- * Change la projection d'affichage des coordonnees curseur et rafraichit immediatement
- * le texte affiche - coordinateFormat n'etant invoque par ol.control.MousePosition que
- * sur mouvement de souris, un changement de selection a souris immobile resterait sinon
- * affiche dans l'ancienne projection jusqu'au prochain pointermove.
- */
 export function setProjectionCoordonnees(code) {
   if (!PROJECTIONS_PAR_CODE.has(code)) return;
   _projectionCoordonnees = code;
@@ -160,12 +127,6 @@ export function setProjectionCoordonnees(code) {
   }
 }
 
-/**
- * Formate la position du curseur pour ol.control.MousePosition, dans la projection
- * actuellement selectionnee (_projectionCoordonnees, cf. setProjectionCoordonnees()).
- * La vue est nativement en EPSG:3857 (Web Mercator, cf. ol.proj.fromLonLat dans
- * renderPoints) — la coordonnee recue ici est donc deja en EPSG:3857.
- */
 function formatMouseCoordinates(coordonnee) {
   _derniereCoordonneeSouris = coordonnee;
   const projection = PROJECTIONS_PAR_CODE.get(_projectionCoordonnees);
@@ -173,9 +134,6 @@ function formatMouseCoordinates(coordonnee) {
   return projection.format(coord);
 }
 
-// Cache du GetCapabilities WMTS IGN — un seul fetch reel partage par toutes les
-// couches WMTS (fonds + overlays), meme si plusieurs sont construites en parallele
-// au chargement de la carte (promesse memoisee, jamais re-fetchee par couche).
 let _wmtsCapabilitiesPromise = null;
 function chargerCapacitesWMTS() {
   if (!_wmtsCapabilitiesPromise) {
@@ -189,15 +147,6 @@ function chargerCapacitesWMTS() {
   return _wmtsCapabilitiesPromise;
 }
 
-/**
- * Cree une couche ol.layer.Tile pour un fond ou overlay WMTS IGN. La couche existe
- * immediatement (necessaire pour l'ordre des layers dans new ol.Map(), construit de
- * facon synchrone), mais sa source est affectee de facon asynchrone (setSource) une
- * fois le GetCapabilities resolu et la couche/matrixSet/style valides.
- * Isolation des pannes : un echec (reseau, ou layer/matrixSet/style introuvable dans
- * le GetCapabilities) est capture ici et n'affecte que CETTE couche — jamais
- * initMap() ni les autres fonds/overlays, qui restent utilisables normalement.
- */
 function creerCoucheWMTS(bm) {
   const layer = new ol.layer.Tile({ visible: bm.visible, opacity: bm.opacity ?? 1 });
   chargerCapacitesWMTS()
@@ -221,11 +170,6 @@ function creerCoucheWMTS(bm) {
   return layer;
 }
 
-/**
- * Cree une couche ol.layer.Tile a partir d'une entree BASEMAPS_CONFIG, quel que soit
- * son type (xyz/osm/wms/wmts) — factorise la logique auparavant inline dans initMap(),
- * reutilisee a la fois pour les fonds exclusifs et les overlays.
- */
 function creerCoucheFond(bm) {
   if (bm.type === 'wmts') {
     return creerCoucheWMTS(bm);
@@ -254,15 +198,7 @@ function creerCoucheFond(bm) {
   return new ol.layer.Tile({ source, visible: bm.visible, opacity: bm.opacity ?? 1 });
 }
 
-/**
- * Initialise la carte et ses couches de base.
- * @param {string} targetId - ID de l'élément HTML contenant la carte
- * @param {string} popupId - ID de l'élément HTML servant de popup
- */
 export function initMap(targetId, popupId) {
-  // Enregistrement dynamique de chaque projection de PROJECTIONS_COORDONNEES_CONFIG dont
-  // proj4def n'est pas null (config.js) — EPSG:4326/EPSG:3857 sont deja connus nativement
-  // par proj4js, jamais besoin de les enregistrer.
   PROJECTIONS_COORDONNEES_CONFIG.forEach(p => {
     if (p.proj4def) proj4.defs(p.code, p.proj4def);
   });
@@ -272,10 +208,6 @@ export function initMap(targetId, popupId) {
   gpsSource = new ol.source.Vector();
   trajectoireSource = new ol.source.Vector();
 
-  // Création de la couche des points GPS — style initial mode Individu (coherent avec
-  // le radio coche par defaut dans index.html) ; voir changerModeCouleur() pour la bascule.
-  // Reduction a 6 attributs GPU par feature (fillR/G/B, strokeR/G/B) au lieu de 18 —
-  // le mode actif est le seul calcule et stocke sur les features.
   gpsLayer = new ol.layer.WebGLPoints({
     source: gpsSource,
     style: {
@@ -286,10 +218,6 @@ export function initMap(targetId, popupId) {
     }
   });
 
-  // Halo de surbrillance — feature separee (Canvas2D, pas WebGL) car un seul point a
-  // la fois : aucun enjeu de performance, et ca isole totalement la surbrillance du
-  // pipeline WebGLPoints (gpsLayer) — le point reel n'est jamais modifie, ni couleur
-  // ni rayon, cf. highlightPoint()/clearHighlight().
   haloSource = new ol.source.Vector();
   haloLayer = new ol.layer.Vector({
     source: haloSource
@@ -300,13 +228,6 @@ export function initMap(targetId, popupId) {
     source: trajectoireSource
   });
 
-  // Definition des fonds de carte exclusifs et des overlays superposables, generes
-  // depuis BASEMAPS_CONFIG — category est toujours explicite ('basemap' ou 'overlay')
-  // sur chaque entree ; le repli || 'basemap' reste un filet de securite si une future
-  // entree omettait ce champ par erreur (sans lui, elle disparaitrait silencieusement
-  // des deux listes plutot que d'atterrir dans les fonds exclusifs). basemaps reste un
-  // tableau parallele aux entrees 'basemap' de BASEMAPS_CONFIG, dans le meme ordre —
-  // c'est ce sur quoi switchBasemap(index) s'appuie, inchange.
   const basemapConfigs = BASEMAPS_CONFIG.filter(bm => (bm.category || 'basemap') === 'basemap');
   const overlayConfigs = BASEMAPS_CONFIG.filter(bm => bm.category === 'overlay');
   basemaps = basemapConfigs.map(creerCoucheFond);
@@ -356,13 +277,6 @@ export function initMap(targetId, popupId) {
         coordinateFormat: formatMouseCoordinates,
         undefinedHTML: ''
       }),
-      // Pas de target: ici, contrairement a MousePosition — ce controle ne partage
-      // pas de conteneur de mise en page avec lui (.legende-wrapper est le cluster
-      // bas-gauche coordonnees/legende ; FullScreen reste en haut-droite, positionne
-      // independamment via .ol-fullscreen-custom en absolu dans main.css). L'y
-      // deplacer casserait le placement visuel actuel et l'espacement de
-      // #toolbarZoom, prevu pour laisser la place a ce bouton juste au-dessus de
-      // lui (cf. audit controles carte, point 2).
       new ol.control.FullScreen({
         className: 'ol-fullscreen-custom',
         tipLabel: 'Plein écran',
@@ -388,10 +302,6 @@ export function initMap(targetId, popupId) {
     ])
   });
 
-  // Handler webglcontextlost / webglcontextrestored — installe apres le premier
-  // rendu d OpenLayers (evenement postrender, once:true), moment ou le canvas WebGL
-  // est garanti existant. Un setTimeout(0) ne suffisait pas car OL cree le canvas
-  // de facon asynchrone pendant son propre cycle de rendu.
   map.once('postrender', () => {
     const canvas = map.getViewport().querySelector('canvas');
     if (canvas) {
@@ -419,10 +329,6 @@ export function initMap(targetId, popupId) {
     }
   });
 
-  // Changement du curseur au survol d'un point.
-  // Guard _webglContextLost : si le contexte GPU est perdu, hasFeatureAtPixel()
-  // appelle en interne forEachFeatureAtCoordinate -> RenderTarget.readPixel et
-  // plante sur this.helper undefined (PointsLayer.js:304). On coupe court ici.
   map.on('pointermove', evt => {
     if (_webglContextLost) return;
     try {
@@ -434,9 +340,6 @@ export function initMap(targetId, popupId) {
     }
   });
 
-  // Gestion du clic pour afficher le popup.
-  // Meme guard que pointermove : forEachFeatureAtPixel appelle la meme chaine
-  // WebGL interne et planterait sur un contexte perdu.
   map.on('singleclick', evt => {
     if (_webglContextLost) return;
     let hit = false;
@@ -461,18 +364,12 @@ export function initMap(targetId, popupId) {
       popupEl.style.display = 'none';
       clearHighlight();
     } else {
-      // Surbrillance du point cliqué directement sur la carte — symétrique au clic
-      // sur une ligne du tableau (panel.js), pour que les deux entrées se comportent
-      // de façon cohérente.
       highlightPoint(aniId, locDatetime);
     }
 
     document.querySelectorAll('.panel-table-row.selected-carte').forEach(tr => {
       tr.classList.remove('selected-carte');
     });
-    // .selected-click n'est jamais pose ici (uniquement par panel.js sur clic tableau)
-    // mais doit etre retire ici : sinon une ancienne ligne selectionnee via le tableau
-    // reste visuellement marquee apres un clic direct sur la carte.
     document.querySelectorAll('.panel-table-row.selected-click').forEach(tr => {
       tr.classList.remove('selected-click');
     });
@@ -534,13 +431,6 @@ function cssToRgba(css) {
   return rgba;
 }
 
-/**
- * Dessine les points GPS sur la carte.
- * @param {Array} locations - Liste des positions (Lambert-93)
- * @param {boolean} clearBefore - Si vrai, efface les points existants
- * @param {boolean} modeTrajectoire - Si vrai, applique le style spécifique trajectoire
- * @param {string} modeCouleur - Mode de coloration actif
- */
 export function renderPoints(locations, clearBefore = true, modeTrajectoire = false, modeCouleur = 'individu') {
   if (clearBefore) { gpsSource.clear(); haloSource?.clear(); _featureSurlignee = null; }
 
@@ -571,10 +461,6 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
       premiereParIndividu[loc.ani_id]?.date === (loc.loc_datetime_local || loc.loc_date_local);
     const estDepart = modeTrajectoire && estPremier && !estDernier;
 
-    // Contour uniforme Blanc en modes Sexe/Gestionnaire — le cycle par index
-    // (getContourParIndex) n a de sens qu en mode Individu, ou il differencie
-    // les couleurs Glasbey proches ; applique aux autres modes il produit un
-    // contour Noir/Blanc incoherent au sein d une meme categorie (cf. audit).
     const idx = indicesIndividus.get(loc.ani_id) ?? 0;
     const contour = modeCouleur === 'individu' ? getContourParIndex(idx) : CONTOURS[0];
 
@@ -596,10 +482,6 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
       strokeWidth = contour.strokeWidth;
     }
 
-    // 6 attributs GPU uniquement (mode actif) — reduit la charge memoire GPU
-    // par rapport a l ancienne approche (18 attributs pour les 3 modes precalcules).
-    // changerModeCouleur() re-parcourt les features pour injecter les nouvelles
-    // couleurs a la volee au changement de mode (cout CPU negligeable vs gain GPU).
     const [cR, cG, cB] = cssToRgba(getCouleur(loc, modeCouleur));
     const featureAttrs = {
       geometry: new ol.geom.Point(coord),
@@ -630,27 +512,13 @@ export function renderPoints(locations, clearBefore = true, modeTrajectoire = fa
     gpsSource.addFeature(feature);
   });
 
-  // Pas d appel a changerModeCouleur() ici — les features viennent d etre crees
-  // avec les bons attributs fillR/G/B, le style de gpsLayer pointe deja sur ces
-  // attributs generiques (cf. initMap). Un setStyle redondant forcerait un re-rendu
-  // inutile apres le addFeature massif.
 
   return gpsSource.getFeatures().length;
 }
 
-/**
- * Bascule la couche de points GPS sur un autre mode de coloration (individu/sexe/gestionnaire).
- * Recalcule et injecte les couleurs a la volee sur chaque feature existante — les features
- * ne stockent plus que 6 attributs GPU (fillR/G/B + strokeR/G/B pour le mode actif),
- * contre 18 dans l ancienne approche (3 modes precalcules simultanement).
- */
 export function changerModeCouleur(modeCouleur) {
   if (!gpsLayer || !gpsSource) return;
 
-  // Re-injection des couleurs sur chaque feature existante.
-  // preparerCouleurs() a ete appele par renderPoints() avant nous — couleursIndividus
-  // et indicesIndividus sont a jour. On relit les metadonnees de chaque feature
-  // plutot que de conserver une reference au loc d origine (features deja en gpsSource).
   const features = gpsSource.getFeatures();
   features.forEach(f => {
     const loc = {
@@ -666,11 +534,6 @@ export function changerModeCouleur(modeCouleur) {
     const idx = indicesIndividus.get(loc.ani_id) ?? 0;
     const contour = modeCouleur === 'individu' ? getContourParIndex(idx) : CONTOURS[0];
 
-    // Point de depart (trajectoire) : fond blanc, contour colore — identifie par strokeA != fillA
-    // heuristique : on detecte le "depart" par le fait que fillR/G/B valent 255/255/255
-    // ET strokeR/G/B ne valent pas 255/255/255 (contour colore, pas blanc).
-    // On ne peut pas relire estDepart directement (non stocke sur la feature) — mais
-    // renderPoints() a stocke fillA=1 pour tous, donc on detecte via les valeurs RGB.
     const estDepart = f.get('fillR') === 255 && f.get('fillG') === 255 && f.get('fillB') === 255 &&
       !(f.get('strokeR') === 255 && f.get('strokeG') === 255 && f.get('strokeB') === 255);
 
@@ -691,14 +554,8 @@ export function changerModeCouleur(modeCouleur) {
     }
   });
 
-  // Le style WebGL pointe toujours sur fillR/G/B et strokeR/G/B (generiques) —
-  // les f.set() ci-dessus declenchent automatiquement le re-rendu OL via changed().
-  // Pas besoin de setStyle() ni de recreer la couche.
 }
 
-/**
- * Affiche le popup d'information au-dessus d'un point cliqué.
- */
 function showPopup(feature, coordinate, popupEl) {
   const p = feature.getProperties();
   const isTrajectoire = document.getElementById('btnTrajectoire')?.classList.contains('active');
@@ -745,9 +602,6 @@ function showPopup(feature, coordinate, popupEl) {
   });
 }
 
-/**
- * Dessine les lignes reliant les points GPS pour former une trajectoire.
- */
 export function renderTrajectoire(locations, modeCouleur = 'individu') {
   trajectoireSource.clear();
   preparerCouleurs(locations);
@@ -769,22 +623,9 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
     points.sort((a, b) => new Date(a.loc.loc_datetime_local) - new Date(b.loc.loc_datetime_local));
     const coords = points.map(p => p.coord);
 
-    // Couleur du segment i (entre coords[i] et coords[i+1]) : par annee du point de
-    // depart en mode Annee — seul mode ou l'attribut source (date de la position)
-    // varie le long de la trajectoire d'un meme individu (Sexe/Gestionnaire/
-    // Population/Individu sont des attributs fixes de l'animal, identiques sur
-    // tous ses points).
     const couleurUnique = modeCouleur === 'annee' ? null : getCouleur(points[0].loc, modeCouleur);
     const couleurSegmentAt = i => modeCouleur === 'annee' ? getCouleur(points[i].loc, modeCouleur) : couleurUnique;
 
-    // Regroupement des segments consecutifs de meme couleur en runs — une seule
-    // Feature MultiLineString par couleur (au lieu d'une Feature LineString par
-    // segment). Les positions etant triees chronologiquement, l'annee est croissante
-    // au fil de la sequence : tous les segments d'une meme annee sont necessairement
-    // contigus, donc le nombre de runs est borne par le nombre d'annees distinctes de
-    // l'individu — jamais par son nombre de positions (memes modes Individu/Sexe/
-    // Gestionnaire/Population : une seule couleur -> un seul run -> une seule Feature,
-    // comportement identique a avant).
     const parCouleur = new Map(); // couleur -> Array<Array<coord>> (runs de cette couleur)
     let coloreurCourant = null;
     let runCourant = null;
@@ -855,20 +696,12 @@ export function updateMapSize() {
   if (map) map.updateSize();
 }
 
-/**
- * Alterne entre les différents fonds de carte disponibles.
- * @param {number} index - Index de la couche dans le tableau basemaps
- */
 export function switchBasemap(index) {
   basemaps.forEach((layer, i) => {
     layer.setVisible(i === index);
   });
 }
 
-/**
- * Active/desactive un overlay WMTS par id (courbes de niveau, pentes, hydrographie,
- * routes) — independant de switchBasemap(), plusieurs overlays actifs simultanement.
- */
 export function toggleOverlay(id, visible) {
   overlaysWmts.get(id)?.setVisible(visible);
 }
@@ -885,10 +718,6 @@ export function getIndicesIndividus() { return indicesIndividus; }
 export function getCouleursPopulations() { return couleursPopulations; }
 export function getCouleursAnnees() { return couleursAnnees; }
 
-/**
- * Masque/affiche les points GPS selon les lignes visibles dans le tableau Localisations.
- * @param {Set<string>|null} visiblesSet - cles 'ani_id__datetime' visibles, ou null pour tout restaurer
- */
 export function filtrerPointsParVisibilite(visiblesSet) {
   const features = gpsSource.getFeatures();
   features.forEach(f => {
@@ -950,16 +779,8 @@ export function filtrerPointsParVisibilite(visiblesSet) {
   });
 }
 
-// Halo de surbrillance (feature independante dans haloSource, Canvas2D) + agrandissement
-// du point reel lui-meme (attribut radius uniquement — jamais fillR/G/B/strokeR/G/B,
-// donc son contour/couleur d'origine reste toujours intact quel que soit le mode de
-// symbologie actif).
 let _featureSurlignee = null;
 
-// locDatetime (loc_datetime_local ou loc_date_local selon la position) distingue les
-// positions d'un meme animal — sans lui, un individu ayant plusieurs positions
-// affichees surlignerait toujours la meme feature (la premiere trouvee), quelle que
-// soit la ligne du tableau reellement cliquee.
 export function highlightPoint(ani_id, locDatetime = null) {
   const dejaCePoint = _featureSurlignee &&
     String(_featureSurlignee.get('ani_id')) === String(ani_id) &&
@@ -1075,10 +896,118 @@ export function effacerDessinSpatial() {
   _drawSource.clear();
 }
 
-/**
- * Capture toutes les couches rendues de la carte dans un blob JPEG.
- * @returns {Promise<Blob>}
- */
+
+const _styleImportPoint = new ol.style.Style({
+  image: new ol.style.Circle({
+    radius: 6,
+    fill: new ol.style.Fill({ color: 'rgba(230, 57, 70, 0.85)' }),
+    stroke: new ol.style.Stroke({ color: '#ffffff', width: 1.5 })
+  })
+});
+const _styleImportLigne = new ol.style.Style({
+  stroke: new ol.style.Stroke({ color: '#e63946', width: 2 })
+});
+const _styleImportPolygone = new ol.style.Style({
+  fill: new ol.style.Fill({ color: 'rgba(230, 57, 70, 0.25)' }),
+  stroke: new ol.style.Stroke({ color: '#e63946', width: 2 })
+});
+
+let _coucheGeoJSONImportee = null;
+
+function styleCoucheImportee(feature) {
+  const type = feature.getGeometry()?.getType() || '';
+  if (type.includes('Point')) return _styleImportPoint;
+  if (type.includes('Line')) return _styleImportLigne;
+  return _styleImportPolygone;
+}
+
+function detecterProjectionGeoJSON(geojson) {
+  const nomCrs = geojson?.crs?.properties?.name;
+  if (!nomCrs) return 'EPSG:4326';
+  if (/CRS84/i.test(nomCrs)) return 'EPSG:4326';
+  const match = nomCrs.match(/EPSG[:]{1,2}(\d+)/i);
+  return match ? `EPSG:${match[1]}` : null;
+}
+
+export function importerCoucheGeoJSON(file) {
+  return new Promise((resolve) => {
+    if (!map || !file) { resolve(null); return; }
+
+    const reader = new FileReader();
+
+    reader.onerror = () => {
+      console.error('Import GeoJSON : lecture du fichier echouee', reader.error);
+      if (window._showToast) window._showToast(`Impossible de lire le fichier "${file.name}".`);
+      resolve(null);
+    };
+
+    reader.onload = () => {
+      let geojson;
+      try {
+        geojson = JSON.parse(reader.result);
+      } catch (err) {
+        console.error('Import GeoJSON : JSON invalide', err);
+        if (window._showToast) window._showToast(`"${file.name}" n'est pas un fichier GeoJSON valide.`);
+        resolve(null);
+        return;
+      }
+
+      const dataProjection = detecterProjectionGeoJSON(geojson);
+      if (!dataProjection || !ol.proj.get(dataProjection)) {
+        console.error(`Import GeoJSON : CRS non reconnu (${dataProjection || 'absent du fichier'})`);
+        if (window._showToast) window._showToast(`"${file.name}" utilise un système de coordonnées non reconnu.`);
+        resolve(null);
+        return;
+      }
+
+      let features;
+      try {
+        features = new ol.format.GeoJSON({
+          dataProjection,
+          featureProjection: map.getView().getProjection()
+        }).readFeatures(geojson);
+      } catch (err) {
+        console.error('Import GeoJSON : lecture des features echouee', err);
+        if (window._showToast) window._showToast(`"${file.name}" n'a pas pu être interprété comme GeoJSON.`);
+        resolve(null);
+        return;
+      }
+
+      if (!features.length) {
+        if (window._showToast) window._showToast(`"${file.name}" ne contient aucune géométrie.`);
+        resolve(null);
+        return;
+      }
+
+      if (_coucheGeoJSONImportee) {
+        map.removeLayer(_coucheGeoJSONImportee);
+        _coucheGeoJSONImportee = null;
+      }
+
+      const layer = new ol.layer.Vector({
+        source: new ol.source.Vector({ features }),
+        zIndex: map.getLayers().getLength() + 1,
+        style: styleCoucheImportee
+      });
+      layer.set('layer_name', file.name);
+      map.addLayer(layer);
+      _coucheGeoJSONImportee = layer;
+
+      resolve(layer);
+    };
+
+    reader.readAsText(file);
+  });
+}
+
+/** Retire la couche GeoJSON importee, si une a ete ajoutee. */
+export function retirerCoucheGeoJSONImportee() {
+  if (!_coucheGeoJSONImportee) return false;
+  map?.removeLayer(_coucheGeoJSONImportee);
+  _coucheGeoJSONImportee = null;
+  return true;
+}
+
 export function capturerCarteEnBlob() {
   return new Promise((resolve, reject) => {
     if (!map) {
@@ -1091,19 +1020,8 @@ export function capturerCarteEnBlob() {
         const size = map.getSize();
         if (!size) throw new Error('Taille de carte indisponible');
 
-        // Ratio reel utilise par OpenLayers pour dimensionner physiquement les canvas
-        // sources (option Map.pixelRatio, par defaut window.devicePixelRatio). Sans ce
-        // facteur, le canvas de sortie (size = pixels CSS) et les canvas sources
-        // (pixels physiques = CSS x dpr) sont a des echelles differentes des que
-        // dpr > 1 (ecran avec mise a l'echelle OS) -> points/traits mal places.
         const pixelRatio = window.devicePixelRatio || 1;
 
-        // Surechantillonnage supplementaire au-dela du devicePixelRatio ecran — sur un
-        // ecran dpr=1 (projecteur), la sortie serait sinon limitee a la taille d'affichage
-        // CSS et paraitrait floue/pixelisee au zoom. Limite reelle : ne peut pas ajouter
-        // de detail au-dela de ce que le navigateur a deja rendu (tuiles de fond plafonnees
-        // par la resolution chargee au zoom courant) — le gain porte sur le lissage des
-        // traits/points vectoriels et la marge de zoom avant pixellisation visible.
         const SURECHANTILLONNAGE = 2;
         const scale = pixelRatio * SURECHANTILLONNAGE;
 
@@ -1121,11 +1039,6 @@ export function capturerCarteEnBlob() {
           const opacity = canvas.parentNode?.style.opacity || canvas.style.opacity;
           mapContext.globalAlpha = opacity === '' ? 1 : Number(opacity);
 
-          // Taille CSS reelle affichee de ce canvas precis (independante de sa resolution
-          // interne, qui peut differer d'une couche a l'autre — ex. le canvas des tuiles
-          // de fond n'a pas forcement exactement size*pixelRatio en physique). offsetWidth/
-          // offsetHeight ignorent le transform CSS (contrairement a getBoundingClientRect),
-          // donnant la taille "avant transform" voulue ici.
           const cssWidth = canvas.offsetWidth || canvas.width;
           const cssHeight = canvas.offsetHeight || canvas.height;
 
@@ -1133,9 +1046,6 @@ export function capturerCarteEnBlob() {
           const match = transform?.match(/^matrix\(([^()]*)\)$/);
           const [a, b, c, d, e, f] = match ? match[1].split(',').map(Number) : [1, 0, 0, 1, 0, 0];
 
-          // scale s applique a toute la matrice (echelle ET translation) : il fait
-          // passer du repere CSS px (ou vivent a,b,c,d,e,f et cssWidth/cssHeight) au
-          // repere physique (suréchantillonné) du canvas de sortie.
           mapContext.setTransform(a * scale, b * scale, c * scale, d * scale, e * scale, f * scale);
 
           mapContext.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, cssWidth, cssHeight);
@@ -1143,23 +1053,11 @@ export function capturerCarteEnBlob() {
 
         mapContext.globalAlpha = 1;
 
-        // Barre d'echelle — absente par construction de la capture (ol.control.ScaleLine
-        // est un element DOM hors du viewport carte, cf. target: scaleTarget dans
-        // initMap()). Calcul independant de ScaleLine (pas de lecture DOM) pour rester
-        // fiable quelle que soit sa config — meme API (getPointResolution) que celle
-        // utilisee en interne par ScaleLine pour corriger la distorsion Web Mercator
-        // selon la latitude du centre.
         const view = map.getView();
         const resolutionSol = ol.proj.getPointResolution(
           view.getProjection(), view.getResolution(), view.getCenter(), 'm'
         );
 
-        // Meme algorithme que ol.control.ScaleLine.updateElement_ (verifie dans le bundle
-        // OL charge par l'app — UP=[1,2,5], boucle ascendante). minWidthCss (100, meme
-        // valeur que minWidth dans la config ScaleLine d'initMap) est un PLANCHER : on
-        // cherche le plus PETIT nombre rond dont la largeur resultante atteint ou depasse
-        // minWidthCss, pas le plus grand qui reste en dessous (bug precedent = un cran
-        // systematique sous la valeur reellement affichee par ScaleLine).
         const minWidthCss = 100;
         const paliers = [1, 2, 5];
         let resolutionUnite = resolutionSol;
@@ -1186,18 +1084,11 @@ export function capturerCarteEnBlob() {
         const yCss = size[1] - margeCss;
 
         mapContext.setTransform(scale, 0, 0, scale, 0, 0);
-        // Halo blanc dessine AVANT le noir (legerement plus grand que la barre) plutot
-        // qu'un strokeRect a cheval sur les bords — un contour de 1px a cheval sur une
-        // barre de 4px de haut mangeait 50% de sa hauteur (25% par bord), donnant une
-        // barre a majorite blanche plutot que noire avec liseré (cf. bug precedent).
         mapContext.fillStyle = '#ffffff';
         mapContext.fillRect(xCss - 1, yCss - hauteurBarreCss - 1, largeurBarreCss + 2, hauteurBarreCss + 2);
         mapContext.fillStyle = '#000000';
         mapContext.fillRect(xCss, yCss - hauteurBarreCss, largeurBarreCss, hauteurBarreCss);
 
-        // Fond semi-transparent derriere le texte — espacement de 4px avec la barre
-        // defini explicitement (independant du padding), pour eviter que le fond ne
-        // vienne toucher la barre (cf. bug precedent : le padding mangeait l'espace).
         const espacementBarreTexte = 4;
         const paddingFond = 3;
         mapContext.font = '12px sans-serif';
@@ -1210,14 +1101,6 @@ export function capturerCarteEnBlob() {
         mapContext.fillStyle = '#000000';
         mapContext.fillText(labelEchelle, xCss, boiteBas - paddingFond);
 
-        // Legende depart/direction — comme #scaleTarget, #legendePanel est un <div> HTML
-        // hors du viewport carte (cf. .legende-wrapper dans index.html), donc absent de
-        // la capture. Dessinee UNIQUEMENT si le mode Trajectoire est actif (ces notions
-        // n'existent pas en mode Positions) — meme lecture d'etat que showPopup() (map.js)
-        // et mettreAJourLegende() (app.js), pas de nouveau parametre a propager dans toute
-        // la chaine d'export. Reproduit fidelement la legende ecran (map.css : en mode
-        // Trajectoire, seuls depart et direction sont visibles — "Derniere position" y
-        // est masquee).
         const modeTrajectoireActif = document.getElementById('btnTrajectoire')?.classList.contains('active');
 
         if (modeTrajectoireActif) {

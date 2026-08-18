@@ -1,21 +1,14 @@
 import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, PROJECTIONS_COORDONNEES_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees, importerCoucheGeoJSON, retirerCoucheGeoJSONImportee } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 import { rendreVisibleDansSidebar, activerDefilementAccordeons } from './sidebar-scroll.js';
 
-/**
- * VARIABLES GLOBALES
- * 'animals' stockera la liste complète des individus pour le filtrage
- */
 
 let animals = [];
 let activeIds = new Set();
 let currentToken = null;
-// Etat des colonnes cochees dans la modal d'export — copie independante de
-// colonnesActives (panel.js), initialisee a l'ouverture depuis getColonnesActives()
-// mais modifiable ici sans repercussion sur le tableau attributaire.
 let _colonnesExportActives = [];
 let _formatExportActif = 'csv';
 const programmationsMap = new Map(); // ani_id → prog_id
@@ -57,11 +50,6 @@ export function getAniCalendrier() { return _aniCalendrier; }
 export function setAnimals(val) { animals = val; }
 export function setActiveIds(val) { activeIds = val; }
 export function setCurrentToken(val) { currentToken = val; }
-// Les 4 accesseurs ci-dessous lisent/ecrivent tous _dernierNPartage — conserves
-// distincts (au lieu d'un seul getDernierNPartage/setDernierNPartage) uniquement pour
-// ne pas casser calculerNEffectifPositions/calculerNEffectifTrajectoire (filters.js),
-// qui les appellent encore pour lire "le N de l'autre mode" (devenu la meme valeur
-// partagee — laisse tel quel pour l'instant, cf. echange du 22/07).
 export function getDernierNPositions() { return _dernierNPartage; }
 export function getDernierNTrajectoire() { return _dernierNPartage; }
 export function setDernierNPositions(val) { _dernierNPartage = val; }
@@ -69,11 +57,6 @@ export function setDernierNTrajectoire(val) { _dernierNPartage = val; }
 export function getFiltreGeom() { return _filtreGeom; }
 export function setFiltreGeom(val) { _filtreGeom = val; }
 
-/**
- * ENRICHISSEMENT DES DONNÉES
- * Les tables de positions GPS ne contiennent pas toujours les métadonnées (sexe, etc.).
- * Cette fonction fusionne les positions avec les informations de la table t_animal.
- */
 export function enrichirLocations(locations) {
   const animalsMap = window._animalsMap || new Map(getAnimals().map(a => [String(a.ani_id), a]));
   return locations.map(loc => {
@@ -104,13 +87,6 @@ export function enrichirAnimauxAvecPositions(locations) {
     });
 }
 
-/**
- * Deduit les N positions les plus recentes par animal a partir d'un lot de positions
- * deja charge (limit_par_animal >= N) — evite une requete RPC separee en limit_par_animal=N
- * pour obtenir la meme information. Utilisee avec n=1 pour activeIds/annees/derniere position
- * (cf. startApp/reinitialiserTousLesFiltres), et avec n=valeur du filtre "N dernieres positions"
- * par filters.js (reutilisation client Trajectoire->Positions, cf. peutReutiliserPositions).
- */
 export function deriverNDernieresPositionsParAnimal(locations, n = 1) {
   const parAnimal = new Map();
   locations.forEach(loc => {
@@ -224,17 +200,6 @@ function adapterSelectNPourMode(mode) {
   const nModeLimite = document.getElementById('nModeLimite');
   if (!inputN) return;
 
-  // N partage entre les deux modes — plus de valeur distincte a selectionner selon
-  // "mode" (le clamp minimum Trajectoire est applique en amont, au clic sur
-  // #btnTrajectoire, avant l'appel a applyFilters() — cf. listener plus bas).
-  //
-  // _nModeManuel n'est PAS reinitialise ici — un basculement de mode ne doit pas
-  // effacer un choix manuel de N deja fait par l'utilisateur (bug confirme le
-  // 22/07 : un individu reste coche, et sans ce garde-fou le prochain appel a
-  // mettreAJourSelectN() force "Toutes" a nouveau, ecrasant silencieusement le
-  // choix). La reinitialisation de _nModeManuel reste geree explicitement par
-  // reinitialiserTousLesFiltres() uniquement (reset complet, geste utilisateur
-  // volontaire) — pas par un simple changement de mode.
   if (_dernierNPartage === 'toutes') {
     _nEstToutes = true;
     if (nModeToutes) nModeToutes.checked = true;
@@ -251,12 +216,6 @@ function adapterSelectNPourMode(mode) {
   mettreAJourBadgeNPositions();
 }
 
-/**
- * Grise #btnTrajectoire quand le dernier chargement valide (cf. filters.js,
- * peutAfficherTrajectoire()) ne couvre pas le minimum de N_POSITIONS_MIN_TRAJECTOIRE
- * positions/animal — a appeler apres tout chargement reussi (initial ou via
- * #btnApplyFilters) qui peut avoir change ce qui est en cache.
- */
 function mettreAJourEtatBoutonTrajectoire() {
   const btnTraj = document.getElementById('btnTrajectoire');
   if (!btnTraj) return;
@@ -407,10 +366,6 @@ export function mettreAJourBadgeNPositions() {
   }, 'nPositions');
 }
 
-/**
- * INITIALISATION DE L'APPLICATION
- * Orchestre le chargement des données et la configuration de l'interface.
- */
 async function startApp(token) {
   initSidebarRight();
   // Masquer l'écran de login après authentification réussie
@@ -481,9 +436,6 @@ async function startApp(token) {
 
     const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
 
-    // Quatre requêtes en parallèle — fusion des anciens Bloc A (métadonnées) et
-    // Bloc B (positions), qui étaient séquentiels sans dépendance entre eux.
-    // populations/gestionnaires ne sont plus des requêtes dediees — extraites de fetchAnimals()
     const [
       animaux, programmations, ,
       locationsSuiviesRaw, idsTranslocations
@@ -491,12 +443,6 @@ async function startApp(token) {
       fetchAnimals(token),
       fetchProgrammations(token),
       chargerProgrammationsGPS(token),
-      // N dernières positions par animal suivi — pour le rendu carte. Sert aussi a
-      // deriver la derniere position par animal (activeIds, annees, liste individus,
-      // cf. deriverNDernieresPositionsParAnimal) au lieu d'un second appel RPC dedie a
-      // limit_par_animal=1 : n >= 1 dans tous les cas (defaut 5, min HTML "1" sur
-      // #inputNDernieres), donc la plus recente parmi les n deja recuperees est
-      // strictement identique a ce que retournerait cet appel separe.
       fetchLocalisationsRPC(currentToken, {
         ani_is_followed: true,
         limit_par_animal: n
@@ -562,13 +508,6 @@ async function startApp(token) {
     window._showToast = showToast;
     // mettreAJourIndividus(animals);
 
-    // Export CSV — colonnes du tableau attributaire, via f_get_localisation (RPC paginee)
-    // Reflete les derniers filtres reellement appliques sur la carte (_derniersFiltresAppliques),
-    // pas l etat courant des champs UI (qui peut differer si l utilisateur n a pas encore reapplique)
-    // Calendrier en arrière-plan — ne bloque pas le rendu carte. Sert aussi a deriver les
-    // animaux avec au moins une position valide (memes filtres WHERE que l'ancien
-    // fetchAniIdsAvecGeom sur v_localisation : loc_anomalie/loc_outlier/geom, cf. api.js) —
-    // evite un second scan complet de la table pour la meme information.
     fetchAniCalendrier(currentToken).then(calendrier => {
       _aniCalendrier = calendrier;
 
@@ -582,11 +521,6 @@ async function startApp(token) {
         }
       });
 
-      // Enregistre le chargement initial dans le cache de reutilisation de filters.js —
-      // sans cela, le premier basculement vers Trajectoire repart toujours en reseau meme
-      // si les N sont identiques (startApp() fait son propre fetch, hors applyFilters()).
-      // Fait ICI (apres le flaggage sansGeom ci-dessus, pas avant) pour que idsAChercher
-      // corresponde exactement a ce qu'un futur applyFilters() calculerait.
       enregistrerChargementInitial(locationsSuiviesRaw, n);
       mettreAJourEtatBoutonTrajectoire();
     }).catch(err => {
@@ -678,11 +612,6 @@ async function startApp(token) {
       mettreAJourIndividus(animauxEnrichis);
     }, 0);
 
-    // Mode couleur (symbologie) par défaut — Individu, coherent avec renderPoints()
-    // appele plus haut sans 4e argument (donc modeCouleur='individu' par defaut, cf. map.js).
-    // Necessaire ici car le navigateur peut restaurer un radio Sexe/Gestionnaire coche
-    // apres un rechargement de page (Ctrl+R), sans declencher l evenement 'change' —
-    // desynchro sinon avec les points reellement colores et avec mettreAJourLegende() ci-dessous.
     document.querySelectorAll('input[name="modeCouleur"]').forEach(radio => {
       radio.checked = radio.value === 'individu';
     });
@@ -830,9 +759,6 @@ async function startApp(token) {
         });
       }
 
-      // Listener select saison — remplace les anciens boutons radio (name="saisonRadio").
-      // Une option "Aucune" (value="") en 1ere position permet nativement de revenir a
-      // "aucune saison", ce que des radios ne permettent pas par simple clic.
       document.getElementById('selectSaison')?.addEventListener('change', (e) => {
         const saison = e.target.value;
         const saisonFrom = document.getElementById('saisonFrom');
@@ -1072,15 +998,6 @@ async function startApp(token) {
     mettreAJourFiltresActifs();
     filtrerListeIndividus();
 
-    // Enregistrement precoce du cache de reutilisation (filters.js) — fetchAniCalendrier()
-    // (ci-dessus) interroge toute v_localisation sans pagination et peut prendre plusieurs
-    // secondes : attendre sa resolution pour enregistrer le cache (seul emplacement avant
-    // ce correctif) le rendait inutile des que l'utilisateur cliquait Trajectoire avant
-    // cette resolution — le cas courant, pas un cas limite rare. Ici, ni ce calcul ni un
-    // futur calcul dans applyFilters() n'excluent encore les individus sansGeom (le
-    // flaggage n'a pas encore eu lieu des deux cotes) — les portees correspondent donc
-    // quand meme. Le second enregistrement (dans le .then() de fetchAniCalendrier) prend
-    // le relais avec la liste corrigee pour les clics plus tardifs.
     enregistrerChargementInitial(locationsSuiviesRaw, n);
     mettreAJourEtatBoutonTrajectoire();
 
@@ -1099,13 +1016,6 @@ async function startApp(token) {
     // Initialisation des boutons de la barre d'outils carte (zoom + filtre spatial)
     initToolbarCarte();
 
-    // TomSelect — initialisation au premier toggle de chaque details
-    // Les selects natifs sont cachés via CSS (select.sidebar-select { display: none })
-    // TomSelect injecte son propre widget au premier toggle
-    // TomSelect — initialisation au premier toggle de chaque details (ou immédiatement si déjà ouvert)
-    // Les selects natifs sont cachés via CSS (select.sidebar-select { display: none })
-    // TomSelect injecte son propre widget
-    // TomSelect multiple dédié pour selectAnnee
     {
       const selectAnneeEl = document.getElementById('selectAnnee');
       if (selectAnneeEl && !selectAnneeEl.tomselect) {
@@ -1186,12 +1096,6 @@ async function startApp(token) {
       const btnPos = document.getElementById('btnPositions');
       const btnTraj = document.getElementById('btnTrajectoire');
       if (btnPos && btnTraj) {
-        // Basculement pur — ne fait plus jamais appel a applyFilters() (donc jamais au
-        // reseau ni au DOM des filtres) : ne fait que re-rendre, sous l'autre mode, les
-        // dernieres donnees reellement validees par un clic sur #btnApplyFilters (ou le
-        // chargement initial), cf. rebasculerModeAffichage() dans filters.js. Un filtre
-        // modifie dans l'UI sans avoir clique "Appliquer" ne peut donc plus jamais fuiter
-        // dans l'affichage via ces boutons.
         btnPos.addEventListener('click', () => {
           decocherCochesAutomatiques();
           const besoin = _dernierNPartage === 'toutes' ? null : (parseInt(_dernierNPartage) || null);
@@ -1461,18 +1365,9 @@ function initBasemapSelector() {
   const overlayOptions = document.getElementById('overlayOptions');
   const btnFondsCarte = document.getElementById('btnFondsCarte');
 
-  // Fonds exclusifs vs overlays superposables — cf. category dans BASEMAPS_CONFIG,
-  // toujours explicite ('basemap' ou 'overlay' => case a cocher independante) ; le
-  // repli || 'basemap' reste un filet de securite si une future entree omettait ce
-  // champ par erreur (meme raisonnement que dans map.js/initMap). L'index passe a
-  // switchBasemap() porte sur basemapConfigs uniquement, coherent avec le tableau
-  // basemaps de map.js (meme filtrage cote la).
   const basemapConfigs = BASEMAPS_CONFIG.filter(bm => (bm.category || 'basemap') === 'basemap');
   const overlayConfigs = BASEMAPS_CONFIG.filter(bm => bm.category === 'overlay');
 
-  // Generer dynamiquement les vignettes de fonds exclusifs — grille 3 colonnes, vignette
-  // carree + libelle sous l'image (cf. .sidebar-fonds-card dans main.css), selection
-  // "facon Figma" (bordure + fond vert leger + texte vert, pas de coche).
   if (basemapOptions) {
     basemapOptions.innerHTML = '';
     basemapConfigs.forEach((bm, index) => {
@@ -1496,12 +1391,6 @@ function initBasemapSelector() {
     });
   }
 
-  // Generer dynamiquement les blocs d'overlays — chaque overlay est un bloc empile
-  // (checkbox+nom, puis curseur d'opacite en ligne a droite) plutot qu'une ligne de
-  // grille dense. Slider d'opacite sur tous les overlays sauf limites administratives
-  // et parcs nationaux (traits/aplats de contour fins, l'opacite n'y apporte rien).
-  // Le mot "Opacité" n'est plus affiche (le slider est explicite par lui-meme) — la
-  // valeur en % reste affichee (info utile).
   const OVERLAYS_SANS_OPACITE = new Set(['ign_limites_admin', 'ign_parcs_nationaux']);
   if (overlayOptions) {
     overlayOptions.innerHTML = '';
@@ -1576,11 +1465,35 @@ function initBasemapSelector() {
   });
   document.getElementById('btnFermerFondsCarte')?.addEventListener('click', afficherVueFiltres);
   document.getElementById('btnRetourFiltres')?.addEventListener('click', afficherVueFiltres);
+
+  // Import GeoJSON utilisateur — le bouton declenche l'input file masque ; l'import
+  // reel (parsing, reprojection, ajout de couche) est gere par map.js.
+  const inputImportGeoJSON = document.getElementById('inputImportGeoJSON');
+  const coucheImporteeInfo = document.getElementById('coucheImporteeInfo');
+  const coucheImporteeNom = document.getElementById('coucheImporteeNom');
+
+  document.getElementById('btnImportGeoJSON')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    inputImportGeoJSON?.click();
+  });
+  inputImportGeoJSON?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permet de reimporter le meme fichier a la suite
+    if (!file) return;
+    const layer = await importerCoucheGeoJSON(file);
+    if (layer && coucheImporteeInfo && coucheImporteeNom) {
+      coucheImporteeNom.textContent = file.name;
+      coucheImporteeInfo.style.display = 'flex';
+    }
+  });
+
+  document.getElementById('btnRetirerGeoJSON')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    retirerCoucheGeoJSONImportee();
+    if (coucheImporteeInfo) coucheImporteeInfo.style.display = 'none';
+  });
 }
 
-/**
- * Démarre le dessin d'une zone (polygone ou rectangle) et ferme le panneau de choix.
- */
 function demarrerDessinSpatial(geometryType) {
   const btn = document.getElementById('btnDessin');
   const panneau = document.getElementById('panneauDessin');
@@ -1783,12 +1696,6 @@ function initToolbarCarte() {
   });
 }
 
-/**
- * Ouvre la modal d'export — pre-remplit resume (positions + filtres actifs), nom de
- * fichier par defaut, et la liste des colonnes (etat independant _colonnesExportActives,
- * initialise depuis getColonnesActives() mais modifiable dans la modal sans repercussion
- * sur le tableau attributaire).
- */
 async function ouvrirModalExport() {
   const modal = document.getElementById('modalExport');
   if (!modal) return;
@@ -1890,10 +1797,6 @@ function svgVersPngDataURL(url) {
   });
 }
 
-// Conversion CSS (hex ou rgb()) -> [r,g,b] entiers pour setFillColor/setDrawColor de
-// jsPDF, qui n'acceptent pas les chaines CSS directement. Meme technique (canvas 1x1)
-// que cssToRgba() dans map.js, non exportee — duplication volontaire plutot que de
-// coupler ce module a un detail interne de map.js pour 6 lignes.
 function cssToRgbArray(css) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 1;
@@ -1904,15 +1807,6 @@ function cssToRgbArray(css) {
   return [r, g, b];
 }
 
-/**
- * Normalise les donnees de legende (individu/sexe/gestionnaire) en entrees
- * {label, fill, stroke} — meme source de donnees que mettreAJourLegende() (DOM),
- * mais sans effet de bord DOM, pour alimenter le dessin vectoriel dans le PDF.
- */
-// Y a-t-il, parmi les positions actuellement affichees, au moins un animal sans
-// population assignee ? Determine s'il faut ajouter l'entree "Inconnu" (grise,
-// #aaaaaa) a la legende Population — couleursPopulations (map.js) ne contient
-// jamais cette valeur (cf. .filter(Boolean) dans preparerCouleurs()).
 function auMoinsUnAnimalSansPopulation() {
   return getGpsSource().getFeatures().some(f => !f.get('ani_pop_rattach'));
 }
@@ -2003,25 +1897,11 @@ function dessinerLegendePDF(doc, entries, x, startY, disposition) {
   });
 }
 
-/**
- * Nom de fichier suggere pour le selecteur systeme — meme regle de nettoyage que celle
- * appliquee en interne par chaque fonction d'export au moment du telechargement classique,
- * dupliquee ici car necessaire AVANT la generation du blob (le picker doit s'ouvrir tout
- * de suite dans le geste utilisateur, cf. obtenirFileHandleExport).
- */
 function nomFichierSuggere(nomFichier, defaut, extension) {
   const nomSanitise = (nomFichier || '').trim().replace(/[\\/:*?"<>|]/g, '').trim();
   return `${nomSanitise || defaut}.${extension}`;
 }
 
-/**
- * Ouvre le selecteur systeme "Enregistrer sous" (API File System Access) si disponible —
- * Chrome/Edge uniquement a ce jour, pas Firefox/Safari. Doit etre appele directement dans
- * le gestionnaire d'evenement utilisateur (sans await bloquant avant), sous peine d'echec
- * faute d'activation transitoire. Renvoie null si l'API est indisponible OU si l'utilisateur
- * annule (AbortError) — dans les deux cas, chaque fonction d'export retombe proprement sur
- * son telechargement automatique classique quand fileHandle est falsy.
- */
 async function obtenirFileHandleExport(nomSuggere, extension, mimeType, description) {
   if (typeof window.showSaveFilePicker !== 'function') return null;
   try {
@@ -2035,11 +1915,6 @@ async function obtenirFileHandleExport(nomSuggere, extension, mimeType, descript
   }
 }
 
-/**
- * Genere un rapport PDF (titre, date, resume des filtres actifs deja affiche dans la
- * modal, capture de la carte via capturerCarteEnBlob(), legende du mode de symbologie
- * actif) et declenche le telechargement.
- */
 async function exporterCarteRapportPDF(nomFichier, inclureLegende = true, fileHandle = null) {
   const [blob, logoDataUrl] = await Promise.all([
     capturerCarteEnBlob(),
@@ -2146,9 +2021,6 @@ async function exporterCarteRapportPDF(nomFichier, inclureLegende = true, fileHa
 
 // --- Export JPG enrichi (habillage logo/resume/legende) ---
 
-// Meme facteur que pixelRatio*SURECHANTILLONNAGE dans capturerCarteEnBlob (map.js) — la
-// carte capturee est deja a cette echelle ; l'habillage doit suivre pour rester net et
-// proportionne au meme niveau de detail sur l'image finale.
 const HABILLAGE_SCALE = (window.devicePixelRatio || 1) * 2;
 
 function chargerImageDepuisUrl(url) {
@@ -2179,12 +2051,6 @@ function enroulerTexteCanvas(ctx, texte, largeurMax) {
   return lignes;
 }
 
-/**
- * Dessine la legende couleur (entries {label, fill, stroke}, cf. construireEntreesLegende())
- * sur un canvas 2D — variante image plate de dessinerLegendePDF() : pas de pagination
- * possible ici, la legende s'enroule en lignes sur la largeur disponible et se tronque
- * ("+N autres") si elle depasse hauteurMax.
- */
 function dessinerLegendeCanvas(ctx, entries, x, y, largeurMax, hauteurMax, scale) {
   const rayon = 4 * scale;
   const ligneHauteur = 20 * scale;
@@ -2237,12 +2103,6 @@ function dessinerLegendeCanvas(ctx, entries, x, y, largeurMax, hauteurMax, scale
   return (ligne + 1) * ligneHauteur;
 }
 
-/**
- * Export JPG enrichi — meme habillage informatif que le rapport PDF (exporterCarteRapportPDF) :
- * logo/titre/resume/filtres en bandeau haut, legende couleur en bandeau bas — mais compose
- * directement sur l'image finale plutot qu'un document multi-pages. Reutilise
- * capturerCarteEnBlob() (map.js) et construireEntreesLegende() (deja ecrite pour le PDF).
- */
 async function exporterCarteJPGRapport(nomFichier, inclureLegende, fileHandle = null) {
   const [blobCarte, logoDataUrl] = await Promise.all([
     capturerCarteEnBlob(),
@@ -2389,10 +2249,6 @@ export function supprimerBadgeById(id) {
   mettreAJourFiltresActifs();
 }
 
-/**
- * SYSTÈME DE BADGES
- * Affiche un badge amovible pour chaque filtre actif.
- */
 export function ajouterBadge(label, onRemove, id = null, onClick = null) {
   if (id) {
     const existing = document.querySelector(`#badgesFiltres .filtre-badge[data-id='${id}']`);
@@ -2526,10 +2382,6 @@ async function reinitialiserTousLesFiltres() {
       clearTrajectoire();
     }
 
-    // 3bis. Mode couleur (symbologie) par défaut — Individu, coherent avec renderPoints()
-    // appele plus bas sans 4e argument (donc modeCouleur='individu' par defaut, cf. map.js).
-    // Fait avant l'appel a mettreAJourLegende() plus bas pour que la legende (qui lit ce
-    // radio) soit coherente avec les points reellement colores.
     document.querySelectorAll('input[name="modeCouleur"]').forEach(radio => {
       radio.checked = radio.value === 'individu';
     });
@@ -2654,17 +2506,8 @@ async function reinitialiserTousLesFiltres() {
         setLabelDatetime('Date de localisation');
         filtrerListeIndividus();
 
-        // Reenregistre le cache de reutilisation (filters.js) avec les donnees
-        // fraichement rechargees par le reset — sans cela, _cachePositions/_dernierChargement
-        // restaient sur l'ancien etat (Reinitialiser fait son propre fetch hors
-        // applyFilters()) et un clic ulterieur sur Trajectoire rebasculait sur des
-        // donnees perimees, cf. rebasculerModeAffichage(). Appele apres filtrerListeIndividus()
-        // ci-dessus pour que idsAChercher corresponde a l'etat de visibilite post-reset.
         enregistrerChargementInitial(locationsSuiviesRaw, n);
 
-        // La modale d'export lit ce snapshot, et non les champs courants de la sidebar.
-        // Sans sa reinitialisation, elle conservait les anciens filtres apres un clic sur
-        // "Reinitialiser", alors que la carte affichait deja son etat par defaut.
         window._derniersFiltresAppliques = {
           ani_is_followed: true,
           limit_par_animal: n
@@ -2778,10 +2621,6 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   }
 });
 
-/**
- * MISE À JOUR DE LA LÉGENDE
- * Adapte la légende selon le mode d'affichage et de coloration.
- */
 export function mettreAJourLegende(modeForce = null) {
   const contenu = document.getElementById('legendeContenu');
   if (!contenu) return;
@@ -2801,15 +2640,9 @@ export function mettreAJourLegende(modeForce = null) {
   const sectionCouleur = document.getElementById('legendeCouleur');
   const titreCouleur = document.getElementById('legendeCouleurTitre');
 
-  // Nettoyage centralise des 2 zones de legende couleur (liste dynamique, bloc
-  // categoriel a 2 emplacements) — chaque branche ci-dessous n'a plus qu'a afficher
-  // ce dont elle a besoin, plus besoin de nettoyer les autres.
   document.getElementById('legendeIndividusList')?.remove();
   sectionCouleur?.classList.remove('visible');
 
-  // Contour fixe (Blanc) utilise sur la carte pour les modes Population/Sexe/Gestionnaire
-  // (cf. getContourDefaut() dans map.js) — la legende doit afficher exactement ce contour,
-  // pas une couleur arbitraire.
   const contourDefaut = getContourDefaut();
   const contourDefautCss = `rgb(${contourDefaut.strokeR}, ${contourDefaut.strokeG}, ${contourDefaut.strokeB})`;
 

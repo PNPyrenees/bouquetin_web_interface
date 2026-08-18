@@ -95,26 +95,7 @@
       </div>
     </div>
   </header>
-  <script>
-    (() => {
-      const token = sessionStorage.getItem('bqt_token');
-      if (!token) return;
-
-      try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const role = payload.role || payload.sub || 'Utilisateur';
-        const initiales = {
-          pnp_bqt_reader: 'LC',
-          pnp_bqt_writer: 'AD'
-        }[role] || role.slice(0, 2).toUpperCase();
-
-        document.getElementById('sessionAvatar').textContent = initiales;
-        document.getElementById('userChip').style.display = 'flex';
-      } catch {
-        // Le traitement normal de la session prendra le relais.
-      }
-    })();
-  </script>
+  <script src="assets/js/session-chip.js"></script>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-content" id="sidebarContent">
     <div class="sidebar-vue sidebar-vue-filtres" id="vueFiltres">
@@ -301,6 +282,18 @@
         <div class="sidebar-fonds-section-titre">Fond principal</div>
         <div id="basemapOptions" class="sidebar-fonds-grid">
           <!-- Dynamically populated cards -->
+        </div>
+
+        <div class="sidebar-fonds-separateur"></div>
+
+        <div class="sidebar-fonds-section-titre">Import de données</div>
+        <div class="sidebar-fonds-import">
+          <button type="button" id="btnImportGeoJSON" class="sidebar-fonds-import-link">Importer une couche</button>
+          <input type="file" id="inputImportGeoJSON" accept=".geojson,.json,application/geo+json,application/json" hidden>
+          <div id="coucheImporteeInfo" class="sidebar-fonds-import-fichier" style="display:none">
+            <button type="button" id="btnRetirerGeoJSON" class="sidebar-fonds-import-retirer" title="Retirer la couche importée">×</button>
+            <span id="coucheImporteeNom"></span>
+          </div>
         </div>
 
         <div class="sidebar-fonds-separateur"></div>

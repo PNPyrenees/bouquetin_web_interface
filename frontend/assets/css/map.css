@@ -1,12 +1,4 @@
-/* ============================================
-   THEME CARTE — panneaux flottants superposes a la carte
-   (legende, toolbar boutons carte, echelle, bouton plein ecran)
-   Variables --map-ui-* definies dans main.css (:root) — disponibles sur toutes les pages.
-   ============================================ */
 
-/* ========================================
-   MAPSCREEN & MAP
-   ======================================== */
 #mapScreen {
   display: block;
   position: fixed;
@@ -37,9 +29,6 @@
   background: #f8f9fa;
 }
 
-/* ========================================
-   POPUP CARTE
-   ======================================== */
 #popup {
   display: none;
   /* Le conteneur créé par OpenLayers assure le positionnement absolu. Le popup doit
@@ -56,9 +45,6 @@
   font-size: 12px;
 }
 
-/* Pointe de bulle — relie visuellement le popup (deporte au-dessus du point via
-   l'offset de popupOverlay, cf. map.js) au point GPS concerne. left:50% + translateX
-   centre la pointe quelle que soit la largeur reelle du popup (120-180px, cf. min/max-width). */
 #popup::after {
   content: '';
   position: absolute;
@@ -83,9 +69,6 @@
   font-size: 11px;
 }
 
-/* ========================================
-   LOADING OVERLAY
-   ======================================== */
 /* Map Loading Overlay */
 #mapLoading {
   position: absolute;
@@ -177,17 +160,14 @@
 
 @keyframes spin {
   0% {
-    transform: rotate(0deg);
+    transform: rotate(360deg);
   }
 
   100% {
-    transform: rotate(360deg);
+    transform: rotate(0deg);
   }
 }
 
-/* ========================================
-   TOOLBAR (Outils, Zoom, Dessin)
-   ======================================== */
 .map-toolbar {
   position: absolute;
   left: 10px;
@@ -256,13 +236,6 @@
   color: var(--map-ui-icon);
 }
 
-/* Icones <img> (SVG externes) — CSS filter ne peut pas lire --map-ui-icon directement ;
-   brightness(0) invert(1) force le blanc, en phase avec --map-ui-icon actuel (#ffffff).
-   Si --map-ui-icon change de couleur, ce filtre doit etre retune manuellement.
-   Classe utilitaire partagee par .toolbar-btn img / .panneau-dessin-btn img /
-   .ol-fullscreen-custom button img — meme recette d'icone blanche dans les 3 contextes,
-   auparavant dupliquee 3 fois. Chaque contexte ne garde que ses proprietes propres
-   (flex-shrink, vertical-align...) en plus de cette classe. */
 .icon-svg-map {
   width: 16px;
   height: 16px;
@@ -279,9 +252,6 @@
   background: var(--map-ui-bg-active);
 }
 
-/* Cf. .basemap-scroll-btn:disabled — meme convention grise/non-cliquable. Place apres
-   .toolbar-btn.active pour gagner le depart a egalite de specificite si le bouton
-   reste "active" (mode en cours d'affichage) alors qu'il devient indisponible. */
 .toolbar-btn:disabled {
   opacity: 0.3;
   pointer-events: none;
@@ -347,9 +317,6 @@
   flex-shrink: 0;
 }
 
-/* ========================================
-   LÉGENDE
-   ======================================== */
 .legende-wrapper {
   position: absolute;
   bottom: 20px;
@@ -562,9 +529,6 @@
   background-size: 10px;
 }
 
-/* ========================================
-   ÉCHELLE (Scale)
-   ======================================== */
 /* Filet de securite — force texte ET traits (bordures/contours) sur TOUS les descendants,
    quel que soit le nom de classe exact utilise par OpenLayers. */
 #scaleTarget,
@@ -642,12 +606,6 @@
   color: var(--map-ui-text) !important;
 }
 
-/* ========================================
-   COORDONNÉES SOURIS
-   ======================================== */
-/* background/border-radius/box-shadow/font-family/pointer-events fournis par la classe
-   partagee .legende-panel (cf. index.html) — meme rendu que la legende et les autres
-   panneaux flottants de la carte, pas de duplication de valeurs qui pourraient diverger. */
 #mouseCoordsTarget {
   display: flex;
   align-items: center;
@@ -664,9 +622,6 @@
   color: var(--map-ui-text) !important;
 }
 
-/* className: 'ol-mouse-position-custom' (cf. map.js) remplace entierement la classe
-   par defaut 'ol-mouse-position' d'OL (meme mecanisme que .ol-fullscreen-custom) —
-   c'est donc bien ce nom qu'il faut cibler ici, pas 'ol-mouse-position'. */
 #mouseCoordsTarget .ol-mouse-position-custom {
   position: static !important;
   top: auto !important;
@@ -687,18 +642,11 @@
   margin-right: 4px;
 }
 
-/* Le menu deroulant ouvert est rendu nativement par le navigateur (fond blanc, hors de
-   portee du reste du style app) — le texte blanc force par le filet de securite
-   #mouseCoordsTarget * plus haut y serait invisible hors survol. Specificite plus
-   elevee (id + 2 selecteurs) pour l'emporter sur ce !important. */
 #mouseCoordsTarget .select-projection-coords option {
   color: #1a1a1a !important;
   background: #ffffff;
 }
 
-/* ========================================
-   PLEIN ÉCRAN & ATTRIBUTION
-   ======================================== */
 .ol-fullscreen-custom {
   position: absolute;
   top: 10px;
@@ -753,4 +701,28 @@
 #map:fullscreen {
   height: 100% !important;
 }
+
+/* Boutons inutiles en plein ecran : ils pilotent des elements hors de #map,
+   invisibles une fois #map seul dans le top layer fullscreen. Regles -webkit-
+   et standard separees : un selecteur invalide dans une liste a virgules
+   invalide toute la regle (Firefox ne connait pas :-webkit-full-screen). */
+#map:fullscreen #btnToggleSidebar,
+#map:fullscreen .toolbar-btn-wrapper,
+#map:fullscreen #btnFondsCarte,
+#map:fullscreen #toolbarExport {
+  display: none;
+}
+
+#map:-webkit-full-screen #btnToggleSidebar,
+#map:-webkit-full-screen .toolbar-btn-wrapper,
+#map:-webkit-full-screen #btnFondsCarte,
+#map:-webkit-full-screen #toolbarExport {
+  display: none;
+}
+
+#map:fullscreen #btnPositions { border-radius: 4px 4px 0 0; }
+#map:-webkit-full-screen #btnPositions { border-radius: 4px 4px 0 0; }
+
+#map:fullscreen #btnTrajectoire { border-radius: 0 0 4px 4px; }
+#map:-webkit-full-screen #btnTrajectoire { border-radius: 0 0 4px 4px; }
 
