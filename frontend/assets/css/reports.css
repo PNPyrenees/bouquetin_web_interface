@@ -296,3 +296,13 @@ select.reports-col-filtre {
     padding: 32px 20px 48px;
   }
 }
+
+/* Filtres generaux masques en attente de confirmation Ludovic sur la nouvelle
+   organisation en blocs — a retirer ce bloc pour les reafficher. */
+#reportsSidebar {
+  display: none;
+}
+
+#reportsScreen {
+  left: 0;
+}
