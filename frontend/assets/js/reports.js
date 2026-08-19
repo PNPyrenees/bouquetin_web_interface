@@ -1,4 +1,5 @@
-let loginEnCours = false;
+let _populationsConnues = [];
+let _gestionnairesConnues = [];
 
 const ROLE_LABELS = {
   pnp_bqt_reader: 'Lecteur',
@@ -15,23 +16,6 @@ const ROLE_INITIALES = {
 const tokenAuChargement = sessionStorage.getItem('bqt_token');
 if (tokenAuChargement) afficherSession(tokenAuChargement);
 
-/**
- * AUTHENTIFICATION
- * Reproduit le pattern d'app.js/individuals.js — overlay #loginScreen affiché/masqué
- * en JS, pas de redirection HTTP, jeton en sessionStorage.
- */
-
-function afficherLoginScreen() {
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.style.display = 'flex';
-  const userChip = document.getElementById('userChip');
-  if (userChip) userChip.style.display = 'none';
-}
-
-function masquerLoginScreen() {
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.style.display = 'none';
-}
 
 function afficherSession(token) {
   try {
@@ -52,26 +36,15 @@ function afficherSession(token) {
 
 function deconnecter() {
   sessionStorage.removeItem('bqt_token');
-  window.location.replace('../index.html');
+  window.location.replace('../login.html');
 }
 
-// Memoise l'import dynamique de api.js — script classique (pas type="module", cf.
-// commentaire en tete de fichier), donc pas d'import statique possible. Un seul point
-// d'acces au module dans le code source plutot qu'un import() duplique a chaque usage
-// (login, chargement des KPI) — le moteur JS cache deja le module en interne, ceci
-// n'evite qu'une redite textuelle, pas un vrai cout de performance.
 let apiPromise = null;
 function chargerApi() {
   if (!apiPromise) apiPromise = import('./api.js');
   return apiPromise;
 }
 
-/**
- * Marque un KPI en echec de chargement — "?" discret + title explicatif au survol,
- * pour qu'un echec silencieux (permission RPC, timeout...) reste au moins detectable
- * sans ouvrir la console, sans pour autant afficher un message intrusif (cf. audit
- * durcissement, point 2).
- */
 function marquerErreur(id) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -79,24 +52,12 @@ function marquerErreur(id) {
   el.title = 'Échec du chargement de cet indicateur — voir la console pour le détail.';
 }
 
-/**
- * Convertit une date JJ/MM/AAAA (format Flatpickr/affichage) en ISO AAAA-MM-JJ, format
- * attendu par les filtres PostgREST (gte./lte.). Meme conversion que getPeriodesActives()
- * dans filters.js, dupliquee ici car reports.js n'importe pas filters.js (page
- * independante, pas de logique de filtre partagee).
- */
 function convertirDateFrancaiseEnISO(dateStr) {
   if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return null;
   const [j, m, a] = dateStr.split('/');
   return `${a}-${m}-${j}`;
 }
 
-/**
- * FILTRES SIDEBAR (Population/Gestionnaire/Sexe/Periode) — filtrage cumulatif (ET
- * logique) en temps reel des 3 KPI filtrables, meme pattern que la page Individus. La
- * periode ne s'applique PAS a Individus recenses : fetchCountAnimaux ignore
- * date_from/date_to par construction (cf. api.js).
- */
 function lireFiltresReports() {
   const dateFrom = document.getElementById('reportsDateFrom')?.value || '';
   const dateTo = document.getElementById('reportsDateTo')?.value || '';
@@ -119,30 +80,24 @@ function setChargementFiltresReports(enCours) {
 
 let filtresReportsRequeteId = 0;
 
-/**
- * Charge les 3 KPI filtrables (Individus recenses, Equipes d'un collier, Suivis GPS)
- * selon les criteres actuels de la sidebar. Appelee au chargement initial (filtres
- * vides) et a chaque changement d'un des 3 selects. Garde de sequence
- * (filtresReportsRequeteId) : evite qu'une reponse perimee (changement rapide de
- * filtre) ecrase un resultat plus recent.
- */
+let _abortControllerKpisReports = null;
+
 async function chargerKpisFiltrablesReports(token) {
+  _abortControllerKpisReports?.abort();
+  const controller = new AbortController();
+  _abortControllerKpisReports = controller;
+  const { signal } = controller;
+
   const requeteId = ++filtresReportsRequeteId;
   const filtres = lireFiltresReports();
   const periodeActive = Boolean(filtres.date_from || filtres.date_to);
   setChargementFiltresReports(true);
   try {
     const { fetchCountAnimaux, fetchCountAnimauxEquipes, fetchAnimauxSuivis } = await chargerApi();
-    // "Suivis GPS" = etat ACTUEL (collier actif + derniere position transmise) SAUF si
-    // une periode est active, auquel cas fetchAnimauxSuivis bascule sur "au moins une
-    // position transmise PENDANT la periode" (cf. api.js). "Equipes d'un collier" =
-    // cumul historique SAUF periode active (alors poses dont cor_date_debut tombe dans
-    // l'intervalle). Ne pas comparer ces chiffres a un rapport externe utilisant une
-    // autre definition.
     const [totalIndividus, totalEquipes, suivisIds] = await Promise.all([
-      fetchCountAnimaux(token, filtres),
-      fetchCountAnimauxEquipes(token, filtres),
-      fetchAnimauxSuivis(token, filtres)
+      fetchCountAnimaux(token, filtres, signal),
+      fetchCountAnimauxEquipes(token, filtres, signal),
+      fetchAnimauxSuivis(token, filtres, signal)
     ]);
     if (requeteId !== filtresReportsRequeteId) return;
     setChargementFiltresReports(false);
@@ -160,6 +115,9 @@ async function chargerKpisFiltrablesReports(token) {
     const kpiSuiviGpsPeriode = document.getElementById('kpiSuiviGpsPeriode');
     if (kpiSuiviGpsPeriode) kpiSuiviGpsPeriode.textContent = periodeActive ? 'Sur la période sélectionnée' : '';
   } catch (err) {
+    // Annulation volontaire (nouvel appel demarre entre-temps) — pas une vraie erreur,
+    // ne pas afficher de marqueur d'echec.
+    if (err.name === 'AbortError') return;
     if (requeteId !== filtresReportsRequeteId) return;
     setChargementFiltresReports(false);
     console.error('Échec chargement des KPI filtrables:', err);
@@ -169,11 +127,6 @@ async function chargerKpisFiltrablesReports(token) {
   }
 }
 
-/**
- * Peuple dynamiquement les selects Population/Gestionnaire (fetchPopulations/
- * fetchGestionnaires, deja utilisees sur la page Carte) — appelee une seule fois au
- * chargement initial. L'option "Tous" (value="") est deja presente en dur dans le HTML.
- */
 async function peuplerFiltresReportsDynamiques(token) {
   try {
     const { fetchPopulations, fetchGestionnaires } = await chargerApi();
@@ -181,6 +134,8 @@ async function peuplerFiltresReportsDynamiques(token) {
       fetchPopulations(token),
       fetchGestionnaires(token)
     ]);
+    _populationsConnues = populations;
+    _gestionnairesConnues = gestionnaires;
 
     const selectPopulation = document.getElementById('filtreReportsPopulation');
     if (selectPopulation) {
@@ -204,20 +159,10 @@ async function peuplerFiltresReportsDynamiques(token) {
   } catch (err) {
     console.error('Échec peuplement des filtres Population/Gestionnaire:', err);
   } finally {
-    // Dans le finally : les 3 selects doivent etre remplaces par TomSelect meme si le
-    // peuplement Population/Gestionnaire a echoue (Sexe reste utilisable, options
-    // statiques deja dans le HTML) — un echec reseau partiel ne doit pas priver
-    // l'utilisateur du filtre Sexe.
     initTomSelectFiltresReports();
   }
 }
 
-// TomSelect — meme mecanisme que initTomSelectFiltresColonnes() (individuals.js) :
-// remplace le rendu natif (popup non stylable de facon fiable/coherente entre
-// navigateurs) par un composant HTML entierement stylable (cf. .ts-wrapper.reports-col-filtre
-// dans reports.css), pour un rendu identique a la page Carte y compris a l'ouverture.
-// dropdownParent: 'body' evite que le popup soit coupe par un overflow parent —
-// meme choix defensif que sur la page Individus.
 function initTomSelectFiltresReports() {
   ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
     const el = document.getElementById(id);
@@ -234,9 +179,6 @@ function initTomSelectFiltresReports() {
   });
 }
 
-// Ferme les dropdowns TomSelect ouverts au scroll du contenu principal —
-// dropdownParent:'body' ne recalcule la position qu'au scroll/resize de la fenetre,
-// jamais au scroll interne de #reportsScreen (meme raison que sur la page Individus).
 document.getElementById('reportsScreen')?.addEventListener('scroll', () => {
   ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
     document.getElementById(id)?.tomselect?.close();
@@ -254,6 +196,162 @@ function reinitialiserFiltresReports(token) {
   if (dateFrom) { dateFrom.value = ''; dateFrom._flatpickr?.clear(); }
   if (dateTo) { dateTo.value = ''; dateTo._flatpickr?.clear(); }
   chargerKpisFiltrablesReports(token);
+  chargerGraphiquesReports(token);
+}
+
+
+const PALETTE_GRAPHIQUES_REPORTS = [
+  '#2D6A4F', '#6a9a84', '#9ab5ac', '#5c7a99', '#b08968', '#a3763f', '#8a8f6b', '#7a6c5d'
+];
+// Gris neutre hors palette categorielle — signale une donnee manquante en base
+// (ani_sexe/ani_pop_rattach/ani_gestionnaire NULL) plutot qu'une vraie categorie.
+const COULEUR_NON_RENSEIGNE_REPORTS = '#b0b0b0';
+
+function chargerFonctionPerimetreReports(fonctions, perimetre) {
+  if (perimetre === 'equipes') return fonctions.fetchCountAnimauxEquipes;
+  if (perimetre === 'suivis') return fonctions.fetchAnimauxSuivis;
+  return fonctions.fetchCountAnimaux;
+}
+
+// fetchAnimauxSuivis retourne un Set (comme les 2 autres KPI filtrables), fetchCountAnimaux
+// et fetchCountAnimauxEquipes un nombre — uniformise en nombre pour les 3 perimetres.
+async function compterPerimetreReports(fn, token, filtres, signal) {
+  const resultat = await fn(token, filtres, signal);
+  return resultat instanceof Set ? resultat.size : resultat;
+}
+
+async function chargerRepartitionReports(fn, token, filtresSansDimension, dimension, categories, signal) {
+  const [total, ...comptes] = await Promise.all([
+    compterPerimetreReports(fn, token, filtresSansDimension, signal),
+    ...categories.map(valeur => compterPerimetreReports(fn, token, { ...filtresSansDimension, [dimension]: valeur }, signal))
+  ]);
+
+  const labels = [...categories];
+  const valeurs = [...comptes];
+  const somme = comptes.reduce((a, b) => a + b, 0);
+  if (total > somme) {
+    labels.push('Non renseigné');
+    valeurs.push(total - somme);
+  }
+  return { labels, valeurs };
+}
+
+function coloreesRepartitionReports(labels) {
+  let indexPalette = 0;
+  return labels.map(label => {
+    if (label === 'Non renseigné') return COULEUR_NON_RENSEIGNE_REPORTS;
+    return PALETTE_GRAPHIQUES_REPORTS[(indexPalette++) % PALETTE_GRAPHIQUES_REPORTS.length];
+  });
+}
+
+const _chartsReports = { sexe: null, population: null, gestionnaire: null };
+
+function detruireGraphiqueReports(dimension) {
+  if (_chartsReports[dimension]) {
+    _chartsReports[dimension].destroy();
+    _chartsReports[dimension] = null;
+  }
+}
+
+const ID_CHART_REPORTS = { sexe: 'chartReportsSexe', population: 'chartReportsPopulation', gestionnaire: 'chartReportsGestionnaire' };
+const ID_WRAPPER_REPORTS = { sexe: 'chartReportsSexeWrapper', population: 'chartReportsPopulationWrapper', gestionnaire: 'chartReportsGestionnaireWrapper' };
+
+function afficherGraphiqueReports(dimension, labels, valeurs) {
+  detruireGraphiqueReports(dimension);
+  const el = document.getElementById(ID_CHART_REPORTS[dimension]);
+  if (!el || !window.ApexCharts) return;
+
+  _chartsReports[dimension] = new ApexCharts(el, {
+    chart: {
+      type: 'pie',
+      height: '100%',
+      width: '100%',
+      animations: { enabled: false }
+    },
+    series: valeurs,
+    labels,
+    colors: coloreesRepartitionReports(labels),
+    dataLabels: {
+      enabled: true,
+      formatter: (val, opts) => opts.w.config.series[opts.seriesIndex]
+    },
+    plotOptions: {
+      pie: {
+        customScale: dimension === 'population' ? 1.3 : 1,
+        dataLabels: {
+          external: {
+            show: true,
+            connector: { show: true, length: 16 }
+          }
+        }
+      }
+    },
+    legend: { show: false },
+    tooltip: { enabled: true },
+    stroke: { width: 1, colors: ['#ffffff'] }
+  });
+  _chartsReports[dimension].render();
+}
+
+function marquerErreurGraphiqueReports(dimension) {
+  detruireGraphiqueReports(dimension);
+  const wrapper = document.getElementById(ID_WRAPPER_REPORTS[dimension]);
+  if (!wrapper) return;
+  wrapper.innerHTML = `<div id="${ID_CHART_REPORTS[dimension]}"></div><div class="reports-chart-erreur">Échec du chargement</div>`;
+}
+
+// Cible .reports-chart-wrapper (pas .reports-chart-cell) — seule la zone du graphique
+// doit griser pendant le chargement, le label au-dessus doit rester net en permanence.
+function setChargementGraphiquesReports(enCours) {
+  document.querySelectorAll('.reports-chart-wrapper').forEach(el => el.classList.toggle('loading', enCours));
+}
+
+let graphiquesReportsRequeteId = 0;
+
+let _abortControllerGraphiquesReports = null;
+
+async function chargerGraphiquesReports(token) {
+  _abortControllerGraphiquesReports?.abort();
+  const controller = new AbortController();
+  _abortControllerGraphiquesReports = controller;
+  const { signal } = controller;
+
+  const requeteId = ++graphiquesReportsRequeteId;
+  const filtresBase = lireFiltresReports();
+  const perimetre = document.getElementById('filtreReportsPerimetre')?.value || 'total';
+  setChargementGraphiquesReports(true);
+
+  try {
+    const fonctions = await chargerApi();
+    const fn = chargerFonctionPerimetreReports(fonctions, perimetre);
+
+    const dimensions = [
+      { dimension: 'sexe', categories: ['M', 'F'] },
+      { dimension: 'population', categories: _populationsConnues },
+      { dimension: 'gestionnaire', categories: _gestionnairesConnues }
+    ];
+
+    const resultats = await Promise.all(dimensions.map(({ dimension, categories }) => {
+      const filtresSansDimension = { ...filtresBase };
+      delete filtresSansDimension[dimension];
+      return chargerRepartitionReports(fn, token, filtresSansDimension, dimension, categories, signal);
+    }));
+
+    if (requeteId !== graphiquesReportsRequeteId) return;
+    setChargementGraphiquesReports(false);
+
+    dimensions.forEach(({ dimension }, i) => {
+      afficherGraphiqueReports(dimension, resultats[i].labels, resultats[i].valeurs);
+    });
+  } catch (err) {
+    // Annulation volontaire (nouvel appel demarre entre-temps) — pas une vraie erreur,
+    // ne pas remplacer les camemberts par un message d'echec.
+    if (err.name === 'AbortError') return;
+    if (requeteId !== graphiquesReportsRequeteId) return;
+    setChargementGraphiquesReports(false);
+    console.error('Échec chargement des camemberts de répartition:', err);
+    ['sexe', 'population', 'gestionnaire'].forEach(marquerErreurGraphiqueReports);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -284,16 +382,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('reportsDateFrom')?.addEventListener('input', () => {
-    if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
+    if (tokenAuChargement) { chargerKpisFiltrablesReports(tokenAuChargement); chargerGraphiquesReports(tokenAuChargement); }
   });
   document.getElementById('reportsDateTo')?.addEventListener('input', () => {
-    if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
+    if (tokenAuChargement) { chargerKpisFiltrablesReports(tokenAuChargement); chargerGraphiquesReports(tokenAuChargement); }
   });
 
   ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', () => {
-      if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
+      if (tokenAuChargement) { chargerKpisFiltrablesReports(tokenAuChargement); chargerGraphiquesReports(tokenAuChargement); }
     });
+  });
+
+  // Perimetre des camemberts — n'affecte que la Repartition, pas les 3 KPI ci-dessus.
+  document.getElementById('filtreReportsPerimetre')?.addEventListener('change', () => {
+    if (tokenAuChargement) chargerGraphiquesReports(tokenAuChargement);
   });
 
   document.getElementById('btnReinitialiserFiltresReports')?.addEventListener('click', () => {
@@ -320,32 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btnDeconnexion')?.addEventListener('click', deconnecter);
 
-  document.getElementById('loginForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (loginEnCours) return;
-    loginEnCours = true;
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value.trim();
-    const errorEl = document.getElementById('loginError');
-    errorEl.textContent = '';
-    try {
-      const { login } = await chargerApi();
-      const token = await login(username, password);
-      sessionStorage.setItem('bqt_token', token);
-      window.location.replace('../index.html');
-    } catch (err) {
-      errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';
-      console.error(err);
-    } finally {
-      loginEnCours = false;
-    }
-  });
-
   if (tokenAuChargement) {
-    masquerLoginScreen();
-    peuplerFiltresReportsDynamiques(tokenAuChargement);
+    peuplerFiltresReportsDynamiques(tokenAuChargement).then(() => chargerGraphiquesReports(tokenAuChargement));
     chargerKpisFiltrablesReports(tokenAuChargement);
-  } else {
-    afficherLoginScreen();
   }
 });

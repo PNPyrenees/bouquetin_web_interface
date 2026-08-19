@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchColliersActifs, fetchNombreCaptureRelacheParAnimal, fetchCouleursCollierParAnimal, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal, fetchLocalisationsRPC } from './api.js';
+import { fetchAnimals, fetchColliersActifs, fetchNombreCaptureRelacheParAnimal, fetchCouleursCollierParAnimal, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal, fetchLocalisationsRPC } from './api.js';
 import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, COULEURS_MARQUAGE, GLASBEY_32, getCouleurParIndex, SEUILS_FRAICHEUR_POSITION } from './config.js';
 import { rendreVisibleDansSidebar, activerDefilementAccordeons } from './sidebar-scroll.js';
 
@@ -9,7 +9,6 @@ let colliersActifs = new Set();
 let dernierePositionParAnimal = new Map();
 let captureRelacheCountParAnimal = new Map();
 let couleurCollierParAnimal = new Map();
-let loginEnCours = false;
 let pageCourante = 1;
 let filtresListeAvantFiche = null;
 const LIGNES_PAR_PAGE = 25;
@@ -42,18 +41,6 @@ let _chartDistanceMois = null;
 let _resizeObserversGraphiques = [];
 
 
-function afficherLoginScreen() {
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.style.display = 'flex';
-  const userChip = document.getElementById('userChip');
-  if (userChip) userChip.style.display = 'none';
-}
-
-function masquerLoginScreen() {
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.style.display = 'none';
-}
-
 function afficherSession(token) {
   try {
     const tokenPayload = JSON.parse(atob(token.split('.')[1]));
@@ -73,7 +60,7 @@ function afficherSession(token) {
 
 function deconnecter() {
   sessionStorage.removeItem('bqt_token');
-  window.location.replace('../index.html');
+  window.location.replace('../login.html');
 }
 
 document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
@@ -95,27 +82,6 @@ document.addEventListener('click', () => {
 });
 
 document.getElementById('btnDeconnexion')?.addEventListener('click', deconnecter);
-
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  if (loginEnCours) return;
-  loginEnCours = true;
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value.trim();
-  const errorEl = document.getElementById('loginError');
-  errorEl.textContent = '';
-  try {
-    const token = await login(username, password);
-    sessionStorage.setItem('bqt_token', token);
-    window.location.replace('../index.html');
-  } catch (err) {
-    errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';
-    console.error(err);
-  } finally {
-    loginEnCours = false;
-  }
-});
-
 
 function computeStatut(ani, colliersActifsSet) {
   if (ani.ani_date_mort) return 'mort';
@@ -2086,7 +2052,6 @@ document.getElementById('btnRetourListe')?.addEventListener('click', afficherLis
 async function initPage(token) {
   currentToken = token;
   sessionStorage.setItem('bqt_token', token);
-  masquerLoginScreen();
   afficherSession(token);
 
   try {
@@ -2123,8 +2088,4 @@ async function initPage(token) {
 }
 
 const tokenSauvegarde = sessionStorage.getItem('bqt_token');
-if (tokenSauvegarde) {
-  initPage(tokenSauvegarde).catch(() => deconnecter());
-} else {
-  afficherLoginScreen();
-}
+if (tokenSauvegarde) initPage(tokenSauvegarde).catch(() => deconnecter());

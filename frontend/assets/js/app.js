@@ -1,4 +1,4 @@
-import { login, fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
+import { fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, PROJECTIONS_COORDONNEES_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
 import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees, importerCoucheGeoJSON, retirerCoucheGeoJSONImportee } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -368,9 +368,6 @@ export function mettreAJourBadgeNPositions() {
 
 async function startApp(token) {
   initSidebarRight();
-  // Masquer l'écran de login après authentification réussie
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.style.display = 'none';
 
   // Afficher la session utilisateur et le bouton déconnexion
   const tokenPayload = JSON.parse(atob(token.split('.')[1]));
@@ -2556,8 +2553,6 @@ window.addEventListener('resize', () => {
   updateMapSize();
 });
 
-let loginEnCours = false;
-
 let inactivityTimer = null;
 const INACTIVITY_DELAY = 30 * 60 * 1000;
 
@@ -2571,7 +2566,7 @@ function resetInactivityTimer() {
 function deconnecter() {
   clearTimeout(inactivityTimer);
   sessionStorage.removeItem('bqt_token');
-  window.location.reload();
+  window.location.replace('login.html');
 }
 
 document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
@@ -2595,31 +2590,7 @@ document.addEventListener('click', () => {
 document.getElementById('btnDeconnexion')?.addEventListener('click', deconnecter);
 
 const tokenSauvegarde = sessionStorage.getItem('bqt_token');
-if (tokenSauvegarde) {
-  startApp(tokenSauvegarde).catch(() => deconnecter());
-} else {
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) loginScreen.style.display = 'flex';
-}
-
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  if (loginEnCours) return;
-  loginEnCours = true;
-  const username = document.getElementById('username').value.trim();
-  const password = document.getElementById('password').value.trim();
-  const errorEl = document.getElementById('loginError');
-  errorEl.textContent = '';
-  try {
-    const token = await login(username, password);
-    sessionStorage.setItem('bqt_token', token);
-    window.location.reload();
-  } catch (err) {
-    errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';
-    console.error(err);
-    loginEnCours = false;
-  }
-});
+if (tokenSauvegarde) startApp(tokenSauvegarde).catch(() => deconnecter());
 
 export function mettreAJourLegende(modeForce = null) {
   const contenu = document.getElementById('legendeContenu');

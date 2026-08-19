@@ -4,10 +4,10 @@
 <head>
   <meta charset="UTF-8">
   <!-- Script classique (pas de module/defer) volontairement — doit s'executer de facon
-       synchrone avant le premier paint pour eviter tout flash de #loginScreen. -->
+       synchrone avant le premier paint pour rediriger sans flash si pas de session. -->
   <script>
-    if (sessionStorage.getItem('bqt_token')) {
-      document.documentElement.classList.add('has-session');
+    if (!sessionStorage.getItem('bqt_token')) {
+      window.location.replace('../login.html');
     }
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -44,6 +44,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/fr.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 
 <body>
@@ -173,39 +174,42 @@
           <div class="reports-kpi-label">Captures sanitaires</div>
         </div>
       </div>
+
+      <div class="reports-charts-section">
+        <div class="reports-charts-header">
+          <h2 class="reports-charts-title">Répartition</h2>
+          <div class="input-group reports-charts-perimetre">
+            <label for="filtreReportsPerimetre">Parmi</label>
+            <select id="filtreReportsPerimetre" class="reports-perimetre-select">
+              <option value="total" selected>Tous les individus recensés</option>
+              <option value="equipes">Équipés d'un collier</option>
+              <option value="suivis">Suivis GPS actuellement</option>
+            </select>
+          </div>
+        </div>
+        <div class="reports-charts-grid" id="reportsChartsGrid">
+          <div class="reports-chart-cell">
+            <div class="reports-chart-label">Sexe</div>
+            <div class="reports-chart-wrapper" id="chartReportsSexeWrapper">
+              <div id="chartReportsSexe"></div>
+            </div>
+          </div>
+          <div class="reports-chart-cell">
+            <div class="reports-chart-label">Population</div>
+            <div class="reports-chart-wrapper" id="chartReportsPopulationWrapper">
+              <div id="chartReportsPopulation"></div>
+            </div>
+          </div>
+          <div class="reports-chart-cell">
+            <div class="reports-chart-label">Gestionnaire</div>
+            <div class="reports-chart-wrapper" id="chartReportsGestionnaireWrapper">
+              <div id="chartReportsGestionnaire"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </main>
-
-  <div id="loginScreen">
-    <div class="login-left">
-      <img src="../assets/img/pnp.jpg" alt="Bouquetin ibérique" class="login-bg-img">
-      <div class="login-photo-credit">
-        © Jean-Paul Crampe
-      </div>
-    </div>
-    <div class="login-right">
-      <div class="login-logos">
-        <img src="../assets/img/logo-parc.svg" alt="Parc National des Pyrénées" class="login-logo-pnp">
-        <img src="../assets/img/Logo_-_République_française.svg" alt="République Française" class="login-logo-rf">
-      </div>
-      <div class="login-card">
-        <h2>Suivi des Bouquetins Ibériques</h2>
-        <p>Parc National des Pyrénées</p>
-        <form id="loginForm">
-          <div class="login-field">
-            <label for="username">Identifiant</label>
-            <input id="username" type="text" autocomplete="username">
-          </div>
-          <div class="login-field">
-            <label for="password">Mot de passe</label>
-            <input id="password" type="password" autocomplete="current-password">
-          </div>
-          <div id="loginError"></div>
-          <button type="submit">Se connecter</button>
-        </form>
-      </div>
-    </div>
-  </div>
 </body>
 
 </html>
