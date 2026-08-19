@@ -475,6 +475,66 @@ export async function fetchCountZonesTranslocation(token) {
   return new Set(data.map(r => r.relache_zone)).size;
 }
 
+export async function fetchRepartitionSexeAnimaux(token, signal = null) {
+  const res = await fetch(`${API_URL}/t_animal?select=ani_sexe`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=none'
+    },
+    signal
+  });
+  if (!res.ok) throw new Error(`fetchRepartitionSexeAnimaux error: ${res.status}`);
+  const data = await res.json();
+  const counts = { M: 0, F: 0, non_renseigne: 0 };
+  data.forEach(r => {
+    if (r.ani_sexe === 'M') counts.M++;
+    else if (r.ani_sexe === 'F') counts.F++;
+    else counts.non_renseigne++;
+  });
+  return counts;
+}
+
+export async function fetchRepartitionPopulationAnimaux(token, signal = null) {
+  const res = await fetch(`${API_URL}/t_animal?select=ani_pop_rattach`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=none'
+    },
+    signal
+  });
+  if (!res.ok) throw new Error(`fetchRepartitionPopulationAnimaux error: ${res.status}`);
+  const data = await res.json();
+  const counts = new Map();
+  let nonRenseigne = 0;
+  data.forEach(r => {
+    if (!r.ani_pop_rattach) { nonRenseigne++; return; }
+    counts.set(r.ani_pop_rattach, (counts.get(r.ani_pop_rattach) || 0) + 1);
+  });
+  return { counts, nonRenseigne };
+}
+
+export async function fetchRepartitionGestionnaireAnimaux(token, signal = null) {
+  const res = await fetch(`${API_URL}/t_animal?select=ani_gestionnaire`, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Accept-Profile': 'bouquetin',
+      'Prefer': 'count=none'
+    },
+    signal
+  });
+  if (!res.ok) throw new Error(`fetchRepartitionGestionnaireAnimaux error: ${res.status}`);
+  const data = await res.json();
+  const counts = { PNP: 0, PNRPA: 0, non_renseigne: 0 };
+  data.forEach(r => {
+    if (r.ani_gestionnaire === 'PNP') counts.PNP++;
+    else if (r.ani_gestionnaire === 'PNRPA') counts.PNRPA++;
+    else counts.non_renseigne++;
+  });
+  return counts;
+}
+
 function construireBodyRPC(filters) {
   const body = {};
 
