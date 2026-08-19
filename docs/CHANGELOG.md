@@ -1,5 +1,9 @@
 # CHANGELOG
 
+### Refonte de l'ecran de connexion
+- L'ecran de connexion devient une page independante, pour corriger definitivement un probleme d'affichage sur mobile ou la carte apparaissait derriere le formulaire
+- La page de connexion est desormais adaptee aux petits ecrans
+
 ### Correctifs de stabilite - Carte et Individus
 - Correction du sens de rotation du spinner de chargement
 - Page Individus : la colonne ID est desormais masquee par defaut ; ajout de filtres et colonnes pour le marquage (oreille droite, oreille gauche, couleur du collier)
