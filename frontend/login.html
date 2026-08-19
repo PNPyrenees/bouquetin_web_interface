@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <!-- Synchrone : redirige avant le premier paint si une session valide existe deja -->
+  <script>
+    if (sessionStorage.getItem('bqt_token')) {
+      window.location.replace('index.html');
+    }
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Connexion - Plateforme de suivi des bouquetins - Parc National des Pyrénées">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Connexion - Suivi des bouquetins</title>
+  <link rel="icon" type="image/png" href="assets/img/PNP_logo_minuature.png">
+
+  <link rel="preload" href="assets/img/pnp.jpg" as="image" type="image/jpeg" fetchpriority="high">
+  <link rel="preload" href="assets/img/logo-parc.svg" as="image" type="image/svg+xml" fetchpriority="high">
+  <link rel="preload" href="assets/img/Logo_-_République_française.svg" as="image" type="image/svg+xml" fetchpriority="high">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="assets/css/main.css">
+</head>
+
+<body>
+  <div id="loginScreen">
+    <div class="login-left">
+      <img src="assets/img/pnp.jpg" alt="Bouquetin ibérique" class="login-bg-img">
+      <div class="login-photo-credit">
+        © Jean-Paul Crampe
+      </div>
+    </div>
+    <div class="login-right">
+      <div class="login-logos">
+        <img src="assets/img/logo-parc.svg" alt="Parc National des Pyrénées" class="login-logo-pnp">
+        <img src="assets/img/Logo_-_République_française.svg" alt="République Française" class="login-logo-rf">
+      </div>
+      <div class="login-card">
+        <h2>Suivi des Bouquetins Ibériques</h2>
+        <p>Parc National des Pyrénées</p>
+        <form id="loginForm">
+          <div class="login-field">
+            <label for="username">Identifiant</label>
+            <input id="username" type="text" autocomplete="username">
+          </div>
+          <div class="login-field">
+            <label for="password">Mot de passe</label>
+            <input id="password" type="password" autocomplete="current-password">
+          </div>
+          <div id="loginError"></div>
+          <button type="submit">Se connecter</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="assets/js/login.js"></script>
+</body>
+
+</html>

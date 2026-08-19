@@ -1,11 +1,5 @@
 import { API_URL } from './config.js';
 
-/**
- * Gère l'authentification de l'utilisateur.
- * @param {string} username - Nom d'utilisateur
- * @param {string} password - Mot de passe
- * @returns {Promise<string>} - Jeton JWT (JSON Web Token)
- */
 export async function login(username, password) {
   // Appel à une fonction RPC (Remote Procedure Call) définie côté serveur
   const res = await fetch(`${API_URL}/rpc/login`, {
@@ -25,9 +19,6 @@ export async function login(username, password) {
   return token;
 }
 
-/**
- * Récupère la liste complète des animaux et leurs métadonnées.
- */
 export async function fetchAnimals(token) {
   // On sélectionne uniquement les colonnes nécessaires pour alléger la réponse
   const res = await fetch(
@@ -43,14 +34,6 @@ export async function fetchAnimals(token) {
   return res.json();
 }
 
-/**
- * Compte le nombre total d'animaux (t_animal) via une requete HEAD — aucune ligne
- * transferee, meme pas une seule. Different de fetchCountLocations() (qui lit
- * count dans le corps JSON via select=count sur la fonction RPC f_get_localisation) :
- * t_animal est une table classique, pas une fonction SQL personnalisee — le mecanisme
- * standard PostgREST pour une table est Prefer: count=exact + lecture du total dans
- * l'entete de reponse Content-Range (format "0-0/348"), pas dans le corps.
- */
 export async function fetchCountAnimaux(token, filters = {}, signal = null) {
   const params = new URLSearchParams();
   params.append('select', 'ani_id');
@@ -73,10 +56,6 @@ export async function fetchCountAnimaux(token, filters = {}, signal = null) {
   return Number.isFinite(total) ? total : 0;
 }
 
-/**
- * Récupère uniquement les ani_id distincts ayant des positions sur une période.
- * Une seule requête au lieu de N requêtes par animal.
- */
 export async function fetchAnimalIdsParPeriode(token, filters = {}, signal = null) {
   const params = new URLSearchParams();
 
@@ -119,19 +98,6 @@ export async function fetchAnimalIdsParPeriode(token, filters = {}, signal = nul
   return ids;
 }
 
-/**
- * Compte les positions correspondant aux filtres via f_get_localisation (select=count),
- * au lieu d'une requete directe sur v_localisation — v_localisation ne supporte pas le
- * filtre spatial (var_geom/var_geom_src), donc le compteur ignorait le polygone dessine.
- * rpcFilters attend le meme format que fetchLocalisationsRPC (filters.js: construireFiltersRPC) —
- * l'appelant transmet l'objet rpcFilters/rpcFiltersTraj complet, geom/geom_src inclus.
- * construireBodyRPC() (definie plus bas, partagee avec fetchLocalisationsRPC) traduit ce
- * format interne en parametres var_* attendus par la fonction SQL — ne jamais spreader
- * rpcFilters tel quel dans le corps de la requete, les cles ne correspondent pas.
- * var_limit force a une valeur tres elevee — f_get_localisation applique son LIMIT avant
- * le COUNT cote SQL, donc sans ce parametre le comptage serait plafonne a la valeur par
- * defaut de la fonction (10000), confirme en base le 2026-07-15.
- */
 export async function fetchCountLocations(token, rpcFilters = {}, signal = null) {
   const body = construireBodyRPC(rpcFilters);
   body.var_limit = 1000000;
@@ -152,10 +118,6 @@ export async function fetchCountLocations(token, rpcFilters = {}, signal = null)
   return data[0]?.count || 0;
 }
 
-/**
- * Récupère les ani_id et leur prog_id depuis cor_animal_capteur.
- * Utilisé pour le filtre Programmation GPS côté frontend.
- */
 export async function fetchProgrammations(token) {
   const res = await fetch(
     `${API_URL}/cor_animal_capteur?select=ani_id,prog_id,cor_date_debut&prog_id=not.is.null&order=cor_date_debut.desc`,
@@ -170,27 +132,6 @@ export async function fetchProgrammations(token) {
   return res.json();
 }
 
-/**
- * Récupère les ani_id "suivis". Sans période (filters.date_from/date_to absents) : au
- * sens de la page Carte — collier actif (cor_date_fin IS NULL) ET au moins une position
- * GPS transmise, dérivé de f_get_localisation (var_ani_is_followed=true,
- * var_limit_par_animal=1) — état ACTUEL, pas d'exigence de date. Construction identique
- * à activeIds (app.js:543-545), pour que la page Individus retombe exactement sur la
- * même source de vérité que la page Carte. Un animal avec collier actif mais 0 position
- * n'apparaît PAS dans ce Set.
- *
- * Avec période : bascule sur une sémantique différente — "au moins une position
- * transmise PENDANT la période", indépendamment du statut actuel du collier
- * (cor_date_fin). var_limit_par_animal=1 ne garde que la DERNIÈRE position de chaque
- * animal, qui peut tomber hors période même si l'animal a transmis PENDANT la période
- * (sous-comptage silencieux) — donc pas question de juste ajouter date_from/date_to au
- * chemin RPC ci-dessus. Réutilise fetchAnimalIdsParPeriode (même fonction que l'ancien
- * indicateur "équipés sur la période" de la page Statistiques, retiré puis réintroduit
- * ici) puis croise avec Population/Gestionnaire/Sexe via t_animal — même mécanisme que
- * fetchCountAnimauxEquipes, nécessaire car v_localisation n'expose pas les attributs de
- * l'animal. fetchAnimauxSuivis n'est appelée que par reports.js (vérifié — non partagée
- * avec app.js/individuals.js), ce branchement est donc sans impact sur la page Carte.
- */
 export async function fetchAnimauxSuivis(token, filters = {}, signal = null) {
   const periodeActive = Boolean(filters.date_from || filters.date_to);
 
@@ -223,13 +164,6 @@ export async function fetchAnimauxSuivis(token, filters = {}, signal = null) {
   return new Set(locations.map(l => l.ani_id));
 }
 
-/**
- * Recupere les ani_id ayant au moins une pose de collier active (cor_date_fin IS NULL),
- * au sens strict demande par Ludovic pour le statut de la page Individus — independant
- * de la presence de positions GPS transmises, contrairement a fetchAnimauxSuivis() (qui
- * reste la source de verite pour la page Carte, non modifiee). Requete directe sur
- * cor_animal_capteur, utilisee uniquement par computeStatut() sur la page Individus.
- */
 export async function fetchColliersActifs(token) {
   const res = await fetch(
     `${API_URL}/cor_animal_capteur?select=ani_id&cor_date_fin=is.null`,
@@ -246,14 +180,6 @@ export async function fetchColliersActifs(token) {
   return new Set(data.map(r => r.ani_id));
 }
 
-/**
- * Recupere la couleur du collier ACTIF (t_capteur.capt_couleur_collier, via embedding
- * PostgREST sur cor_animal_capteur, cor_date_fin IS NULL) pour chaque animal concerne —
- * meme definition de "collier actif" que fetchColliersActifs. Un animal sans collier
- * actif n'apparait pas dans la Map retournee : coherent avec la fiche individu
- * (remplirIdentite, individuals.js) qui n'affiche deja capt_couleur_collier que si
- * collierActif est vrai, jamais pour un ancien collier retire.
- */
 export async function fetchCouleursCollierParAnimal(token) {
   const res = await fetch(
     `${API_URL}/cor_animal_capteur?select=ani_id,t_capteur(capt_couleur_collier)&cor_date_fin=is.null`,
@@ -275,17 +201,6 @@ export async function fetchCouleursCollierParAnimal(token) {
   return couleurs;
 }
 
-/**
- * Compte les individus ayant ete equipes d'au moins un collier. Sans periode : cumul
- * historique complet (COUNT(DISTINCT ani_id) sur cor_animal_capteur, toutes poses
- * confondues, actives ou terminees) — distinct de fetchAnimauxSuivis (etat COURANT :
- * collier actif + position recente). Avec date_from/date_to : restreint aux poses dont
- * cor_date_debut tombe dans l'intervalle (combien de colliers ont ete POSES durant la
- * periode — pas une notion d'activite GPS). Une requete HEAD ne peut pas exprimer un
- * COUNT(DISTINCT ...) via PostgREST, d'ou le meme mecanisme que
- * fetchCountZonesTranslocation : colonne unique recuperee en bulk, deduplication cote
- * client via Set.
- */
 export async function fetchCountAnimauxEquipes(token, filters = {}, signal = null) {
   const aFiltres = Boolean(filters.population || filters.gestionnaire || filters.sexe);
   let idsAutorises = null;
@@ -325,10 +240,6 @@ export async function fetchCountAnimauxEquipes(token, filters = {}, signal = nul
   return new Set(lignes.map(r => r.ani_id)).size;
 }
 
-/**
- * Récupère les ani_id ayant au moins une translocation (t_capture_relache.translocation = true).
- * Utilisé pour le filtre Translocation côté frontend.
- */
 export async function fetchTranslocationIds(token) {
   const res = await fetch(`${API_URL}/t_capture_relache?select=ani_id,translocation&translocation=eq.true`, {
     headers: {
@@ -342,13 +253,6 @@ export async function fetchTranslocationIds(token) {
   return new Set(data.map(r => r.ani_id));
 }
 
-/**
- * Compte le nombre d'evenements t_capture_relache par animal, toutes categories
- * confondues (capture_objectif quelconque — translocation, veille sanitaire, probleme
- * collier, etc.). Utilise pour le filtre "Captures/Relaches" de la page Individus.
- * Meme approche que fetchColliersActifs/fetchTranslocationIds : une seule colonne
- * (ani_id) recuperee en bulk, agregation cote client (ici un comptage, pas un Set).
- */
 export async function fetchNombreCaptureRelacheParAnimal(token) {
   const res = await fetch(`${API_URL}/t_capture_relache?select=ani_id`, {
     headers: {
@@ -387,9 +291,6 @@ export async function fetchGestionnaires(token) {
   return [...new Set(data.map(d => d.ani_gestionnaire))];
 }
 
-/**
- * Récupère les programmations GPS depuis bib_programmation
- */
 export async function fetchBibliothequeProgrammations(token) {
   const res = await fetch(
     `${API_URL}/bib_programmation?select=prog_id,prog_libelle,prog_frequence,prog_duree_acquisition&order=prog_id`,
@@ -408,11 +309,6 @@ export async function fetchBibliothequeProgrammations(token) {
   return res.json();
 }
 
-/**
- * Precharge un index leger ani_id -> Set(mois_jour) pour filtrer la liste
- * individus instantanement cote client lors d'une selection de saison,
- * sans requete API supplementaire.
- */
 export async function fetchAniCalendrier(token) {
   // Requete legere — uniquement ani_id + loc_mois_jour_local, pas de geom
   const url = `${API_URL}/v_localisation?select=ani_id,loc_mois_jour_local&loc_anomalie=not.is.true&loc_outlier=is.null&geom=not.is.null&order=ani_id.asc`;
@@ -439,12 +335,6 @@ export async function fetchAniCalendrier(token) {
   return calendrier;
 }
 
-/**
- * Recupere les ani_id distincts ayant au moins une position avec geometrie
- * valide dans tout l historique (v_localisation), pas seulement leur derniere
- * position (v_animal_last_loc) — un animal inactif dont la derniere position
- * n a pas de geom ne doit pas etre exclu s il a des positions valides ailleurs.
- */
 export async function fetchAniIdsAvecGeom(token) {
   // Recupere uniquement les ani_id distincts ayant au moins une position avec geom
   const res = await fetch(
@@ -462,9 +352,6 @@ export async function fetchAniIdsAvecGeom(token) {
   return new Set(data.map(r => String(r.ani_id)));
 }
 
-/**
- * Détail complet d'un animal (t_animal) — champs identité + marquage pour la fiche individu.
- */
 export async function fetchAnimalDetail(token, aniId) {
   const res = await fetch(
     `${API_URL}/t_animal?ani_id=eq.${aniId}&select=ani_id,ani_nom,ani_code,ani_sexe,ani_annee_naissance,ani_date_mort,ani_gestionnaire,ani_pop_rattach,ani_marquage_oreille_droite,ani_marquage_oreille_gauche,ani_marquage_code_collier,ani_marquage_bande_laterale_collier,ani_commentaire`,
@@ -480,11 +367,6 @@ export async function fetchAnimalDetail(token, aniId) {
   return data[0] || null;
 }
 
-/**
- * Capteur(s) associé(s) à l'animal, avec programmation — utilise l'embedding PostgREST
- * (t_capteur, bib_programmation), non teste ailleurs dans ce fichier : necessite des FK
- * entre cor_animal_capteur et ces deux tables cote schema.
- */
 export async function fetchCapteurParAnimal(token, aniId) {
   const res = await fetch(
     `${API_URL}/cor_animal_capteur?ani_id=eq.${aniId}&select=cor_id,cor_date_debut,cor_date_fin,capt_id,prog_id,t_capteur(capt_id,capt_id_constructeur,capt_constructeur,capt_type,capt_frequence,capt_actif,capt_couleur_collier),bib_programmation(prog_libelle,prog_desciption,prog_frequence,prog_duree_acquisition)&order=cor_date_debut.desc`,
@@ -499,9 +381,6 @@ export async function fetchCapteurParAnimal(token, aniId) {
   return res.json();
 }
 
-/**
- * Historique captures/relâchés d'un animal.
- */
 export async function fetchCaptureRelacheParAnimal(token, aniId) {
   const res = await fetch(
     `${API_URL}/t_capture_relache?ani_id=eq.${aniId}&select=capture_relache_id,capture_date,capture_zone,capture_lieu_dit,capture_site_geom,relache_date,relache_zone,relache_lieu_dit,relache_site_geom,capture_methode,capture_objectif,translocation,capture_relache_commentaire&order=capture_date.desc`,
@@ -516,11 +395,6 @@ export async function fetchCaptureRelacheParAnimal(token, aniId) {
   return res.json();
 }
 
-/**
- * Compte les captures "reelles" sur t_capture_relache, filtrees sur capture_date.
- * Le filtre translocation=false rend leur exclusion explicite et robuste, meme si les
- * lignes de translocation actuelles ont toujours une capture_date NULL.
- */
 export async function fetchCountCaptures(token, { date_from, date_to } = {}) {
   const params = new URLSearchParams();
   params.append('select', 'capture_relache_id');
@@ -543,11 +417,6 @@ export async function fetchCountCaptures(token, { date_from, date_to } = {}) {
   return Number.isFinite(total) ? total : 0;
 }
 
-/**
- * Compte les captures dont capture_objectif = 'Veille sanitaire', filtrees sur
- * capture_date (ces lignes ne sont jamais des translocations, capture_date y est
- * toujours renseignee).
- */
 export async function fetchCountCapturesSanitaires(token, { date_from, date_to } = {}) {
   const params = new URLSearchParams();
   params.append('select', 'capture_relache_id');
@@ -569,15 +438,6 @@ export async function fetchCountCapturesSanitaires(token, { date_from, date_to }
   return Number.isFinite(total) ? total : 0;
 }
 
-/**
- * Compte les evenements de translocation = nombre de DATES distinctes de relache_date
- * parmi les lignes translocation=true. PostgREST (Prefer: count=exact) compte des LIGNES
- * filtrees, pas des valeurs distinctes d'une colonne — aucun mecanisme natif pour un
- * COUNT(DISTINCT ...) via l'API REST standard. Meme approche que fetchPopulations/
- * fetchGestionnaires : on recupere uniquement relache_date (colonne unique, requete
- * legere - au plus quelques centaines de lignes sur toute la table) et on deduplique
- * cote client via un Set, sur la partie date seule (relache_date peut inclure une heure).
- */
 export async function fetchCountEvenementsTranslocation(token, { date_from, date_to } = {}) {
   const params = new URLSearchParams();
   params.append('select', 'relache_date');
@@ -599,12 +459,6 @@ export async function fetchCountEvenementsTranslocation(token, { date_from, date
   return datesDistinctes.size;
 }
 
-/**
- * Compte le nombre de zones distinctes (relache_zone) parmi les translocations
- * (translocation=true). Meme approche que fetchPopulations/fetchGestionnaires :
- * colonne unique, requete legere, deduplication cote client via Set — pas de
- * COUNT(DISTINCT) natif possible via l'API REST standard.
- */
 export async function fetchCountZonesTranslocation(token) {
   const res = await fetch(
     `${API_URL}/t_capture_relache?select=relache_zone&translocation=eq.true&relache_zone=not.is.null`,
@@ -621,12 +475,6 @@ export async function fetchCountZonesTranslocation(token) {
   return new Set(data.map(r => r.relache_zone)).size;
 }
 
-/**
- * Traduit un objet filters au format interne (cf. construireFiltersRPC dans filters.js :
- * ani_id, date_from, saisonFrom, geom...) en corps de requete pour f_get_localisation
- * (parametres var_*). Partagee par fetchLocalisationsRPC (pagination) et
- * fetchCountLocations (select=count, sans pagination) — une seule traduction a maintenir.
- */
 function construireBodyRPC(filters) {
   const body = {};
 
@@ -657,17 +505,6 @@ function construireBodyRPC(filters) {
   return body;
 }
 
-/**
- * Appelle la fonction SQL f_get_localisation via PostgREST RPC.
- * Gère la pagination par batches avec rendu progressif via onBatch.
- *
- * @param {string} token - Jeton JWT
- * @param {Object} filters - Filtres au format interne (date_from, date_to, saisonFrom...)
- * @param {Function} onBatch - Callback(batch, premierBatch) pour rendu progressif
- * @param {AbortSignal} signal - Permet d'interrompre le chargement en cours (bouton Annuler,
- *   cf. filters.js applyFilters) — verifie a la fois entre deux lots (evite de demarrer un
- *   nouveau lot inutile) et transmis a fetch() pour interrompre une requete deja en vol.
- */
 export async function fetchLocalisationsRPC(token, filters = {}, onBatch = null, signal = null) {
   const BATCH_SIZE = 10000;
   let offset = 0;
@@ -725,10 +562,6 @@ export async function fetchLocalisationsRPC(token, filters = {}, onBatch = null,
   return totalLocations;
 }
 
-/**
- * Localisations d'un seul animal via f_get_localisation — pour la mini-carte de la fiche individu.
- * Meme RPC que fetchLocalisationsRPC, sans pagination (usage borne a un animal).
- */
 export async function fetchLocalisationsAnimal(token, aniId, options = {}) {
   const body = { var_ani_id: [Number(aniId)] };
   if (options.limitParAnimal) body.var_limit_par_animal = options.limitParAnimal;

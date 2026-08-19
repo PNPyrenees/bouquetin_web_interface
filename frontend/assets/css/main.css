@@ -1702,19 +1702,10 @@ select:has(+ .ts-wrapper) {
 /* ── Login screen ─────────────────────────────────────────── */
 
 #loginScreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100vh;
-  height: 100dvh; /* suit la hauteur reelle sur mobile (barre d'adresse) */
+  min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
-  z-index: 99999;
   background: #2D6A4F;
-}
-
-html.has-session #loginScreen {
-  display: none;
 }
 
 .login-left {
@@ -1839,6 +1830,41 @@ html.has-session #loginScreen {
 
 #loginScreen button[type='submit']:hover {
   background: #245a42;
+}
+
+@media (max-width: 640px) {
+  .login-left {
+    display: none;
+  }
+
+  .login-right {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 32px 24px;
+  }
+
+  .login-logos {
+    margin-bottom: 24px;
+  }
+
+  .login-logo-pnp {
+    height: 60px;
+  }
+
+  .login-logo-rf {
+    height: 52px;
+  }
+
+  /* 16px minimum evite le zoom automatique de Safari iOS au focus */
+  .login-field input {
+    font-size: 16px;
+    padding: 13px 14px;
+  }
+
+  #loginScreen button[type='submit'] {
+    padding: 14px 13px;
+  }
 }
 
 /* Filtres temporels — integration sidebar */
