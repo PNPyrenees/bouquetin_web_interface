@@ -231,6 +231,66 @@ select.reports-col-filtre {
   margin-top: 16px;
 }
 
+.reports-graph-tile {
+  border: 1px solid var(--color-border);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reports-graph-label {
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.reports-graph-chart {
+  height: 220px;
+}
+
+.reports-graph-tile:not(.reports-graph-tile-large) .reports-graph-chart {
+  height: 220px;
+  margin: auto 0;
+}
+
+.reports-graph-legend {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  min-height: 18px;
+  font-family: var(--font-family);
+  font-size: 11px;
+  color: var(--color-text);
+  margin-bottom: 2px;
+}
+
+.reports-graph-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reports-graph-legend-color {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex: 0 0 11px;
+}
+
+.reports-graph-tile-large {
+  grid-column: span 2;
+}
+
+.reports-graph-tile-large .reports-graph-chart {
+  height: 360px;
+}
+
 @media (max-width: 640px) {
   .reports-content {
     padding: 32px 20px 48px;

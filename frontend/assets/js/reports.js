@@ -35,23 +35,12 @@ function deconnecter() {
   window.location.replace('../login.html');
 }
 
-// Memoise l'import dynamique de api.js — script classique (pas type="module", cf.
-// commentaire en tete de fichier), donc pas d'import statique possible. Un seul point
-// d'acces au module dans le code source plutot qu'un import() duplique a chaque usage
-// (login, chargement des KPI) — le moteur JS cache deja le module en interne, ceci
-// n'evite qu'une redite textuelle, pas un vrai cout de performance.
 let apiPromise = null;
 function chargerApi() {
   if (!apiPromise) apiPromise = import('./api.js');
   return apiPromise;
 }
 
-/**
- * Marque un KPI en echec de chargement — "?" discret + title explicatif au survol,
- * pour qu'un echec silencieux (permission RPC, timeout...) reste au moins detectable
- * sans ouvrir la console, sans pour autant afficher un message intrusif (cf. audit
- * durcissement, point 2).
- */
 function marquerErreur(id) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -77,13 +66,6 @@ function setChargementFiltresReports(enCours) {
 
 let filtresReportsRequeteId = 0;
 
-/**
- * Charge les 3 KPI filtrables (Individus recenses, Equipes d'un collier, Suivis GPS)
- * selon les criteres actuels de la sidebar. Appelee au chargement initial (filtres
- * vides) et a chaque changement d'un des 3 selects. Garde de sequence
- * (filtresReportsRequeteId) : evite qu'une reponse perimee (changement rapide de
- * filtre) ecrase un resultat plus recent.
- */
 async function chargerKpisFiltrablesReports(token) {
   const requeteId = ++filtresReportsRequeteId;
   const filtres = lireFiltresReports();
@@ -114,11 +96,6 @@ async function chargerKpisFiltrablesReports(token) {
   }
 }
 
-/**
- * Peuple dynamiquement les selects Population/Gestionnaire (fetchPopulations/
- * fetchGestionnaires, deja utilisees sur la page Carte) — appelee une seule fois au
- * chargement initial. L'option "Tous" (value="") est deja presente en dur dans le HTML.
- */
 async function peuplerFiltresReportsDynamiques(token) {
   try {
     const { fetchPopulations, fetchGestionnaires } = await chargerApi();
@@ -149,20 +126,10 @@ async function peuplerFiltresReportsDynamiques(token) {
   } catch (err) {
     console.error('Échec peuplement des filtres Population/Gestionnaire:', err);
   } finally {
-    // Dans le finally : les 3 selects doivent etre remplaces par TomSelect meme si le
-    // peuplement Population/Gestionnaire a echoue (Sexe reste utilisable, options
-    // statiques deja dans le HTML) — un echec reseau partiel ne doit pas priver
-    // l'utilisateur du filtre Sexe.
     initTomSelectFiltresReports();
   }
 }
 
-// TomSelect — meme mecanisme que initTomSelectFiltresColonnes() (individuals.js) :
-// remplace le rendu natif (popup non stylable de facon fiable/coherente entre
-// navigateurs) par un composant HTML entierement stylable (cf. .ts-wrapper.reports-col-filtre
-// dans reports.css), pour un rendu identique a la page Carte y compris a l'ouverture.
-// dropdownParent: 'body' evite que le popup soit coupe par un overflow parent —
-// meme choix defensif que sur la page Individus.
 function initTomSelectFiltresReports() {
   ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
     const el = document.getElementById(id);
@@ -179,14 +146,146 @@ function initTomSelectFiltresReports() {
   });
 }
 
-// Ferme les dropdowns TomSelect ouverts au scroll du contenu principal —
-// dropdownParent:'body' ne recalcule la position qu'au scroll/resize de la fenetre,
-// jamais au scroll interne de #reportsScreen (meme raison que sur la page Individus).
 document.getElementById('reportsScreen')?.addEventListener('scroll', () => {
   ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
     document.getElementById(id)?.tomselect?.close();
   });
 }, { passive: true });
+
+function afficherLegendeGraphique(id, entrees) {
+  const legende = document.getElementById(id);
+  if (!legende) return;
+  legende.replaceChildren(...entrees.map(entree => {
+    const item = document.createElement('span');
+    item.className = 'reports-graph-legend-item';
+    const couleur = document.createElement('span');
+    couleur.className = 'reports-graph-legend-color';
+    couleur.style.backgroundColor = entree.couleur;
+    const label = document.createElement('span');
+    label.textContent = entree.label;
+    item.append(couleur, label);
+    return item;
+  }));
+}
+
+async function chargerRepartitionSexeTotal(token) {
+  const el = document.getElementById('chartTotalSexe');
+  if (!el || !window.ApexCharts) return;
+  try {
+    const { fetchRepartitionSexeAnimaux } = await chargerApi();
+    const counts = await fetchRepartitionSexeAnimaux(token);
+
+    const entrees = [
+      { label: 'Mâle', valeur: counts.M, couleur: '#3A86FF' },
+      { label: 'Femelle', valeur: counts.F, couleur: '#FF006E' },
+      { label: 'Non renseigné', valeur: counts.non_renseigne, couleur: '#b0b0b0' }
+    ].filter(e => e.valeur > 0);
+
+    afficherLegendeGraphique('legendTotalSexe', entrees);
+
+    new ApexCharts(el, {
+      chart: { type: 'pie', height: '100%' },
+      series: entrees.map(e => e.valeur),
+      labels: entrees.map(e => e.label),
+      colors: entrees.map(e => e.couleur),
+      legend: { show: false },
+      plotOptions: {
+        pie: {
+          offsetY: -10,
+          customScale: 0.88
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        formatter: (val, opts) => opts.w.config.series[opts.seriesIndex]
+      },
+      tooltip: { enabled: true }
+    }).render();
+  } catch (err) {
+    console.error('Échec chargement répartition Sexe:', err);
+  }
+}
+
+async function chargerRepartitionPopulationTotal(token) {
+  const el = document.getElementById('chartTotalPopulation');
+  if (!el || !window.ApexCharts) return;
+  try {
+    const { fetchRepartitionPopulationAnimaux } = await chargerApi();
+    const { getCouleurParIndex } = await import('./config.js');
+    const { counts, nonRenseigne } = await fetchRepartitionPopulationAnimaux(token);
+
+    const entrees = [...counts.keys()].sort().map((pop, i) => ({
+      label: pop,
+      valeur: counts.get(pop),
+      couleur: getCouleurParIndex(i)
+    }));
+    if (nonRenseigne > 0) {
+      entrees.push({ label: 'Non renseigné', valeur: nonRenseigne, couleur: '#aaaaaa' });
+    }
+
+    new ApexCharts(el, {
+      chart: { type: 'pie', height: '100%', width: '100%', animations: { enabled: false } },
+      series: entrees.map(e => e.valeur),
+      labels: entrees.map(e => e.label),
+      colors: entrees.map(e => e.couleur),
+      dataLabels: {
+        enabled: true,
+        formatter: (val, opts) => opts.w.config.series[opts.seriesIndex]
+      },
+      plotOptions: {
+        pie: {
+          customScale: 1.3,
+          dataLabels: {
+            external: { show: true, connector: { show: true, length: 16 } }
+          }
+        }
+      },
+      legend: { show: false },
+      tooltip: { enabled: true },
+      stroke: { width: 1, colors: ['#ffffff'] }
+    }).render();
+  } catch (err) {
+    console.error('Échec chargement répartition Population:', err);
+  }
+}
+
+async function chargerRepartitionGestionnaireTotal(token) {
+  const el = document.getElementById('chartTotalGestionnaire');
+  if (!el || !window.ApexCharts) return;
+  try {
+    const { fetchRepartitionGestionnaireAnimaux } = await chargerApi();
+    const counts = await fetchRepartitionGestionnaireAnimaux(token);
+
+    const entrees = [
+      { label: 'PNP', valeur: counts.PNP, couleur: '#2D6A4F' },
+      { label: 'PNRPA', valeur: counts.PNRPA, couleur: '#E07B39' },
+      { label: 'Non renseigné', valeur: counts.non_renseigne, couleur: '#aaaaaa' }
+    ].filter(e => e.valeur > 0);
+
+    afficherLegendeGraphique('legendTotalGestionnaire', entrees);
+
+    new ApexCharts(el, {
+      chart: { type: 'pie', height: '100%' },
+      series: entrees.map(e => e.valeur),
+      labels: entrees.map(e => e.label),
+      colors: entrees.map(e => e.couleur),
+      legend: { show: false },
+      plotOptions: {
+        pie: {
+          offsetY: -10,
+          customScale: 0.88
+        }
+      },
+      dataLabels: {
+        enabled: true,
+        formatter: (val, opts) => opts.w.config.series[opts.seriesIndex]
+      },
+      tooltip: { enabled: true }
+    }).render();
+  } catch (err) {
+    console.error('Échec chargement répartition Gestionnaire:', err);
+  }
+}
 
 function reinitialiserFiltresReports(token) {
   ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
@@ -230,5 +329,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tokenAuChargement) {
     peuplerFiltresReportsDynamiques(tokenAuChargement);
     chargerKpisFiltrablesReports(tokenAuChargement);
+    chargerRepartitionSexeTotal(tokenAuChargement);
+    chargerRepartitionPopulationTotal(tokenAuChargement);
+    chargerRepartitionGestionnaireTotal(tokenAuChargement);
   }
 });
