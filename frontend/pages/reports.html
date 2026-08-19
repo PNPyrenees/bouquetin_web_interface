@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <!-- Script classique (pas de module/defer) volontairement — doit s'executer de facon
+  <!-- Script classique (pas de module/defer) volontairement - doit s'executer de facon
        synchrone avant le premier paint pour rediriger sans flash si pas de session. -->
   <script>
     if (!sessionStorage.getItem('bqt_token')) {
@@ -39,10 +39,7 @@
     rel="stylesheet">
   <link rel="stylesheet" href="../assets/css/main.css">
   <link rel="stylesheet" href="../assets/css/reports.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css">
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/fr.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 </head>
 
@@ -94,16 +91,6 @@
     <div class="sidebar-content">
       <div class="sidebar-header">FILTRES</div>
       <div class="reports-sidebar-body">
-        <div class="date-row">
-          <div class="input-group">
-            <label for="reportsDateFrom">Du</label>
-            <input type="text" class="sidebar-input" id="reportsDateFrom" placeholder="JJ/MM/AAAA" autocomplete="off">
-          </div>
-          <div class="input-group">
-            <label for="reportsDateTo">Au</label>
-            <input type="text" class="sidebar-input" id="reportsDateTo" placeholder="JJ/MM/AAAA" autocomplete="off">
-          </div>
-        </div>
         <div class="input-group">
           <label>Population</label>
           <select id="filtreReportsPopulation" class="reports-col-filtre">
@@ -133,8 +120,8 @@
 
   <main id="reportsScreen">
     <div class="reports-content">
-      <!-- Grille de chiffres cles — peuplee par reports.js a partir de l'etape 2, jamais de
-           valeur codee en dur ici. "—" = etat initial/chargement. -->
+      <!-- Grille de chiffres cles - peuplee par reports.js a partir de l'etape 2, jamais de
+           valeur codee en dur ici. "-" = etat initial/chargement. -->
       <div class="reports-kpi-grid" id="reportsKpiGrid">
         <div class="reports-kpi-cell">
           <div class="reports-kpi-value" id="kpiTotalIndividus">-</div>
@@ -149,7 +136,6 @@
           <div class="reports-kpi-value" id="kpiSuiviGps">-</div>
           <div class="reports-kpi-label">Suivis GPS</div>
           <div class="reports-kpi-sub" id="kpiSuiviGpsPourcentage"></div>
-          <div class="reports-kpi-sub" id="kpiSuiviGpsPeriode"></div>
         </div>
         <div class="reports-kpi-cell reports-masque">
           <div class="reports-kpi-value" id="kpiTransloques">-</div>
@@ -172,6 +158,85 @@
           <div class="reports-kpi-value" id="kpiCapturesSanitaires">-</div>
           <div class="reports-kpi-label">Captures sanitaires</div>
         </div>
+      </div>
+
+      <div class="reports-blocs">
+        <section class="reports-bloc">
+          <div class="reports-bloc-entete">
+            <h2 class="reports-bloc-titre">Total animaux déclarés</h2>
+          </div>
+          <div class="reports-graph-grid">
+            <div class="reports-graph-placeholder">Sexe</div>
+            <div class="reports-graph-placeholder">Population</div>
+            <div class="reports-graph-placeholder">Gestionnaire</div>
+          </div>
+        </section>
+
+        <section class="reports-bloc">
+          <div class="reports-bloc-entete">
+            <h2 class="reports-bloc-titre">Animaux en cours de suivi</h2>
+          </div>
+          <div class="reports-graph-grid">
+            <div class="reports-graph-placeholder">Sexe</div>
+            <div class="reports-graph-placeholder">Population</div>
+            <div class="reports-graph-placeholder">Gestionnaire</div>
+          </div>
+        </section>
+
+        <section class="reports-bloc">
+          <div class="reports-bloc-entete">
+            <h2 class="reports-bloc-titre">Animaux ayant été équipés</h2>
+            <div class="reports-bloc-filtre">
+              <label for="selectAnneeEquipes">Année</label>
+              <select id="selectAnneeEquipes" class="reports-select-annee" disabled>
+                <option value="">Toutes les années</option>
+              </select>
+            </div>
+          </div>
+          <div class="reports-graph-grid">
+            <div class="reports-graph-placeholder">Sexe</div>
+            <div class="reports-graph-placeholder">Population</div>
+            <div class="reports-graph-placeholder">Gestionnaire</div>
+          </div>
+        </section>
+
+        <section class="reports-bloc">
+          <div class="reports-bloc-entete">
+            <h2 class="reports-bloc-titre">Animaux capturés</h2>
+            <div class="reports-bloc-filtre">
+              <label for="selectAnneeCaptures">Année</label>
+              <select id="selectAnneeCaptures" class="reports-select-annee" disabled>
+                <option value="">Toutes les années</option>
+              </select>
+            </div>
+          </div>
+          <div class="reports-graph-grid">
+            <div class="reports-graph-placeholder">Sexe</div>
+            <div class="reports-graph-placeholder">Population</div>
+            <div class="reports-graph-placeholder">Gestionnaire</div>
+            <div class="reports-graph-placeholder">Objectif</div>
+            <div class="reports-graph-placeholder">Méthode</div>
+          </div>
+          <div class="reports-map-placeholder">Carte - sites de capture</div>
+        </section>
+
+        <section class="reports-bloc">
+          <div class="reports-bloc-entete">
+            <h2 class="reports-bloc-titre">Translocations</h2>
+            <div class="reports-bloc-filtre">
+              <label for="selectAnneeTranslocations">Année</label>
+              <select id="selectAnneeTranslocations" class="reports-select-annee" disabled>
+                <option value="">Toutes les années</option>
+              </select>
+            </div>
+          </div>
+          <div class="reports-graph-grid">
+            <div class="reports-graph-placeholder">Sexe</div>
+            <div class="reports-graph-placeholder">Population</div>
+            <div class="reports-graph-placeholder">Gestionnaire</div>
+          </div>
+          <div class="reports-map-placeholder">Carte - sites de destination</div>
+        </section>
       </div>
     </div>
   </main>

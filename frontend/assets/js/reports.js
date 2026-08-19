@@ -59,33 +59,11 @@ function marquerErreur(id) {
   el.title = 'Échec du chargement de cet indicateur — voir la console pour le détail.';
 }
 
-/**
- * Convertit une date JJ/MM/AAAA (format Flatpickr/affichage) en ISO AAAA-MM-JJ, format
- * attendu par les filtres PostgREST (gte./lte.). Meme conversion que getPeriodesActives()
- * dans filters.js, dupliquee ici car reports.js n'importe pas filters.js (page
- * independante, pas de logique de filtre partagee).
- */
-function convertirDateFrancaiseEnISO(dateStr) {
-  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) return null;
-  const [j, m, a] = dateStr.split('/');
-  return `${a}-${m}-${j}`;
-}
-
-/**
- * FILTRES SIDEBAR (Population/Gestionnaire/Sexe/Periode) — filtrage cumulatif (ET
- * logique) en temps reel des 3 KPI filtrables, meme pattern que la page Individus. La
- * periode ne s'applique PAS a Individus recenses : fetchCountAnimaux ignore
- * date_from/date_to par construction (cf. api.js).
- */
 function lireFiltresReports() {
-  const dateFrom = document.getElementById('reportsDateFrom')?.value || '';
-  const dateTo = document.getElementById('reportsDateTo')?.value || '';
   return {
     population: document.getElementById('filtreReportsPopulation')?.value || '',
     gestionnaire: document.getElementById('filtreReportsGestionnaire')?.value || '',
-    sexe: document.getElementById('filtreReportsSexe')?.value || '',
-    date_from: convertirDateFrancaiseEnISO(dateFrom) || undefined,
-    date_to: convertirDateFrancaiseEnISO(dateTo) || undefined
+    sexe: document.getElementById('filtreReportsSexe')?.value || ''
   };
 }
 
@@ -109,16 +87,9 @@ let filtresReportsRequeteId = 0;
 async function chargerKpisFiltrablesReports(token) {
   const requeteId = ++filtresReportsRequeteId;
   const filtres = lireFiltresReports();
-  const periodeActive = Boolean(filtres.date_from || filtres.date_to);
   setChargementFiltresReports(true);
   try {
     const { fetchCountAnimaux, fetchCountAnimauxEquipes, fetchAnimauxSuivis } = await chargerApi();
-    // "Suivis GPS" = etat ACTUEL (collier actif + derniere position transmise) SAUF si
-    // une periode est active, auquel cas fetchAnimauxSuivis bascule sur "au moins une
-    // position transmise PENDANT la periode" (cf. api.js). "Equipes d'un collier" =
-    // cumul historique SAUF periode active (alors poses dont cor_date_debut tombe dans
-    // l'intervalle). Ne pas comparer ces chiffres a un rapport externe utilisant une
-    // autre definition.
     const [totalIndividus, totalEquipes, suivisIds] = await Promise.all([
       fetchCountAnimaux(token, filtres),
       fetchCountAnimauxEquipes(token, filtres),
@@ -130,15 +101,9 @@ async function chargerKpisFiltrablesReports(token) {
     document.getElementById('kpiTotalIndividus').textContent = totalIndividus.toLocaleString('fr-FR');
     document.getElementById('kpiEquipes').textContent = totalEquipes.toLocaleString('fr-FR');
 
-    const kpiEquipesSub = document.getElementById('kpiEquipesSub');
-    if (kpiEquipesSub) kpiEquipesSub.textContent = periodeActive ? 'Sur la période sélectionnée' : 'Cumul historique';
-
     const pourcentageSuivi = totalIndividus > 0 ? Math.round((suivisIds.size / totalIndividus) * 100) : 0;
     document.getElementById('kpiSuiviGps').textContent = suivisIds.size.toLocaleString('fr-FR');
     document.getElementById('kpiSuiviGpsPourcentage').textContent = `${pourcentageSuivi}%`;
-
-    const kpiSuiviGpsPeriode = document.getElementById('kpiSuiviGpsPeriode');
-    if (kpiSuiviGpsPeriode) kpiSuiviGpsPeriode.textContent = periodeActive ? 'Sur la période sélectionnée' : '';
   } catch (err) {
     if (requeteId !== filtresReportsRequeteId) return;
     setChargementFiltresReports(false);
@@ -223,53 +188,15 @@ document.getElementById('reportsScreen')?.addEventListener('scroll', () => {
   });
 }, { passive: true });
 
-// Vide les 3 selects + la periode puis recharge les KPI — equivaut a "tout afficher".
 function reinitialiserFiltresReports(token) {
   ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  const dateFrom = document.getElementById('reportsDateFrom');
-  const dateTo = document.getElementById('reportsDateTo');
-  if (dateFrom) { dateFrom.value = ''; dateFrom._flatpickr?.clear(); }
-  if (dateTo) { dateTo.value = ''; dateTo._flatpickr?.clear(); }
   chargerKpisFiltrablesReports(token);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Flatpickr — Periode (JJ/MM/AAAA), meme pattern que app.js/individuals.js.
-  if (window.flatpickr) {
-    flatpickr('#reportsDateFrom', {
-      dateFormat: 'd/m/Y',
-      allowInput: true,
-      locale: 'fr',
-      onClose(selectedDates, dateStr) {
-        if (dateStr) {
-          document.getElementById('reportsDateFrom').value = dateStr;
-          document.getElementById('reportsDateFrom').dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      }
-    });
-    flatpickr('#reportsDateTo', {
-      dateFormat: 'd/m/Y',
-      allowInput: true,
-      locale: 'fr',
-      onClose(selectedDates, dateStr) {
-        if (dateStr) {
-          document.getElementById('reportsDateTo').value = dateStr;
-          document.getElementById('reportsDateTo').dispatchEvent(new Event('input', { bubbles: true }));
-        }
-      }
-    });
-  }
-
-  document.getElementById('reportsDateFrom')?.addEventListener('input', () => {
-    if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
-  });
-  document.getElementById('reportsDateTo')?.addEventListener('input', () => {
-    if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
-  });
-
   ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', () => {
       if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
