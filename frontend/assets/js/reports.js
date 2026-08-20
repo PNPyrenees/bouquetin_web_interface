@@ -41,6 +41,22 @@ function chargerApi() {
   return apiPromise;
 }
 
+let animauxSuivisPromise = null;
+function chargerAnimauxSuivis(token) {
+  if (!animauxSuivisPromise) {
+    animauxSuivisPromise = chargerApi().then(({ fetchAnimauxSuivis }) => fetchAnimauxSuivis(token));
+  }
+  return animauxSuivisPromise;
+}
+
+let animauxPromise = null;
+function chargerAnimaux(token) {
+  if (!animauxPromise) {
+    animauxPromise = chargerApi().then(({ fetchAnimals }) => fetchAnimals(token));
+  }
+  return animauxPromise;
+}
+
 function marquerErreur(id) {
   const el = document.getElementById(id);
   if (!el) return;
@@ -48,37 +64,24 @@ function marquerErreur(id) {
   el.title = 'Échec du chargement de cet indicateur — voir la console pour le détail.';
 }
 
-function lireFiltresReports() {
-  return {
-    population: document.getElementById('filtreReportsPopulation')?.value || '',
-    gestionnaire: document.getElementById('filtreReportsGestionnaire')?.value || '',
-    sexe: document.getElementById('filtreReportsSexe')?.value || ''
-  };
-}
+const ID_KPIS = ['kpiTotalIndividus', 'kpiEquipes', 'kpiSuiviGps'];
 
-const ID_KPIS_FILTRABLES = ['kpiTotalIndividus', 'kpiEquipes', 'kpiSuiviGps'];
-
-function setChargementFiltresReports(enCours) {
-  ID_KPIS_FILTRABLES.forEach(id => {
+function setChargementKpis(enCours) {
+  ID_KPIS.forEach(id => {
     document.getElementById(id)?.classList.toggle('loading', enCours);
   });
 }
 
-let filtresReportsRequeteId = 0;
-
-async function chargerKpisFiltrablesReports(token) {
-  const requeteId = ++filtresReportsRequeteId;
-  const filtres = lireFiltresReports();
-  setChargementFiltresReports(true);
+async function chargerKpis(token) {
+  setChargementKpis(true);
   try {
-    const { fetchCountAnimaux, fetchCountAnimauxEquipes, fetchAnimauxSuivis } = await chargerApi();
+    const { fetchCountAnimaux, fetchCountAnimauxEquipes } = await chargerApi();
     const [totalIndividus, totalEquipes, suivisIds] = await Promise.all([
-      fetchCountAnimaux(token, filtres),
-      fetchCountAnimauxEquipes(token, filtres),
-      fetchAnimauxSuivis(token, filtres)
+      fetchCountAnimaux(token),
+      fetchCountAnimauxEquipes(token),
+      chargerAnimauxSuivis(token)
     ]);
-    if (requeteId !== filtresReportsRequeteId) return;
-    setChargementFiltresReports(false);
+    setChargementKpis(false);
 
     document.getElementById('kpiTotalIndividus').textContent = totalIndividus.toLocaleString('fr-FR');
     document.getElementById('kpiEquipes').textContent = totalEquipes.toLocaleString('fr-FR');
@@ -87,70 +90,13 @@ async function chargerKpisFiltrablesReports(token) {
     document.getElementById('kpiSuiviGps').textContent = suivisIds.size.toLocaleString('fr-FR');
     document.getElementById('kpiSuiviGpsPourcentage').textContent = `${pourcentageSuivi}%`;
   } catch (err) {
-    if (requeteId !== filtresReportsRequeteId) return;
-    setChargementFiltresReports(false);
-    console.error('Échec chargement des KPI filtrables:', err);
+    setChargementKpis(false);
+    console.error('Échec chargement des KPI:', err);
     marquerErreur('kpiTotalIndividus');
     marquerErreur('kpiEquipes');
     marquerErreur('kpiSuiviGps');
   }
 }
-
-async function peuplerFiltresReportsDynamiques(token) {
-  try {
-    const { fetchPopulations, fetchGestionnaires } = await chargerApi();
-    const [populations, gestionnaires] = await Promise.all([
-      fetchPopulations(token),
-      fetchGestionnaires(token)
-    ]);
-
-    const selectPopulation = document.getElementById('filtreReportsPopulation');
-    if (selectPopulation) {
-      populations.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p;
-        opt.textContent = p;
-        selectPopulation.appendChild(opt);
-      });
-    }
-
-    const selectGestionnaire = document.getElementById('filtreReportsGestionnaire');
-    if (selectGestionnaire) {
-      gestionnaires.forEach(g => {
-        const opt = document.createElement('option');
-        opt.value = g;
-        opt.textContent = g;
-        selectGestionnaire.appendChild(opt);
-      });
-    }
-  } catch (err) {
-    console.error('Échec peuplement des filtres Population/Gestionnaire:', err);
-  } finally {
-    initTomSelectFiltresReports();
-  }
-}
-
-function initTomSelectFiltresReports() {
-  ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
-    const el = document.getElementById(id);
-    if (!el || el.tomselect) return;
-    const ts = new TomSelect(el, {
-      create: false,
-      allowEmptyOption: true,
-      dropdownParent: 'body',
-      onChange() {
-        el.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    });
-    ts.dropdown.classList.add('reports-col-filtre-dropdown');
-  });
-}
-
-document.getElementById('reportsScreen')?.addEventListener('scroll', () => {
-  ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
-    document.getElementById(id)?.tomselect?.close();
-  });
-}, { passive: true });
 
 function afficherLegendeGraphique(id, entrees) {
   const legende = document.getElementById(id);
@@ -168,144 +114,177 @@ function afficherLegendeGraphique(id, entrees) {
   }));
 }
 
-async function chargerRepartitionSexeTotal(token) {
-  const el = document.getElementById('chartTotalSexe');
+const COULEURS_SEXE = { M: '#3A86FF', F: '#FF006E', non_renseigne: '#b0b0b0' };
+
+function construireEntreesSexe(counts) {
+  return [
+    { label: 'Mâle', valeur: counts.M, couleur: COULEURS_SEXE.M },
+    { label: 'Femelle', valeur: counts.F, couleur: COULEURS_SEXE.F },
+    { label: 'Non renseigné', valeur: counts.non_renseigne, couleur: COULEURS_SEXE.non_renseigne }
+  ].filter(e => e.valeur > 0);
+}
+
+function afficherCamembertAvecLegende(elId, legendId, entrees) {
+  const el = document.getElementById(elId);
   if (!el || !window.ApexCharts) return;
+  afficherLegendeGraphique(legendId, entrees);
+  new ApexCharts(el, {
+    chart: { type: 'pie', height: '100%' },
+    series: entrees.map(e => e.valeur),
+    labels: entrees.map(e => e.label),
+    colors: entrees.map(e => e.couleur),
+    legend: { show: false },
+    plotOptions: {
+      pie: {
+        offsetY: -10,
+        customScale: 0.88
+      }
+    },
+    dataLabels: {
+      enabled: true,
+      formatter: (val, opts) => opts.w.config.series[opts.seriesIndex]
+    },
+    tooltip: { enabled: true }
+  }).render();
+}
+
+async function chargerRepartitionSexeTotal(token) {
   try {
     const { fetchRepartitionSexeAnimaux } = await chargerApi();
     const counts = await fetchRepartitionSexeAnimaux(token);
-
-    const entrees = [
-      { label: 'Mâle', valeur: counts.M, couleur: '#3A86FF' },
-      { label: 'Femelle', valeur: counts.F, couleur: '#FF006E' },
-      { label: 'Non renseigné', valeur: counts.non_renseigne, couleur: '#b0b0b0' }
-    ].filter(e => e.valeur > 0);
-
-    afficherLegendeGraphique('legendTotalSexe', entrees);
-
-    new ApexCharts(el, {
-      chart: { type: 'pie', height: '100%' },
-      series: entrees.map(e => e.valeur),
-      labels: entrees.map(e => e.label),
-      colors: entrees.map(e => e.couleur),
-      legend: { show: false },
-      plotOptions: {
-        pie: {
-          offsetY: -10,
-          customScale: 0.88
-        }
-      },
-      dataLabels: {
-        enabled: true,
-        formatter: (val, opts) => opts.w.config.series[opts.seriesIndex]
-      },
-      tooltip: { enabled: true }
-    }).render();
+    afficherCamembertAvecLegende('chartTotalSexe', 'legendTotalSexe', construireEntreesSexe(counts));
   } catch (err) {
     console.error('Échec chargement répartition Sexe:', err);
   }
 }
 
-async function chargerRepartitionPopulationTotal(token) {
-  const el = document.getElementById('chartTotalPopulation');
+async function chargerRepartitionSexeSuivi(token) {
+  try {
+    const [suivisIds, animaux] = await Promise.all([chargerAnimauxSuivis(token), chargerAnimaux(token)]);
+    const suivisIdsStr = new Set([...suivisIds].map(String));
+    const counts = { M: 0, F: 0, non_renseigne: 0 };
+    animaux.filter(a => suivisIdsStr.has(String(a.ani_id))).forEach(a => {
+      if (a.ani_sexe === 'M') counts.M++;
+      else if (a.ani_sexe === 'F') counts.F++;
+      else counts.non_renseigne++;
+    });
+    afficherCamembertAvecLegende('chartSuiviSexe', 'legendSuiviSexe', construireEntreesSexe(counts));
+  } catch (err) {
+    console.error('Échec chargement répartition Sexe (suivi):', err);
+  }
+}
+
+function afficherCamembertExterne(elId, entrees) {
+  const el = document.getElementById(elId);
   if (!el || !window.ApexCharts) return;
+  new ApexCharts(el, {
+    chart: { type: 'pie', height: '100%', width: '100%', animations: { enabled: false } },
+    series: entrees.map(e => e.valeur),
+    labels: entrees.map(e => e.label),
+    colors: entrees.map(e => e.couleur),
+    dataLabels: {
+      enabled: true,
+      formatter: (val, opts) => opts.w.config.series[opts.seriesIndex]
+    },
+    plotOptions: {
+      pie: {
+        customScale: 1.3,
+        dataLabels: {
+          external: { show: true, connector: { show: true, length: 16 } }
+        }
+      }
+    },
+    legend: { show: false },
+    tooltip: { enabled: true },
+    stroke: { width: 1, colors: ['#ffffff'] }
+  }).render();
+}
+
+function construireEntreesPopulation(counts, nonRenseigne, getCouleurParIndex) {
+  const entrees = [...counts.keys()].sort().map((pop, i) => ({
+    label: pop,
+    valeur: counts.get(pop),
+    couleur: getCouleurParIndex(i)
+  }));
+  if (nonRenseigne > 0) {
+    entrees.push({ label: 'Non renseigné', valeur: nonRenseigne, couleur: '#aaaaaa' });
+  }
+  return entrees;
+}
+
+function compterParPopulation(animaux) {
+  const counts = new Map();
+  let nonRenseigne = 0;
+  animaux.forEach(a => {
+    if (!a.ani_pop_rattach) { nonRenseigne++; return; }
+    counts.set(a.ani_pop_rattach, (counts.get(a.ani_pop_rattach) || 0) + 1);
+  });
+  return { counts, nonRenseigne };
+}
+
+async function chargerRepartitionPopulationTotal(token) {
   try {
     const { fetchRepartitionPopulationAnimaux } = await chargerApi();
     const { getCouleurParIndex } = await import('./config.js');
     const { counts, nonRenseigne } = await fetchRepartitionPopulationAnimaux(token);
-
-    const entrees = [...counts.keys()].sort().map((pop, i) => ({
-      label: pop,
-      valeur: counts.get(pop),
-      couleur: getCouleurParIndex(i)
-    }));
-    if (nonRenseigne > 0) {
-      entrees.push({ label: 'Non renseigné', valeur: nonRenseigne, couleur: '#aaaaaa' });
-    }
-
-    new ApexCharts(el, {
-      chart: { type: 'pie', height: '100%', width: '100%', animations: { enabled: false } },
-      series: entrees.map(e => e.valeur),
-      labels: entrees.map(e => e.label),
-      colors: entrees.map(e => e.couleur),
-      dataLabels: {
-        enabled: true,
-        formatter: (val, opts) => opts.w.config.series[opts.seriesIndex]
-      },
-      plotOptions: {
-        pie: {
-          customScale: 1.3,
-          dataLabels: {
-            external: { show: true, connector: { show: true, length: 16 } }
-          }
-        }
-      },
-      legend: { show: false },
-      tooltip: { enabled: true },
-      stroke: { width: 1, colors: ['#ffffff'] }
-    }).render();
+    afficherCamembertExterne('chartTotalPopulation', construireEntreesPopulation(counts, nonRenseigne, getCouleurParIndex));
   } catch (err) {
     console.error('Échec chargement répartition Population:', err);
   }
 }
 
+async function chargerRepartitionPopulationSuivi(token) {
+  try {
+    const [suivisIds, animaux, { getCouleurParIndex }] = await Promise.all([
+      chargerAnimauxSuivis(token),
+      chargerAnimaux(token),
+      import('./config.js')
+    ]);
+    const suivisIdsStr = new Set([...suivisIds].map(String));
+    const { counts, nonRenseigne } = compterParPopulation(animaux.filter(a => suivisIdsStr.has(String(a.ani_id))));
+    afficherCamembertExterne('chartSuiviPopulation', construireEntreesPopulation(counts, nonRenseigne, getCouleurParIndex));
+  } catch (err) {
+    console.error('Échec chargement répartition Population (suivi):', err);
+  }
+}
+
+const COULEURS_GESTIONNAIRE = { PNP: '#2D6A4F', PNRPA: '#E07B39', non_renseigne: '#aaaaaa' };
+
+function construireEntreesGestionnaire(counts) {
+  return [
+    { label: 'PNP', valeur: counts.PNP, couleur: COULEURS_GESTIONNAIRE.PNP },
+    { label: 'PNRPA', valeur: counts.PNRPA, couleur: COULEURS_GESTIONNAIRE.PNRPA },
+    { label: 'Non renseigné', valeur: counts.non_renseigne, couleur: COULEURS_GESTIONNAIRE.non_renseigne }
+  ].filter(e => e.valeur > 0);
+}
+
 async function chargerRepartitionGestionnaireTotal(token) {
-  const el = document.getElementById('chartTotalGestionnaire');
-  if (!el || !window.ApexCharts) return;
   try {
     const { fetchRepartitionGestionnaireAnimaux } = await chargerApi();
     const counts = await fetchRepartitionGestionnaireAnimaux(token);
-
-    const entrees = [
-      { label: 'PNP', valeur: counts.PNP, couleur: '#2D6A4F' },
-      { label: 'PNRPA', valeur: counts.PNRPA, couleur: '#E07B39' },
-      { label: 'Non renseigné', valeur: counts.non_renseigne, couleur: '#aaaaaa' }
-    ].filter(e => e.valeur > 0);
-
-    afficherLegendeGraphique('legendTotalGestionnaire', entrees);
-
-    new ApexCharts(el, {
-      chart: { type: 'pie', height: '100%' },
-      series: entrees.map(e => e.valeur),
-      labels: entrees.map(e => e.label),
-      colors: entrees.map(e => e.couleur),
-      legend: { show: false },
-      plotOptions: {
-        pie: {
-          offsetY: -10,
-          customScale: 0.88
-        }
-      },
-      dataLabels: {
-        enabled: true,
-        formatter: (val, opts) => opts.w.config.series[opts.seriesIndex]
-      },
-      tooltip: { enabled: true }
-    }).render();
+    afficherCamembertAvecLegende('chartTotalGestionnaire', 'legendTotalGestionnaire', construireEntreesGestionnaire(counts));
   } catch (err) {
     console.error('Échec chargement répartition Gestionnaire:', err);
   }
 }
 
-function reinitialiserFiltresReports(token) {
-  ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  });
-  chargerKpisFiltrablesReports(token);
+async function chargerRepartitionGestionnaireSuivi(token) {
+  try {
+    const [suivisIds, animaux] = await Promise.all([chargerAnimauxSuivis(token), chargerAnimaux(token)]);
+    const suivisIdsStr = new Set([...suivisIds].map(String));
+    const counts = { PNP: 0, PNRPA: 0, non_renseigne: 0 };
+    animaux.filter(a => suivisIdsStr.has(String(a.ani_id))).forEach(a => {
+      if (a.ani_gestionnaire === 'PNP') counts.PNP++;
+      else if (a.ani_gestionnaire === 'PNRPA') counts.PNRPA++;
+      else counts.non_renseigne++;
+    });
+    afficherCamembertAvecLegende('chartSuiviGestionnaire', 'legendSuiviGestionnaire', construireEntreesGestionnaire(counts));
+  } catch (err) {
+    console.error('Échec chargement répartition Gestionnaire (suivi):', err);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  ['filtreReportsPopulation', 'filtreReportsGestionnaire', 'filtreReportsSexe'].forEach(id => {
-    document.getElementById(id)?.addEventListener('change', () => {
-      if (tokenAuChargement) chargerKpisFiltrablesReports(tokenAuChargement);
-    });
-  });
-
-  document.getElementById('btnReinitialiserFiltresReports')?.addEventListener('click', () => {
-    if (tokenAuChargement) reinitialiserFiltresReports(tokenAuChargement);
-  });
-
   document.getElementById('sessionTrigger')?.addEventListener('click', (e) => {
     e.stopPropagation();
     const menu = document.getElementById('sessionMenu');
@@ -327,10 +306,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnDeconnexion')?.addEventListener('click', deconnecter);
 
   if (tokenAuChargement) {
-    peuplerFiltresReportsDynamiques(tokenAuChargement);
-    chargerKpisFiltrablesReports(tokenAuChargement);
+    chargerKpis(tokenAuChargement);
     chargerRepartitionSexeTotal(tokenAuChargement);
     chargerRepartitionPopulationTotal(tokenAuChargement);
     chargerRepartitionGestionnaireTotal(tokenAuChargement);
+    chargerRepartitionSexeSuivi(tokenAuChargement);
+    chargerRepartitionPopulationSuivi(tokenAuChargement);
+    chargerRepartitionGestionnaireSuivi(tokenAuChargement);
   }
 });

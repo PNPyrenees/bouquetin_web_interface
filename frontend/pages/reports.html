@@ -39,8 +39,6 @@
     rel="stylesheet">
   <link rel="stylesheet" href="../assets/css/main.css">
   <link rel="stylesheet" href="../assets/css/reports.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css">
-  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 </head>
 
@@ -87,37 +85,6 @@
   </header>
   <!-- Script classique synchrone : initialise la session avant le premier rendu du header. -->
   <script src="../assets/js/reports.js"></script>
-
-  <aside class="sidebar" id="reportsSidebar">
-    <div class="sidebar-content">
-      <div class="sidebar-header">FILTRES</div>
-      <div class="reports-sidebar-body">
-        <div class="input-group">
-          <label>Population</label>
-          <select id="filtreReportsPopulation" class="reports-col-filtre">
-            <option value="">Tous</option>
-          </select>
-        </div>
-        <div class="input-group">
-          <label>Gestionnaire</label>
-          <select id="filtreReportsGestionnaire" class="reports-col-filtre">
-            <option value="">Tous</option>
-          </select>
-        </div>
-        <div class="input-group">
-          <label>Sexe</label>
-          <select id="filtreReportsSexe" class="reports-col-filtre">
-            <option value="">Tous</option>
-            <option value="M">M</option>
-            <option value="F">F</option>
-          </select>
-        </div>
-      </div>
-      <div class="sidebar-footer">
-        <a id="btnReinitialiserFiltresReports" class="reports-lien-reinitialiser">Réinitialiser</a>
-      </div>
-    </div>
-  </aside>
 
   <main id="reportsScreen">
     <div class="reports-content">
@@ -189,9 +156,20 @@
             <h2 class="reports-bloc-titre">Animaux en cours de suivi</h2>
           </div>
           <div class="reports-graph-grid">
-            <div class="reports-graph-placeholder">Sexe</div>
-            <div class="reports-graph-placeholder">Population</div>
-            <div class="reports-graph-placeholder">Gestionnaire</div>
+            <div class="reports-graph-tile">
+              <div class="reports-graph-label">Sexe</div>
+              <div id="chartSuiviSexe" class="reports-graph-chart"></div>
+              <div id="legendSuiviSexe" class="reports-graph-legend"></div>
+            </div>
+            <div class="reports-graph-tile reports-graph-tile-large">
+              <div class="reports-graph-label">Population</div>
+              <div id="chartSuiviPopulation" class="reports-graph-chart"></div>
+            </div>
+            <div class="reports-graph-tile">
+              <div class="reports-graph-label">Gestionnaire</div>
+              <div id="chartSuiviGestionnaire" class="reports-graph-chart"></div>
+              <div id="legendSuiviGestionnaire" class="reports-graph-legend"></div>
+            </div>
           </div>
         </section>
 
