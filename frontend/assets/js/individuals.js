@@ -1,6 +1,6 @@
 import { fetchAnimals, fetchColliersActifs, fetchNombreCaptureRelacheParAnimal, fetchCouleursCollierParAnimal, fetchAnimalDetail, fetchCapteurParAnimal, fetchCaptureRelacheParAnimal, fetchLocalisationsAnimal, fetchLocalisationsRPC } from './api.js';
 import { ROLE_LABELS, ROLE_INITIALES, LAMBERT93, DEFAULT_CENTER, DEFAULT_ZOOM, IGN_API_KEY, BASEMAPS_CONFIG, COULEURS_MARQUAGE, GLASBEY_32, getCouleurParIndex, SEUILS_FRAICHEUR_POSITION } from './config.js';
-import { rendreVisibleDansSidebar, activerDefilementAccordeons } from './sidebar-scroll.js';
+import { rendreVisibleDansSidebar } from './sidebar-scroll.js';
 
 let currentToken = null;
 let currentAniId = null;
@@ -12,16 +12,6 @@ let couleurCollierParAnimal = new Map();
 let pageCourante = 1;
 let filtresListeAvantFiche = null;
 const LIGNES_PAR_PAGE = 25;
-
-// Accordeons de la sidebar filtres (Individus, Marquage) — meme mecanisme que la page
-// Carte (app.js) : garde l'accordeon ouvert entierement visible dans la sidebar au clic.
-activerDefilementAccordeons(document.querySelector('.indiv-sidebar-body'));
-
-document.querySelectorAll('.indiv-sidebar-body details').forEach(details => {
-  details.addEventListener('toggle', () => {
-    if (details.open) initTomSelectFiltresColonnes();
-  });
-});
 
 // Cartes de la fiche individu — instances OpenLayers autonomes, independantes du
 // singleton de map.js (page separee, pas de conflit de contexte JS possible)
@@ -1333,6 +1323,7 @@ function initCarteLocalisations() {
   _carteLocalisations = new ol.Map({
     target: 'ficheMapLocalisations',
     controls: [],
+    interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: false, pinchZoom: false, shiftDragZoom: false }),
     layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), coucheLocalisations],
     overlays: [_popupOverlayLocalisations],
     view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
@@ -1529,6 +1520,7 @@ function initCarteSites() {
   _carteSites = new ol.Map({
     target: 'ficheMapSites',
     controls: [],
+    interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: false, pinchZoom: false, shiftDragZoom: false }),
     layers: [
       creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]),
       coucheSitesLiens,
@@ -1957,6 +1949,15 @@ function viderFiche() {
 
   const compteurPositions = document.getElementById('compteurPositionsLocalisations');
   if (compteurPositions) compteurPositions.textContent = '';
+
+  const ficheInputN = document.getElementById('ficheInputN');
+  if (ficheInputN) ficheInputN.value = '';
+
+  const ficheDateFrom = document.getElementById('ficheDateFrom');
+  if (ficheDateFrom) ficheDateFrom._flatpickr ? ficheDateFrom._flatpickr.clear() : ficheDateFrom.value = '';
+
+  const ficheDateTo = document.getElementById('ficheDateTo');
+  if (ficheDateTo) ficheDateTo._flatpickr ? ficheDateTo._flatpickr.clear() : ficheDateTo.value = '';
 
   const popupLocalisations = document.getElementById('popupLocalisations');
   if (popupLocalisations) popupLocalisations.style.display = 'none';
