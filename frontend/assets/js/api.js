@@ -240,6 +240,51 @@ export async function fetchCountAnimauxEquipes(token, filters = {}, signal = nul
   return new Set(lignes.map(r => r.ani_id)).size;
 }
 
+export async function fetchPosesCapteurs(token) {
+  const res = await fetch(
+    `${API_URL}/cor_animal_capteur?select=ani_id,cor_date_debut&cor_date_debut=not.is.null`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchPosesCapteurs error: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchCapturesReelles(token) {
+  const res = await fetch(
+    `${API_URL}/t_capture_relache?select=capture_relache_id,ani_id,capture_date,capture_objectif,capture_methode,capture_site_geom,capture_zone,capture_lieu_dit&translocation=eq.false&capture_date=not.is.null`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchCapturesReelles error: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchTranslocationsReelles(token) {
+  const res = await fetch(
+    `${API_URL}/t_capture_relache?select=capture_relache_id,ani_id,relache_date,relache_site_geom,relache_zone,relache_lieu_dit&translocation=eq.true&relache_date=not.is.null`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      }
+    }
+  );
+  if (!res.ok) throw new Error(`fetchTranslocationsReelles error: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchTranslocationIds(token) {
   const res = await fetch(`${API_URL}/t_capture_relache?select=ani_id,translocation&translocation=eq.true`, {
     headers: {
