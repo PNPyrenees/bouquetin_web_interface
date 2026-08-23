@@ -1,6 +1,6 @@
 import { fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, PROJECTIONS_COORDONNEES_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees, importerCoucheGeoJSON, retirerCoucheGeoJSONImportee } from './map.js';
+import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees, importerCoucheGeoJSON, retirerCoucheGeoJSONImportee, toggleCoucheGeoJSONImportee, setOpaciteCoucheGeoJSONImportee } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 import { rendreVisibleDansSidebar, activerDefilementAccordeons } from './sidebar-scroll.js';
@@ -1464,10 +1464,70 @@ function initBasemapSelector() {
   document.getElementById('btnRetourFiltres')?.addEventListener('click', afficherVueFiltres);
 
   // Import GeoJSON utilisateur — le bouton declenche l'input file masque ; l'import
-  // reel (parsing, reprojection, ajout de couche) est gere par map.js.
+  // reel (parsing, reprojection, ajout de couche) est gere par map.js. Plusieurs
+  // couches peuvent coexister, chacune avec sa ligne (case, slider opacite, retrait).
   const inputImportGeoJSON = document.getElementById('inputImportGeoJSON');
-  const coucheImporteeInfo = document.getElementById('coucheImporteeInfo');
-  const coucheImporteeNom = document.getElementById('coucheImporteeNom');
+  const couchesImporteesListe = document.getElementById('couchesImporteesListe');
+
+  function ajouterLigneCoucheImportee({ id, nom, couleur }) {
+    if (!couchesImporteesListe) return;
+
+    const item = document.createElement('div');
+    item.className = 'sidebar-fonds-overlay-item sidebar-fonds-overlay-item-importee';
+
+    const label = document.createElement('label');
+    label.className = 'sidebar-fonds-overlay-label';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = true;
+    const pastille = document.createElement('span');
+    pastille.className = 'sidebar-fonds-import-couleur';
+    pastille.style.background = couleur;
+    const span = document.createElement('span');
+    span.className = 'sidebar-fonds-import-nom';
+    span.textContent = nom;
+    span.title = nom;
+    label.append(checkbox, pastille, span);
+    item.appendChild(label);
+
+    const opacityRow = document.createElement('div');
+    opacityRow.className = 'sidebar-fonds-overlay-opacity-row';
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '0';
+    slider.max = '1';
+    slider.step = '0.05';
+    slider.value = '1';
+    slider.title = 'Opacité';
+    const valeurOpacite = document.createElement('span');
+    valeurOpacite.className = 'sidebar-fonds-overlay-opacity-value';
+    valeurOpacite.textContent = '100 %';
+    slider.addEventListener('input', () => {
+      const opacite = Number(slider.value);
+      setOpaciteCoucheGeoJSONImportee(id, opacite);
+      valeurOpacite.textContent = `${Math.round(opacite * 100)} %`;
+    });
+    opacityRow.append(slider, valeurOpacite);
+    item.appendChild(opacityRow);
+
+    const btnRetirer = document.createElement('button');
+    btnRetirer.type = 'button';
+    btnRetirer.className = 'sidebar-fonds-import-retirer';
+    btnRetirer.title = 'Retirer la couche importée';
+    btnRetirer.textContent = '×';
+    item.appendChild(btnRetirer);
+
+    checkbox.addEventListener('change', () => {
+      toggleCoucheGeoJSONImportee(id, checkbox.checked);
+    });
+    btnRetirer.addEventListener('click', (e) => {
+      e.stopPropagation();
+      retirerCoucheGeoJSONImportee(id);
+      item.remove();
+    });
+
+    couchesImporteesListe.appendChild(item);
+  }
 
   document.getElementById('btnImportGeoJSON')?.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1477,17 +1537,8 @@ function initBasemapSelector() {
     const file = e.target.files?.[0];
     e.target.value = ''; // permet de reimporter le meme fichier a la suite
     if (!file) return;
-    const layer = await importerCoucheGeoJSON(file);
-    if (layer && coucheImporteeInfo && coucheImporteeNom) {
-      coucheImporteeNom.textContent = file.name;
-      coucheImporteeInfo.style.display = 'flex';
-    }
-  });
-
-  document.getElementById('btnRetirerGeoJSON')?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    retirerCoucheGeoJSONImportee();
-    if (coucheImporteeInfo) coucheImporteeInfo.style.display = 'none';
+    const entree = await importerCoucheGeoJSON(file);
+    if (entree) ajouterLigneCoucheImportee(entree);
   });
 }
 

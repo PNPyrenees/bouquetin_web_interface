@@ -176,8 +176,15 @@ header {
 .nav-icon {
   width: 18px;
   height: 18px;
+  flex: 0 0 18px;
+  display: block;
   object-fit: contain;
   margin-right: 8px;
+}
+
+.nav-icon[src$="pointeur-de-localisation.png"],
+.nav-icon[src$="animaux-domestiques.png"] {
+  transform: scale(0.84);
 }
 
 .nav-link {
@@ -903,16 +910,19 @@ header {
 }
 
 .sidebar-fonds-overlay-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .sidebar-fonds-overlay-label {
   display: flex;
   align-items: center;
   gap: 7px;
+  flex: 1 1 0;
   min-width: 0;
   overflow: hidden;
   font-family: var(--font-family);
@@ -936,17 +946,52 @@ header {
   flex-shrink: 0;
 }
 
+/* Pastille de couleur d'une couche GeoJSON importee — identifie la couleur assignee
+   sur la carte, a cote de son nom de fichier dans la liste. */
+.sidebar-fonds-import-couleur {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sidebar-fonds-import-nom {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sidebar-fonds-overlay-item-importee .sidebar-fonds-overlay-label {
+  grid-column: 1;
+  grid-row: 1;
+  padding-right: 18px;
+}
+
+.sidebar-fonds-overlay-item-importee .sidebar-fonds-import-retirer {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+  z-index: 1;
+}
+
 .sidebar-fonds-overlay-opacity-row {
   display: flex;
   align-items: center;
+  grid-column: 2;
+  grid-row: 1;
   gap: 6px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
   margin-right: 6px;
 }
 
 .sidebar-fonds-overlay-opacity-row input[type="range"] {
   accent-color: var(--color-primary);
+  flex: 0 0 100px;
   width: 100px;
+  min-width: 100px;
+  max-width: 100px;
   cursor: pointer;
 }
 

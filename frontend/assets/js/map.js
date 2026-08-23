@@ -17,6 +17,16 @@ const couleursAnnees = new Map();
 
 let _webglContextLost = false;
 
+// Ordre explicite des couches — necessaire car une couche avec zIndex explicite
+// (import GeoJSON, dessin spatial) passe devant toute couche sans zIndex, quel que
+// soit l'ordre du tableau `layers` de la carte.
+const ZINDEX_BASEMAP = 0;
+const ZINDEX_OVERLAY = 1;
+const ZINDEX_IMPORT = 2;
+const ZINDEX_TRAJECTOIRE = 3;
+const ZINDEX_HALO = 4;
+const ZINDEX_GPS = 5;
+
 // Contours variables — 4 styles pour differencier les individus avec couleurs proches
 const CONTOURS = [
   { strokeR: 255, strokeG: 255, strokeB: 255, strokeA: 1, strokeWidth: 2 }, // Blanc
@@ -210,6 +220,7 @@ export function initMap(targetId, popupId) {
 
   gpsLayer = new ol.layer.WebGLPoints({
     source: gpsSource,
+    zIndex: ZINDEX_GPS,
     style: {
       'circle-radius': ['get', 'radius'],
       'circle-fill-color': ['color', ['get', 'fillR'], ['get', 'fillG'], ['get', 'fillB'], ['get', 'fillA']],
@@ -220,18 +231,22 @@ export function initMap(targetId, popupId) {
 
   haloSource = new ol.source.Vector();
   haloLayer = new ol.layer.Vector({
-    source: haloSource
+    source: haloSource,
+    zIndex: ZINDEX_HALO
   });
 
   // Création de la couche des lignes (trajectoires)
   const trajectoireLayer = new ol.layer.Vector({
-    source: trajectoireSource
+    source: trajectoireSource,
+    zIndex: ZINDEX_TRAJECTOIRE
   });
 
   const basemapConfigs = BASEMAPS_CONFIG.filter(bm => (bm.category || 'basemap') === 'basemap');
   const overlayConfigs = BASEMAPS_CONFIG.filter(bm => bm.category === 'overlay');
   basemaps = basemapConfigs.map(creerCoucheFond);
+  basemaps.forEach(layer => layer.setZIndex(ZINDEX_BASEMAP));
   overlaysWmts = new Map(overlayConfigs.map(bm => [bm.id, creerCoucheFond(bm)]));
+  overlaysWmts.forEach(layer => layer.setZIndex(ZINDEX_OVERLAY));
 
   // Préparation du popup (Overlay)
   const popupEl = document.getElementById(popupId);
@@ -262,6 +277,8 @@ export function initMap(targetId, popupId) {
       maxZoom: ZOOM_MAX_MANUAL,
       minZoom: ZOOM_MIN_MANUAL
     }),
+    // Zoom uniquement via les boutons +/- personnalises — molette/pincement/double-clic desactives.
+    interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: false, pinchZoom: false, shiftDragZoom: false }),
     controls: ol.control.defaults.defaults({ zoom: false, rotate: false }).extend([
       new ol.control.ScaleLine({
         units: 'metric',
@@ -808,7 +825,7 @@ export function highlightPoint(ani_id, locDatetime = null) {
     image: new ol.style.Circle({
       radius: haloRayon,
       fill: new ol.style.Fill({ color: 'rgba(233, 152, 82, 0.89)' }),
-      stroke: new ol.style.Stroke({ color: 'rgba(255, 0, 0, 0.9)', width: 2 })
+      stroke: new ol.style.Stroke({ color: 'rgba(255, 0, 0, 0.9)', width: 4 })
     })
   }));
   haloSource.addFeature(halo);
@@ -897,29 +914,49 @@ export function effacerDessinSpatial() {
 }
 
 
-const _styleImportPoint = new ol.style.Style({
-  image: new ol.style.Circle({
-    radius: 6,
-    fill: new ol.style.Fill({ color: 'rgba(230, 57, 70, 0.85)' }),
-    stroke: new ol.style.Stroke({ color: '#ffffff', width: 1.5 })
-  })
-});
-const _styleImportLigne = new ol.style.Style({
-  stroke: new ol.style.Stroke({ color: '#e63946', width: 2 })
-});
-const _styleImportPolygone = new ol.style.Style({
-  fill: new ol.style.Fill({ color: 'rgba(230, 57, 70, 0.25)' }),
-  stroke: new ol.style.Stroke({ color: '#e63946', width: 2 })
-});
-
-let _coucheGeoJSONImportee = null;
-
-function styleCoucheImportee(feature) {
-  const type = feature.getGeometry()?.getType() || '';
-  if (type.includes('Point')) return _styleImportPoint;
-  if (type.includes('Line')) return _styleImportLigne;
-  return _styleImportPolygone;
+// Palette cyclique simple (pas la Glasbey des points GPS, trop chargee pour de simples
+// couches de reference importees) — une couleur differente a chaque nouvel import.
+const PALETTE_COUCHES_IMPORTEES = ['#e63946', '#1d7874', '#f4a261', '#6a4c93', '#2a9d8f', '#e76f51', '#4361ee', '#9c6644'];
+function getCouleurImportParIndex(index) {
+  return PALETTE_COUCHES_IMPORTEES[index % PALETTE_COUCHES_IMPORTEES.length];
 }
+
+function hexVersRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// L'opacite globale de la couche passe par layer.setOpacity() (cf. setOpaciteCoucheGeoJSONImportee)
+// — le style, lui, ne code que la couleur assignee, pas de recalcul a chaque changement de slider.
+function creerStyleCoucheImportee(couleur) {
+  const stylePoint = new ol.style.Style({
+    image: new ol.style.Circle({
+      radius: 6,
+      fill: new ol.style.Fill({ color: hexVersRgba(couleur, 0.85) }),
+      stroke: new ol.style.Stroke({ color: '#ffffff', width: 1.5 })
+    })
+  });
+  const styleLigne = new ol.style.Style({
+    stroke: new ol.style.Stroke({ color: couleur, width: 2 })
+  });
+  const stylePolygone = new ol.style.Style({
+    fill: new ol.style.Fill({ color: hexVersRgba(couleur, 0.25) }),
+    stroke: new ol.style.Stroke({ color: couleur, width: 2 })
+  });
+
+  return (feature) => {
+    const type = feature.getGeometry()?.getType() || '';
+    if (type.includes('Point')) return stylePoint;
+    if (type.includes('Line')) return styleLigne;
+    return stylePolygone;
+  };
+}
+
+// id -> { id, nom, layer, couleur, opacite } — plusieurs couches importees simultanement.
+const _couchesGeoJSONImportees = new Map();
+let _prochainIdCoucheImportee = 0;
 
 function detecterProjectionGeoJSON(geojson) {
   const nomCrs = geojson?.crs?.properties?.name;
@@ -979,33 +1016,46 @@ export function importerCoucheGeoJSON(file) {
         return;
       }
 
-      if (_coucheGeoJSONImportee) {
-        map.removeLayer(_coucheGeoJSONImportee);
-        _coucheGeoJSONImportee = null;
-      }
+      const id = _prochainIdCoucheImportee++;
+      const couleur = getCouleurImportParIndex(_couchesGeoJSONImportees.size);
 
       const layer = new ol.layer.Vector({
         source: new ol.source.Vector({ features }),
-        zIndex: map.getLayers().getLength() + 1,
-        style: styleCoucheImportee
+        zIndex: ZINDEX_IMPORT,
+        style: creerStyleCoucheImportee(couleur)
       });
       layer.set('layer_name', file.name);
       map.addLayer(layer);
-      _coucheGeoJSONImportee = layer;
 
-      resolve(layer);
+      _couchesGeoJSONImportees.set(id, { id, nom: file.name, layer, couleur, opacite: 1 });
+
+      resolve({ id, nom: file.name, couleur });
     };
 
     reader.readAsText(file);
   });
 }
 
-/** Retire la couche GeoJSON importee, si une a ete ajoutee. */
-export function retirerCoucheGeoJSONImportee() {
-  if (!_coucheGeoJSONImportee) return false;
-  map?.removeLayer(_coucheGeoJSONImportee);
-  _coucheGeoJSONImportee = null;
+/** Retire une couche GeoJSON importee par id. */
+export function retirerCoucheGeoJSONImportee(id) {
+  const entree = _couchesGeoJSONImportees.get(id);
+  if (!entree) return false;
+  map?.removeLayer(entree.layer);
+  _couchesGeoJSONImportees.delete(id);
   return true;
+}
+
+/** Bascule la visibilite d'une couche importee (case a cocher du panneau). */
+export function toggleCoucheGeoJSONImportee(id, visible) {
+  _couchesGeoJSONImportees.get(id)?.layer.setVisible(visible);
+}
+
+/** Ajuste l'opacite d'une couche importee par id (0 a 1). */
+export function setOpaciteCoucheGeoJSONImportee(id, opacite) {
+  const entree = _couchesGeoJSONImportees.get(id);
+  if (!entree) return;
+  entree.opacite = opacite;
+  entree.layer.setOpacity(opacite);
 }
 
 export function capturerCarteEnBlob() {
