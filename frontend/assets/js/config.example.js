@@ -6,7 +6,7 @@ export const MAX_ZOOM = 18;
 
 // TEMPORAIRE : force le select Annee des blocs Captures/Translocations (page
 // Statistiques) sur la derniere annee au lieu de "Toutes les annees", tant que les
-// points aberrants sur la carte ne sont pas corriges par Ludovic. Repasser a false
+// points aberrants sur la carte ne sont pas corriges Repasser a false
 // une fois les donnees corrigees (cf. initFiltreAnneeCaptures/Translocations dans
 // reports.js).
 export const REPORTS_ANNEE_PAR_DEFAUT_DERNIERE = true;
