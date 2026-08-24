@@ -316,26 +316,6 @@ export async function fetchNombreCaptureRelacheParAnimal(token) {
   return counts;
 }
 
-export async function fetchPopulations(token) {
-  const res = await fetch(
-    `${API_URL}/t_animal?select=ani_pop_rattach&ani_pop_rattach=not.is.null&order=ani_pop_rattach.asc`,
-    { headers: { Authorization: `Bearer ${token}`, 'Accept-Profile': 'bouquetin' } }
-  );
-  if (!res.ok) throw new Error('Erreur fetchPopulations');
-  const data = await res.json();
-  return [...new Set(data.map(d => d.ani_pop_rattach))];
-}
-
-export async function fetchGestionnaires(token) {
-  const res = await fetch(
-    `${API_URL}/t_animal?select=ani_gestionnaire&ani_gestionnaire=not.is.null&order=ani_gestionnaire.asc`,
-    { headers: { Authorization: `Bearer ${token}`, 'Accept-Profile': 'bouquetin' } }
-  );
-  if (!res.ok) throw new Error('Erreur fetchGestionnaires');
-  const data = await res.json();
-  return [...new Set(data.map(d => d.ani_gestionnaire))];
-}
-
 export async function fetchBibliothequeProgrammations(token) {
   const res = await fetch(
     `${API_URL}/bib_programmation?select=prog_id,prog_libelle,prog_frequence,prog_duree_acquisition&order=prog_id`,
@@ -380,23 +360,6 @@ export async function fetchAniCalendrier(token) {
   return calendrier;
 }
 
-export async function fetchAniIdsAvecGeom(token) {
-  // Recupere uniquement les ani_id distincts ayant au moins une position avec geom
-  const res = await fetch(
-    `${API_URL}/v_localisation?select=ani_id&geom=not.is.null&loc_anomalie=not.is.true&loc_outlier=is.null`,
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept-Profile': 'bouquetin',
-        'Prefer': 'count=none'
-      }
-    }
-  );
-  if (!res.ok) throw new Error(`fetchAniIdsAvecGeom error: ${res.status}`);
-  const data = await res.json();
-  return new Set(data.map(r => String(r.ani_id)));
-}
-
 export async function fetchAnimalDetail(token, aniId) {
   const res = await fetch(
     `${API_URL}/t_animal?ani_id=eq.${aniId}&select=ani_id,ani_nom,ani_code,ani_sexe,ani_annee_naissance,ani_date_mort,ani_gestionnaire,ani_pop_rattach,ani_marquage_oreille_droite,ani_marquage_oreille_gauche,ani_marquage_code_collier,ani_marquage_bande_laterale_collier,ani_commentaire`,
@@ -438,86 +401,6 @@ export async function fetchCaptureRelacheParAnimal(token, aniId) {
   );
   if (!res.ok) throw new Error(`fetchCaptureRelacheParAnimal error: ${res.status}`);
   return res.json();
-}
-
-export async function fetchCountCaptures(token, { date_from, date_to } = {}) {
-  const params = new URLSearchParams();
-  params.append('select', 'capture_relache_id');
-  params.append('capture_date', 'not.is.null');
-  params.append('translocation', 'eq.false');
-  if (date_from) params.append('capture_date', `gte.${date_from}`);
-  if (date_to) params.append('capture_date', `lte.${date_to}`);
-
-  const res = await fetch(`${API_URL}/t_capture_relache?${params.toString()}`, {
-    method: 'HEAD',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept-Profile': 'bouquetin',
-      'Prefer': 'count=exact'
-    }
-  });
-  if (!res.ok) throw new Error(`fetchCountCaptures error: ${res.status}`);
-  const contentRange = res.headers.get('content-range');
-  const total = contentRange ? Number(contentRange.split('/')[1]) : 0;
-  return Number.isFinite(total) ? total : 0;
-}
-
-export async function fetchCountCapturesSanitaires(token, { date_from, date_to } = {}) {
-  const params = new URLSearchParams();
-  params.append('select', 'capture_relache_id');
-  params.append('capture_objectif', 'eq.Veille sanitaire');
-  if (date_from) params.append('capture_date', `gte.${date_from}`);
-  if (date_to) params.append('capture_date', `lte.${date_to}`);
-
-  const res = await fetch(`${API_URL}/t_capture_relache?${params.toString()}`, {
-    method: 'HEAD',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept-Profile': 'bouquetin',
-      'Prefer': 'count=exact'
-    }
-  });
-  if (!res.ok) throw new Error(`fetchCountCapturesSanitaires error: ${res.status}`);
-  const contentRange = res.headers.get('content-range');
-  const total = contentRange ? Number(contentRange.split('/')[1]) : 0;
-  return Number.isFinite(total) ? total : 0;
-}
-
-export async function fetchCountEvenementsTranslocation(token, { date_from, date_to } = {}) {
-  const params = new URLSearchParams();
-  params.append('select', 'relache_date');
-  params.append('translocation', 'eq.true');
-  params.append('relache_date', 'not.is.null');
-  if (date_from) params.append('relache_date', `gte.${date_from}`);
-  if (date_to) params.append('relache_date', `lte.${date_to}`);
-
-  const res = await fetch(`${API_URL}/t_capture_relache?${params.toString()}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Accept-Profile': 'bouquetin',
-      'Prefer': 'count=none'
-    }
-  });
-  if (!res.ok) throw new Error(`fetchCountEvenementsTranslocation error: ${res.status}`);
-  const data = await res.json();
-  const datesDistinctes = new Set(data.map(r => String(r.relache_date).slice(0, 10)));
-  return datesDistinctes.size;
-}
-
-export async function fetchCountZonesTranslocation(token) {
-  const res = await fetch(
-    `${API_URL}/t_capture_relache?select=relache_zone&translocation=eq.true&relache_zone=not.is.null`,
-    {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept-Profile': 'bouquetin',
-        'Prefer': 'count=none'
-      }
-    }
-  );
-  if (!res.ok) throw new Error(`fetchCountZonesTranslocation error: ${res.status}`);
-  const data = await res.json();
-  return new Set(data.map(r => r.relache_zone)).size;
 }
 
 export async function fetchRepartitionSexeAnimaux(token, signal = null) {
