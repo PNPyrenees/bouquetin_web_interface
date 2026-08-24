@@ -98,7 +98,7 @@
           <button type="button" class="reports-nav-item active" data-vue="total">Animaux déclarés</button>
           <button type="button" class="reports-nav-item" data-vue="suivi">Animaux en cours de suivi</button>
           <button type="button" class="reports-nav-item" data-vue="equipes">Animaux ayant été équipés</button>
-          <button type="button" class="reports-nav-item" data-vue="captures">Animaux capturés</button>
+          <button type="button" class="reports-nav-item" data-vue="captures">Nombre de captures</button>
           <button type="button" class="reports-nav-item" data-vue="translocations">Translocations</button>
       </nav>
     </div>
@@ -198,7 +198,7 @@
 
           <section class="reports-vue" data-vue="captures">
             <div class="reports-bloc-entete reports-bloc-entete--total">
-              <h2 class="reports-bloc-titre">Animaux capturés</h2>
+              <h2 class="reports-bloc-titre">Nombre de captures</h2>
               <div class="reports-entete-actions">
                 <div class="reports-bloc-filtre">
                   <label for="selectAnneeCaptures">Année</label>
@@ -271,6 +271,9 @@
                 <div id="legendCapturesMethode" class="reports-graph-legend"></div>
               </div>
             </div>
+            <p class="reports-note">
+              <strong>* Le nombre de captures correspond au nombre total d’événements de capture enregistrés, translocations comprises (une translocation est aussi une capture). Un même animal capturé plusieurs fois est comptabilisé à chaque capture. Les informations absentes sont classées « Non renseigné ».</strong>
+            </p>
           </section>
 
           <section class="reports-vue" data-vue="translocations">
@@ -284,7 +287,7 @@
                   </select>
                 </div>
                 <div class="reports-total" aria-live="polite">
-                  <span class="reports-total-label">Total :</span>
+                  <span class="reports-total-label">Opérations :</span>
                   <span class="reports-total-value" id="totalAnimauxTransloques">-</span>
                 </div>
               </div>
@@ -328,16 +331,15 @@
                   </div>
                 </div>
                 <div class="reports-legende-panel reports-map-legende">
-                  <div class="reports-legende-mode">
-                    <label><input type="radio" name="modeCouleurTranslocations" value="zone" checked> Zone</label>
-                    <label><input type="radio" name="modeCouleurTranslocations" value="lieu_dit"> Lieu-dit</label>
-                  </div>
                   <div class="reports-legende-contenu" id="legendeTranslocationsCouleurs">
                     <!-- Peuplée en JS par construireLegende() -->
                   </div>
                 </div>
               </div>
             </div>
+            <p class="reports-note" id="noteTranslocations">
+              <strong>* Le nombre d’opérations correspond au nombre total d’événements de translocation enregistrés dans la base (<span id="noteTranslocationsOperations">-</span> opérations). Le nombre d’animaux transloqués correspond au nombre d’individus distincts concernés par ces opérations (<span id="noteTranslocationsAnimaux">-</span> animaux). Un même animal peut être comptabilisé dans plusieurs opérations s’il a été transloqué plusieurs fois. Le filtre par année actualise automatiquement ces deux valeurs ainsi que les graphiques.</strong>
+            </p>
           </section>
     </div>
   </main>

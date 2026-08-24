@@ -58,12 +58,13 @@ function chargerAnimaux(token) {
   return animauxPromise;
 }
 
-let posesCapteursPromise = null;
-function chargerPosesCapteurs(token) {
-  if (!posesCapteursPromise) {
-    posesCapteursPromise = chargerApi().then(({ fetchPosesCapteurs }) => fetchPosesCapteurs(token));
+const _animauxEquipesPromises = new Map();
+function chargerAnimauxEquipes(token, annee) {
+  const cle = annee || '__global__';
+  if (!_animauxEquipesPromises.has(cle)) {
+    _animauxEquipesPromises.set(cle, chargerApi().then(({ fetchAnimauxEquipes }) => fetchAnimauxEquipes(token, annee)));
   }
-  return posesCapteursPromise;
+  return _animauxEquipesPromises.get(cle);
 }
 
 let capturesReellesPromise = null;
@@ -105,7 +106,7 @@ async function chargerTotalAnimauxSuivis(token) {
   try {
     const animauxSuivis = await chargerAnimauxSuivis(token);
     const el = document.getElementById('totalAnimauxSuivis');
-    if (el) el.textContent = animauxSuivis.size.toLocaleString('fr-FR');
+    if (el) el.textContent = animauxSuivis.length.toLocaleString('fr-FR');
   } catch (err) {
     console.error('Échec chargement total animaux en cours de suivi :', err);
     marquerErreur('totalAnimauxSuivis');
@@ -202,10 +203,9 @@ async function chargerRepartitionSexeTotal(token) {
 
 async function chargerRepartitionSexeSuivi(token) {
   try {
-    const [suivisIds, animaux] = await Promise.all([chargerAnimauxSuivis(token), chargerAnimaux(token)]);
-    const suivisIdsStr = new Set([...suivisIds].map(String));
+    const animaux = await chargerAnimauxSuivis(token);
     const counts = { M: 0, F: 0, non_renseigne: 0 };
-    animaux.filter(a => suivisIdsStr.has(String(a.ani_id))).forEach(a => {
+    animaux.forEach(a => {
       if (a.ani_sexe === 'M') counts.M++;
       else if (a.ani_sexe === 'F') counts.F++;
       else counts.non_renseigne++;
@@ -256,13 +256,11 @@ async function chargerRepartitionPopulationTotal(token) {
 
 async function chargerRepartitionPopulationSuivi(token) {
   try {
-    const [suivisIds, animaux, { getCouleurParIndex }] = await Promise.all([
+    const [animaux, { getCouleurParIndex }] = await Promise.all([
       chargerAnimauxSuivis(token),
-      chargerAnimaux(token),
       import('./config.js')
     ]);
-    const suivisIdsStr = new Set([...suivisIds].map(String));
-    const { counts, nonRenseigne } = compterParPopulation(animaux.filter(a => suivisIdsStr.has(String(a.ani_id))));
+    const { counts, nonRenseigne } = compterParPopulation(animaux);
     afficherCamembertExterne('chartSuiviPopulation', 'legendSuiviPopulation', construireEntreesPopulation(counts, nonRenseigne, getCouleurParIndex));
   } catch (err) {
     console.error('Échec chargement répartition Population (suivi):', err);
@@ -292,10 +290,9 @@ async function chargerRepartitionGestionnaireTotal(token) {
 
 async function chargerRepartitionGestionnaireSuivi(token) {
   try {
-    const [suivisIds, animaux] = await Promise.all([chargerAnimauxSuivis(token), chargerAnimaux(token)]);
-    const suivisIdsStr = new Set([...suivisIds].map(String));
+    const animaux = await chargerAnimauxSuivis(token);
     const counts = { PNP: 0, PNRPA: 0, non_renseigne: 0 };
-    animaux.filter(a => suivisIdsStr.has(String(a.ani_id))).forEach(a => {
+    animaux.forEach(a => {
       if (a.ani_gestionnaire === 'PNP') counts.PNP++;
       else if (a.ani_gestionnaire === 'PNRPA') counts.PNRPA++;
       else counts.non_renseigne++;
@@ -311,10 +308,10 @@ async function initFiltreAnneeEquipes(token) {
   const select = document.getElementById('selectAnneeEquipes');
   if (!select) return;
   try {
-    const poses = await chargerPosesCapteurs(token);
-    const annees = [...new Set(poses.map(p => Number(String(p.cor_date_debut).slice(0, 4))))]
-      .filter(y => Number.isFinite(y))
-      .sort((a, b) => b - a);
+    const animaux = await chargerAnimauxEquipes(token, '');
+    const annees = [...new Set(
+      animaux.flatMap(a => a.cor_animal_capteur.map(c => Number(String(c.cor_date_debut).slice(0, 4))))
+    )].filter(y => Number.isFinite(y)).sort((a, b) => b - a);
     annees.forEach(annee => {
       const opt = document.createElement('option');
       opt.value = String(annee);
@@ -328,10 +325,7 @@ async function initFiltreAnneeEquipes(token) {
         create: false,
         allowEmptyOption: true,
         controlInput: null,
-        dropdownParent: 'body',
-        onChange() {
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+        dropdownParent: 'body'
       });
       tomSelect.dropdown.classList.add('reports-select-annee-dropdown');
     }
@@ -340,19 +334,11 @@ async function initFiltreAnneeEquipes(token) {
   }
 }
 
-function idsEquipesPourAnnee(poses, annee) {
-  return new Set(
-    poses.filter(p => !annee || String(p.cor_date_debut).slice(0, 4) === annee)
-      .map(p => String(p.ani_id))
-  );
-}
-
 async function chargerTotalAnimauxEquipes(token, annee) {
   try {
-    const poses = await chargerPosesCapteurs(token);
-    const total = idsEquipesPourAnnee(poses, annee).size;
+    const animaux = await chargerAnimauxEquipes(token, annee);
     const el = document.getElementById('totalAnimauxEquipes');
-    if (el) el.textContent = total.toLocaleString('fr-FR');
+    if (el) el.textContent = animaux.length.toLocaleString('fr-FR');
   } catch (err) {
     console.error('Échec chargement total animaux équipés :', err);
     marquerErreur('totalAnimauxEquipes');
@@ -361,10 +347,9 @@ async function chargerTotalAnimauxEquipes(token, annee) {
 
 async function chargerRepartitionSexeEquipes(token, annee) {
   try {
-    const [poses, animaux] = await Promise.all([chargerPosesCapteurs(token), chargerAnimaux(token)]);
-    const idsEquipes = idsEquipesPourAnnee(poses, annee);
+    const animaux = await chargerAnimauxEquipes(token, annee);
     const counts = { M: 0, F: 0, non_renseigne: 0 };
-    animaux.filter(a => idsEquipes.has(String(a.ani_id))).forEach(a => {
+    animaux.forEach(a => {
       if (a.ani_sexe === 'M') counts.M++;
       else if (a.ani_sexe === 'F') counts.F++;
       else counts.non_renseigne++;
@@ -377,13 +362,11 @@ async function chargerRepartitionSexeEquipes(token, annee) {
 
 async function chargerRepartitionPopulationEquipes(token, annee) {
   try {
-    const [poses, animaux, { getCouleurParIndex }] = await Promise.all([
-      chargerPosesCapteurs(token),
-      chargerAnimaux(token),
+    const [animaux, { getCouleurParIndex }] = await Promise.all([
+      chargerAnimauxEquipes(token, annee),
       import('./config.js')
     ]);
-    const idsEquipes = idsEquipesPourAnnee(poses, annee);
-    const { counts, nonRenseigne } = compterParPopulation(animaux.filter(a => idsEquipes.has(String(a.ani_id))));
+    const { counts, nonRenseigne } = compterParPopulation(animaux);
     afficherCamembertExterne('chartEquipesPopulation', 'legendEquipesPopulation', construireEntreesPopulation(counts, nonRenseigne, getCouleurParIndex));
   } catch (err) {
     console.error('Échec chargement répartition Population (équipés):', err);
@@ -392,10 +375,9 @@ async function chargerRepartitionPopulationEquipes(token, annee) {
 
 async function chargerRepartitionGestionnaireEquipes(token, annee) {
   try {
-    const [poses, animaux] = await Promise.all([chargerPosesCapteurs(token), chargerAnimaux(token)]);
-    const idsEquipes = idsEquipesPourAnnee(poses, annee);
+    const animaux = await chargerAnimauxEquipes(token, annee);
     const counts = { PNP: 0, PNRPA: 0, non_renseigne: 0 };
-    animaux.filter(a => idsEquipes.has(String(a.ani_id))).forEach(a => {
+    animaux.forEach(a => {
       if (a.ani_gestionnaire === 'PNP') counts.PNP++;
       else if (a.ani_gestionnaire === 'PNRPA') counts.PNRPA++;
       else counts.non_renseigne++;
@@ -406,13 +388,25 @@ async function chargerRepartitionGestionnaireEquipes(token, annee) {
   }
 }
 
-// --- Vue Captures : filtre annuel base sur capture_date ---
+// Annee de reference d'un evenement — champ principal en priorite, champ de repli
+// sinon (une translocation n'a pas de capture_date ; a l'inverse, une translocation
+// pas encore relachee n'a pas de relache_date).
+function anneeEvenement(ligne, champPrincipal, champRepli) {
+  const date = ligne[champPrincipal] || (champRepli && ligne[champRepli]);
+  return date ? String(date).slice(0, 4) : null;
+}
+
+// --- Vue Captures : filtre annuel base sur capture_date (repli relache_date pour les
+// translocations, qui n'ont pas de capture_date) ---
 async function initFiltreAnneeCaptures(token) {
   const select = document.getElementById('selectAnneeCaptures');
-  if (!select) return;
+  if (!select) return '';
   try {
-    const captures = await chargerCapturesReelles(token);
-    const annees = [...new Set(captures.map(c => Number(String(c.capture_date).slice(0, 4))))]
+    const [captures, { REPORTS_ANNEE_PAR_DEFAUT_DERNIERE }] = await Promise.all([
+      chargerCapturesReelles(token),
+      import('./config.js')
+    ]);
+    const annees = [...new Set(captures.map(c => Number(anneeEvenement(c, 'capture_date', 'relache_date'))))]
       .filter(y => Number.isFinite(y))
       .sort((a, b) => b - a);
     annees.forEach(annee => {
@@ -423,34 +417,33 @@ async function initFiltreAnneeCaptures(token) {
     });
     select.disabled = false;
 
+    const anneeParDefaut = REPORTS_ANNEE_PAR_DEFAUT_DERNIERE && annees.length > 0 ? String(annees[0]) : '';
+    if (anneeParDefaut) select.value = anneeParDefaut;
+
     if (window.TomSelect && !select.tomselect) {
       const tomSelect = new TomSelect(select, {
         create: false,
         allowEmptyOption: true,
         controlInput: null,
-        dropdownParent: 'body',
-        onChange() {
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+        dropdownParent: 'body'
       });
       tomSelect.dropdown.classList.add('reports-select-annee-dropdown');
     }
+    return anneeParDefaut;
   } catch (err) {
     console.error('Échec peuplement des années (captures):', err);
+    return '';
   }
 }
 
 function idsCapturesPourAnnee(captures, annee) {
-  return new Set(
-    captures.filter(c => !annee || String(c.capture_date).slice(0, 4) === annee)
-      .map(c => String(c.ani_id))
-  );
+  return captures.filter(c => !annee || anneeEvenement(c, 'capture_date', 'relache_date') === annee);
 }
 
 async function chargerTotalAnimauxCaptures(token, annee) {
   try {
     const captures = await chargerCapturesReelles(token);
-    const total = idsCapturesPourAnnee(captures, annee).size;
+    const total = idsCapturesPourAnnee(captures, annee).length;
     const el = document.getElementById('totalAnimauxCaptures');
     if (el) el.textContent = total.toLocaleString('fr-FR');
   } catch (err) {
@@ -461,12 +454,11 @@ async function chargerTotalAnimauxCaptures(token, annee) {
 
 async function chargerRepartitionSexeCaptures(token, annee) {
   try {
-    const [captures, animaux] = await Promise.all([chargerCapturesReelles(token), chargerAnimaux(token)]);
-    const idsCaptures = idsCapturesPourAnnee(captures, annee);
+    const captures = idsCapturesPourAnnee(await chargerCapturesReelles(token), annee);
     const counts = { M: 0, F: 0, non_renseigne: 0 };
-    animaux.filter(a => idsCaptures.has(String(a.ani_id))).forEach(a => {
-      if (a.ani_sexe === 'M') counts.M++;
-      else if (a.ani_sexe === 'F') counts.F++;
+    captures.forEach(capture => {
+      if (capture.ani_sexe === 'M') counts.M++;
+      else if (capture.ani_sexe === 'F') counts.F++;
       else counts.non_renseigne++;
     });
     afficherCamembertAvecLegende('chartCapturesSexe', 'legendCapturesSexe', construireEntreesSexe(counts));
@@ -477,13 +469,11 @@ async function chargerRepartitionSexeCaptures(token, annee) {
 
 async function chargerRepartitionPopulationCaptures(token, annee) {
   try {
-    const [captures, animaux, { getCouleurParIndex }] = await Promise.all([
+    const [captures, { getCouleurParIndex }] = await Promise.all([
       chargerCapturesReelles(token),
-      chargerAnimaux(token),
       import('./config.js')
     ]);
-    const idsCaptures = idsCapturesPourAnnee(captures, annee);
-    const { counts, nonRenseigne } = compterParPopulation(animaux.filter(a => idsCaptures.has(String(a.ani_id))));
+    const { counts, nonRenseigne } = compterParPopulation(idsCapturesPourAnnee(captures, annee));
     afficherCamembertExterne('chartCapturesPopulation', 'legendCapturesPopulation', construireEntreesPopulation(counts, nonRenseigne, getCouleurParIndex));
   } catch (err) {
     console.error('Échec chargement répartition Population (captures):', err);
@@ -492,12 +482,11 @@ async function chargerRepartitionPopulationCaptures(token, annee) {
 
 async function chargerRepartitionGestionnaireCaptures(token, annee) {
   try {
-    const [captures, animaux] = await Promise.all([chargerCapturesReelles(token), chargerAnimaux(token)]);
-    const idsCaptures = idsCapturesPourAnnee(captures, annee);
+    const captures = idsCapturesPourAnnee(await chargerCapturesReelles(token), annee);
     const counts = { PNP: 0, PNRPA: 0, non_renseigne: 0 };
-    animaux.filter(a => idsCaptures.has(String(a.ani_id))).forEach(a => {
-      if (a.ani_gestionnaire === 'PNP') counts.PNP++;
-      else if (a.ani_gestionnaire === 'PNRPA') counts.PNRPA++;
+    captures.forEach(capture => {
+      if (capture.ani_gestionnaire === 'PNP') counts.PNP++;
+      else if (capture.ani_gestionnaire === 'PNRPA') counts.PNRPA++;
       else counts.non_renseigne++;
     });
     afficherCamembertAvecLegende('chartCapturesGestionnaire', 'legendCapturesGestionnaire', construireEntreesGestionnaire(counts));
@@ -510,7 +499,7 @@ function compterCapturesParChamp(captures, annee, champ) {
   const counts = new Map();
   let nonRenseigne = 0;
   captures
-    .filter(c => !annee || String(c.capture_date).slice(0, 4) === annee)
+    .filter(c => !annee || anneeEvenement(c, 'capture_date', 'relache_date') === annee)
     .forEach(c => {
       const val = c[champ];
       if (!val) {
@@ -564,13 +553,17 @@ async function chargerRepartitionMethodeCaptures(token, annee) {
   }
 }
 
-// --- Vue Translocations : filtre annuel base sur relache_date ---
+// --- Vue Translocations : filtre annuel base sur relache_date (repli capture_date pour
+// une translocation pas encore relachee) ---
 async function initFiltreAnneeTranslocations(token) {
   const select = document.getElementById('selectAnneeTranslocations');
-  if (!select) return;
+  if (!select) return '';
   try {
-    const translocations = await chargerTranslocationsReelles(token);
-    const annees = [...new Set(translocations.map(t => Number(String(t.relache_date).slice(0, 4))))]
+    const [translocations, { REPORTS_ANNEE_PAR_DEFAUT_DERNIERE }] = await Promise.all([
+      chargerTranslocationsReelles(token),
+      import('./config.js')
+    ]);
+    const annees = [...new Set(translocations.map(t => Number(anneeEvenement(t, 'relache_date', 'capture_date'))))]
       .filter(y => Number.isFinite(y))
       .sort((a, b) => b - a);
     annees.forEach(annee => {
@@ -581,36 +574,42 @@ async function initFiltreAnneeTranslocations(token) {
     });
     select.disabled = false;
 
+    const anneeParDefaut = REPORTS_ANNEE_PAR_DEFAUT_DERNIERE && annees.length > 0 ? String(annees[0]) : '';
+    if (anneeParDefaut) select.value = anneeParDefaut;
+
     if (window.TomSelect && !select.tomselect) {
       const tomSelect = new TomSelect(select, {
         create: false,
         allowEmptyOption: true,
         controlInput: null,
-        dropdownParent: 'body',
-        onChange() {
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-        }
+        dropdownParent: 'body'
       });
       tomSelect.dropdown.classList.add('reports-select-annee-dropdown');
     }
+    return anneeParDefaut;
   } catch (err) {
     console.error('Échec peuplement des années (translocations):', err);
+    return '';
   }
 }
 
 function idsTranslocationsPourAnnee(translocations, annee) {
-  return new Set(
-    translocations.filter(t => !annee || String(t.relache_date).slice(0, 4) === annee)
-      .map(t => String(t.ani_id))
-  );
+  return translocations.filter(t => !annee || anneeEvenement(t, 'relache_date', 'capture_date') === annee);
 }
 
 async function chargerTotalAnimauxTransloques(token, annee) {
   try {
     const translocations = await chargerTranslocationsReelles(token);
-    const total = idsTranslocationsPourAnnee(translocations, annee).size;
+    const translocationsFiltrees = idsTranslocationsPourAnnee(translocations, annee);
+    const dates = new Set(translocationsFiltrees.map(t => String(t.relache_date).slice(0, 10)));
+    const total = dates.size;
     const el = document.getElementById('totalAnimauxTransloques');
     if (el) el.textContent = total.toLocaleString('fr-FR');
+    const ids = new Set(translocationsFiltrees.map(t => String(t.ani_id)));
+    const noteOperations = document.getElementById('noteTranslocationsOperations');
+    const noteAnimaux = document.getElementById('noteTranslocationsAnimaux');
+    if (noteOperations) noteOperations.textContent = total.toLocaleString('fr-FR');
+    if (noteAnimaux) noteAnimaux.textContent = ids.size.toLocaleString('fr-FR');
   } catch (err) {
     console.error('Échec chargement total animaux transloqués :', err);
     marquerErreur('totalAnimauxTransloques');
@@ -619,12 +618,11 @@ async function chargerTotalAnimauxTransloques(token, annee) {
 
 async function chargerRepartitionSexeTranslocations(token, annee) {
   try {
-    const [translocations, animaux] = await Promise.all([chargerTranslocationsReelles(token), chargerAnimaux(token)]);
-    const idsTranslocations = idsTranslocationsPourAnnee(translocations, annee);
+    const translocations = idsTranslocationsPourAnnee(await chargerTranslocationsReelles(token), annee);
     const counts = { M: 0, F: 0, non_renseigne: 0 };
-    animaux.filter(a => idsTranslocations.has(String(a.ani_id))).forEach(a => {
-      if (a.ani_sexe === 'M') counts.M++;
-      else if (a.ani_sexe === 'F') counts.F++;
+    translocations.forEach(translocation => {
+      if (translocation.ani_sexe === 'M') counts.M++;
+      else if (translocation.ani_sexe === 'F') counts.F++;
       else counts.non_renseigne++;
     });
     afficherCamembertAvecLegende('chartTranslocationsSexe', 'legendTranslocationsSexe', construireEntreesSexe(counts));
@@ -635,13 +633,11 @@ async function chargerRepartitionSexeTranslocations(token, annee) {
 
 async function chargerRepartitionPopulationTranslocations(token, annee) {
   try {
-    const [translocations, animaux, { getCouleurParIndex }] = await Promise.all([
+    const [translocations, { getCouleurParIndex }] = await Promise.all([
       chargerTranslocationsReelles(token),
-      chargerAnimaux(token),
       import('./config.js')
     ]);
-    const idsTranslocations = idsTranslocationsPourAnnee(translocations, annee);
-    const { counts, nonRenseigne } = compterParPopulation(animaux.filter(a => idsTranslocations.has(String(a.ani_id))));
+    const { counts, nonRenseigne } = compterParPopulation(idsTranslocationsPourAnnee(translocations, annee));
     afficherCamembertExterne('chartTranslocationsPopulation', 'legendTranslocationsPopulation', construireEntreesPopulation(counts, nonRenseigne, getCouleurParIndex));
   } catch (err) {
     console.error('Échec chargement répartition Population (translocations):', err);
@@ -650,12 +646,11 @@ async function chargerRepartitionPopulationTranslocations(token, annee) {
 
 async function chargerRepartitionGestionnaireTranslocations(token, annee) {
   try {
-    const [translocations, animaux] = await Promise.all([chargerTranslocationsReelles(token), chargerAnimaux(token)]);
-    const idsTranslocations = idsTranslocationsPourAnnee(translocations, annee);
+    const translocations = idsTranslocationsPourAnnee(await chargerTranslocationsReelles(token), annee);
     const counts = { PNP: 0, PNRPA: 0, non_renseigne: 0 };
-    animaux.filter(a => idsTranslocations.has(String(a.ani_id))).forEach(a => {
-      if (a.ani_gestionnaire === 'PNP') counts.PNP++;
-      else if (a.ani_gestionnaire === 'PNRPA') counts.PNRPA++;
+    translocations.forEach(translocation => {
+      if (translocation.ani_gestionnaire === 'PNP') counts.PNP++;
+      else if (translocation.ani_gestionnaire === 'PNRPA') counts.PNRPA++;
       else counts.non_renseigne++;
     });
     afficherCamembertAvecLegende('chartTranslocationsGestionnaire', 'legendTranslocationsGestionnaire', construireEntreesGestionnaire(counts));
@@ -870,6 +865,37 @@ function lambert93VersEcran(coordLambert93) {
   return ol.proj.fromLonLat(wgs84);
 }
 
+// Duplication fidele de creerFeaturesLienSite() (individuals.js) — trait + fleche au
+// milieu, pointant de l'origine vers la destination.
+function creerFeaturesLienSite(coordOrigineLambert93, coordDestinationLambert93, couleur) {
+  const pointA = lambert93VersEcran(coordOrigineLambert93);
+  const pointB = lambert93VersEcran(coordDestinationLambert93);
+
+  const ligne = new ol.Feature({ geometry: new ol.geom.LineString([pointA, pointB]) });
+  ligne.setStyle(new ol.style.Style({
+    stroke: new ol.style.Stroke({ color: couleur, width: 2, lineCap: 'round', lineJoin: 'round' })
+  }));
+
+  const dx = pointB[0] - pointA[0];
+  const dy = pointB[1] - pointA[1];
+  const rotation = Math.atan2(dy, dx) - Math.PI / 2;
+  const midpoint = [(pointA[0] + pointB[0]) / 2, (pointA[1] + pointB[1]) / 2];
+
+  const fleche = new ol.Feature({ geometry: new ol.geom.Point(midpoint) });
+  fleche.setStyle(new ol.style.Style({
+    image: new ol.style.RegularShape({
+      points: 3,
+      radius: 7,
+      rotation: -rotation,
+      fill: new ol.style.Fill({ color: couleur }),
+      stroke: new ol.style.Stroke({ color: '#ffffff', width: 1 }),
+      rotateWithView: false
+    })
+  }));
+
+  return [ligne, fleche];
+}
+
 function observerRedimensionnementCarte(carte, targetId) {
   if (window.ResizeObserver) {
     const resizeObserver = new ResizeObserver(() => carte.updateSize());
@@ -922,42 +948,71 @@ function creerLigneLegendeSite(couleur, contour, label) {
 // Fabrique une carte OL "sites" (fond IGN + symbologie Zone/Lieu-dit + legende + popup),
 // parametree par les noms de champs — utilisee pour les blocs "Animaux captures" et
 // "Translocations", identiques a l'exception de ces champs et des ids DOM (suffixe).
-function creerCarteSites({ suffixe, champDate, champZone, champLieuDit, champGeom, libellePopup }) {
+function creerCarteSites({ suffixe, champDate, champDateRepli, champZone, champLieuDit, champGeom, champDateOrigine, champZoneOrigine, champLieuDitOrigine, champGeomOrigine, libellePopup, symbologieFixe }) {
   let carte = null;
   let couche = null;
   let source = null;
+  let coucheLiens = null;
+  let sourceLiens = null;
   let popupOverlay = null;
   let modeCouleur = 'zone';
-  let lignesAffichees = [];
+  let pointsAffiches = [];
   const couleursZone = new Map();
   const couleursLieuDit = new Map();
 
-  function champActif() {
-    return modeCouleur === 'lieu_dit' ? champLieuDit : champZone;
+  // Un point "origine" (site de capture) reprend ses propres champs zone/lieu-dit —
+  // pas ceux du point "destination" du meme evenement.
+  function construirePoints(lignes) {
+    const points = [];
+    lignes.forEach(l => {
+      const coord = parseGeomPostGIS(l[champGeom]);
+      if (coord) points.push({ ligne: l, siteType: 'destination', coord, zone: l[champZone], lieuDit: l[champLieuDit] });
+      if (!champGeomOrigine) return;
+      const coordOrigine = parseGeomPostGIS(l[champGeomOrigine]);
+      if (coordOrigine) points.push({ ligne: l, siteType: 'origine', coord: coordOrigine, zone: l[champZoneOrigine], lieuDit: l[champLieuDitOrigine] });
+    });
+    return points;
   }
 
-  function preparerCouleurs(lignes) {
+  function preparerCouleurs(points) {
     couleursZone.clear();
-    [...new Set(lignes.map(l => l[champZone]).filter(Boolean))].sort()
+    [...new Set(points.map(p => p.zone).filter(Boolean))].sort()
       .forEach((v, i) => couleursZone.set(v, { couleur: getCouleurParIndex(i), contour: getContourSiteParIndex(i) }));
 
     couleursLieuDit.clear();
-    [...new Set(lignes.map(l => l[champLieuDit]).filter(Boolean))].sort()
+    [...new Set(points.map(p => p.lieuDit).filter(Boolean))].sort()
       .forEach((v, i) => couleursLieuDit.set(v, { couleur: getCouleurParIndex(i), contour: getContourSiteParIndex(i) }));
   }
 
-  function getStyleLigne(l) {
+  function getStylePoint(feature) {
+    const champ = modeCouleur === 'lieu_dit' ? 'pointLieuDit' : 'pointZone';
     const couleursMap = modeCouleur === 'lieu_dit' ? couleursLieuDit : couleursZone;
-    return couleursMap.get(l[champActif()]) || STYLE_NON_RENSEIGNE_SITE;
+    return couleursMap.get(feature.get(champ)) || STYLE_NON_RENSEIGNE_SITE;
   }
 
+  // Contour : noir (origine/capture) / blanc (destination/relache) sur les cartes a
+  // deux roles (translocations), fidele a stylePointSite() d'individuals.js — sinon
+  // contour cyclique habituel (evite le noir sur couleur GLASBEY sombre).
   function stylePoint(feature) {
-    const { couleur, contour } = getStyleLigne(feature.getProperties());
+    if (symbologieFixe) {
+      const style = feature.get('siteType') === 'origine' ? symbologieFixe.origine : symbologieFixe.destination;
+      return new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 7,
+          fill: new ol.style.Fill({ color: style.couleur }),
+          stroke: new ol.style.Stroke({ color: style.contour, width: 3 })
+        })
+      });
+    }
+    const { couleur, contour } = getStylePoint(feature);
+    const contourFinal = champGeomOrigine
+      ? (feature.get('siteType') === 'origine' ? '#000000' : '#ffffff')
+      : contour;
     return new ol.style.Style({
       image: new ol.style.Circle({
         radius: 7,
         fill: new ol.style.Fill({ color: couleur }),
-        stroke: new ol.style.Stroke({ color: contour, width: 3 })
+        stroke: new ol.style.Stroke({ color: contourFinal, width: 3 })
       })
     });
   }
@@ -967,12 +1022,19 @@ function creerCarteSites({ suffixe, champDate, champZone, champLieuDit, champGeo
     if (!conteneur) return;
     conteneur.innerHTML = '';
 
+    if (symbologieFixe) {
+      conteneur.appendChild(creerLigneLegendeSite(symbologieFixe.origine.couleur, symbologieFixe.origine.contour, symbologieFixe.origine.libelle));
+      conteneur.appendChild(creerLigneLegendeSite(symbologieFixe.destination.couleur, symbologieFixe.destination.contour, symbologieFixe.destination.libelle));
+      return;
+    }
+
     const couleursMap = modeCouleur === 'lieu_dit' ? couleursLieuDit : couleursZone;
     couleursMap.forEach(({ couleur, contour }, valeur) => {
       conteneur.appendChild(creerLigneLegendeSite(couleur, contour, valeur));
     });
 
-    if (lignesAffichees.some(l => !l[champActif()])) {
+    const champ = modeCouleur === 'lieu_dit' ? 'lieuDit' : 'zone';
+    if (pointsAffiches.some(p => !p[champ])) {
       conteneur.appendChild(creerLigneLegendeSite(STYLE_NON_RENSEIGNE_SITE.couleur, STYLE_NON_RENSEIGNE_SITE.contour, 'Non renseigné'));
     }
   }
@@ -991,6 +1053,11 @@ function creerCarteSites({ suffixe, champDate, champZone, champLieuDit, champGeo
     source = new ol.source.Vector();
     couche = new ol.layer.Vector({ source, style: stylePoint });
 
+    if (symbologieFixe) {
+      sourceLiens = new ol.source.Vector();
+      coucheLiens = new ol.layer.Vector({ source: sourceLiens });
+    }
+
     const popupEl = document.getElementById(`popupMap${suffixe}`);
     popupOverlay = new ol.Overlay({
       element: popupEl,
@@ -1003,7 +1070,7 @@ function creerCarteSites({ suffixe, champDate, champZone, champLieuDit, champGeo
       target: `reportsMap${suffixe}`,
       controls: [],
       interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: true, pinchZoom: false, shiftDragZoom: false }),
-      layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), couche],
+      layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), ...(coucheLiens ? [coucheLiens] : []), couche],
       overlays: [popupOverlay],
       view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
     });
@@ -1024,10 +1091,16 @@ function creerCarteSites({ suffixe, champDate, champZone, champLieuDit, champGeo
         strong.textContent = libellePopup;
         popupEl.appendChild(strong);
 
+        const estOrigine = l.siteType === 'origine';
+        const date = estOrigine ? l[champDateOrigine] : l[champDate];
+        const zone = estOrigine ? l[champZoneOrigine] : l[champZone];
+        const lieuDit = estOrigine ? l[champLieuDitOrigine] : l[champLieuDit];
+        strong.textContent = estOrigine ? 'Site de capture' : libellePopup;
+
         [
-          ['Date', l[champDate] ? l[champDate].slice(0, 10).split('-').reverse().join('/') : null],
-          ['Zone', l[champZone]],
-          ['Lieu-dit', l[champLieuDit]]
+          ['Date', date ? date.slice(0, 10).split('-').reverse().join('/') : null],
+          ['Zone', zone],
+          ['Lieu-dit', lieuDit]
         ].forEach(([label, valeur]) => {
           const div = document.createElement('div');
           div.className = 'popup-champ';
@@ -1061,33 +1134,47 @@ function creerCarteSites({ suffixe, champDate, champZone, champLieuDit, champGeo
     observerRedimensionnementCarte(carte, `reportsMap${suffixe}`);
     initBoutonFondsCarte(suffixe, () => carte);
 
-    document.querySelectorAll(`input[name="modeCouleur${suffixe}"]`).forEach(radio => {
-      radio.addEventListener('change', () => {
-        if (radio.checked) changerModeCouleur(radio.value);
+    if (!symbologieFixe) {
+      document.querySelectorAll(`input[name="modeCouleur${suffixe}"]`).forEach(radio => {
+        radio.addEventListener('change', () => {
+          if (radio.checked) changerModeCouleur(radio.value);
+        });
       });
-    });
+    }
   }
 
   function lignesPourAnnee(lignes, annee) {
-    return lignes.filter(l => !annee || String(l[champDate]).slice(0, 4) === annee);
+    return lignes.filter(l => !annee || anneeEvenement(l, champDate, champDateRepli) === annee);
   }
 
   function renderPoints(lignes, annee) {
     if (!source) return;
 
-    lignesAffichees = lignesPourAnnee(lignes, annee);
-    preparerCouleurs(lignesAffichees);
+    const lignesFiltrees = lignesPourAnnee(lignes, annee);
+    pointsAffiches = construirePoints(lignesFiltrees);
+    if (!symbologieFixe) preparerCouleurs(pointsAffiches);
     construireLegende();
 
     source.clear();
-    const features = lignesAffichees
-      .map(l => {
-        const coord = parseGeomPostGIS(l[champGeom]);
-        if (!coord) return null;
-        return new ol.Feature({ ...l, geometry: new ol.geom.Point(lambert93VersEcran(coord)) });
-      })
-      .filter(Boolean);
+    const features = pointsAffiches.map(p => new ol.Feature({
+      ...p.ligne,
+      siteType: p.siteType,
+      pointZone: p.zone,
+      pointLieuDit: p.lieuDit,
+      geometry: new ol.geom.Point(lambert93VersEcran(p.coord))
+    }));
     source.addFeatures(features);
+
+    if (sourceLiens) {
+      sourceLiens.clear();
+      const traits = lignesFiltrees.flatMap(l => {
+        const coordDestination = parseGeomPostGIS(l[champGeom]);
+        const coordOrigine = champGeomOrigine ? parseGeomPostGIS(l[champGeomOrigine]) : null;
+        if (!coordDestination || !coordOrigine) return [];
+        return creerFeaturesLienSite(coordOrigine, coordDestination, symbologieFixe.couleurTrait);
+      });
+      sourceLiens.addFeatures(traits);
+    }
 
     const extent = source.getExtent();
     if (!ol.extent.isEmpty(extent)) {
@@ -1111,6 +1198,7 @@ function creerCarteSites({ suffixe, champDate, champZone, champLieuDit, champGeo
 const carteCaptures = creerCarteSites({
   suffixe: 'Captures',
   champDate: 'capture_date',
+  champDateRepli: 'relache_date',
   champZone: 'capture_zone',
   champLieuDit: 'capture_lieu_dit',
   champGeom: 'capture_site_geom',
@@ -1120,10 +1208,20 @@ const carteCaptures = creerCarteSites({
 const carteTranslocations = creerCarteSites({
   suffixe: 'Translocations',
   champDate: 'relache_date',
+  champDateRepli: 'capture_date',
   champZone: 'relache_zone',
   champLieuDit: 'relache_lieu_dit',
   champGeom: 'relache_site_geom',
-  libellePopup: 'Site de destination'
+  champDateOrigine: 'capture_date',
+  champZoneOrigine: 'capture_zone',
+  champLieuDitOrigine: 'capture_lieu_dit',
+  champGeomOrigine: 'capture_site_geom',
+  libellePopup: 'Site de destination',
+  symbologieFixe: {
+    origine: { couleur: '#E63946', contour: '#ffffff', libelle: 'Site de capture' },
+    destination: { couleur: '#3A86FF', contour: '#ffffff', libelle: 'Site de relâché' },
+    couleurTrait: '#E63946'
+  }
 });
 
 function chargerCarteCapturesSites(token, annee) {
@@ -1152,21 +1250,23 @@ function chargerVueSiNecessaire(nomVue, token) {
     chargerRepartitionPopulationEquipes(token, '');
     chargerRepartitionGestionnaireEquipes(token, '');
   } else if (nomVue === 'captures') {
-    initFiltreAnneeCaptures(token);
-    chargerTotalAnimauxCaptures(token, '');
-    chargerRepartitionSexeCaptures(token, '');
-    chargerRepartitionPopulationCaptures(token, '');
-    chargerRepartitionGestionnaireCaptures(token, '');
-    chargerRepartitionObjectifCaptures(token, '');
-    chargerRepartitionMethodeCaptures(token, '');
-    chargerCarteCapturesSites(token, '');
+    initFiltreAnneeCaptures(token).then(annee => {
+      chargerTotalAnimauxCaptures(token, annee);
+      chargerRepartitionSexeCaptures(token, annee);
+      chargerRepartitionPopulationCaptures(token, annee);
+      chargerRepartitionGestionnaireCaptures(token, annee);
+      chargerRepartitionObjectifCaptures(token, annee);
+      chargerRepartitionMethodeCaptures(token, annee);
+      chargerCarteCapturesSites(token, annee);
+    });
   } else if (nomVue === 'translocations') {
-    initFiltreAnneeTranslocations(token);
-    chargerTotalAnimauxTransloques(token, '');
-    chargerRepartitionSexeTranslocations(token, '');
-    chargerRepartitionPopulationTranslocations(token, '');
-    chargerRepartitionGestionnaireTranslocations(token, '');
-    chargerCarteTranslocationsSites(token, '');
+    initFiltreAnneeTranslocations(token).then(annee => {
+      chargerTotalAnimauxTransloques(token, annee);
+      chargerRepartitionSexeTranslocations(token, annee);
+      chargerRepartitionPopulationTranslocations(token, annee);
+      chargerRepartitionGestionnaireTranslocations(token, annee);
+      chargerCarteTranslocationsSites(token, annee);
+    });
   }
 }
 
