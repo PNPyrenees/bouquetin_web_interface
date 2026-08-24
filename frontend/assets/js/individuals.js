@@ -1323,7 +1323,7 @@ function initCarteLocalisations() {
   _carteLocalisations = new ol.Map({
     target: 'ficheMapLocalisations',
     controls: [],
-    interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: false, pinchZoom: false, shiftDragZoom: false }),
+    interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: true, pinchZoom: false, shiftDragZoom: false }),
     layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), coucheLocalisations],
     overlays: [_popupOverlayLocalisations],
     view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
@@ -1520,7 +1520,7 @@ function initCarteSites() {
   _carteSites = new ol.Map({
     target: 'ficheMapSites',
     controls: [],
-    interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: false, pinchZoom: false, shiftDragZoom: false }),
+    interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: true, pinchZoom: false, shiftDragZoom: false }),
     layers: [
       creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]),
       coucheSitesLiens,
