@@ -118,25 +118,23 @@ function creerCelluleFraicheur(tier, dateDerniere) {
   const cellule = document.createElement('div');
   cellule.className = 'indiv-fraicheur-cellule';
 
-  const pastille = document.createElement('span');
   const texte = document.createElement('span');
-  texte.className = 'indiv-fraicheur-texte';
 
   if (tier === 'aucune') {
-    pastille.className = 'indiv-fraicheur-pastille indiv-fraicheur-aucune';
+    texte.className = 'indiv-fraicheur-texte indiv-fraicheur-aucune';
     texte.textContent = 'Aucune position';
     cellule.title = FRAICHEUR_LABELS.aucune;
   } else if (tier) {
-    pastille.className = `indiv-fraicheur-pastille indiv-fraicheur-${tier}`;
+    texte.className = `indiv-fraicheur-texte indiv-fraicheur-${tier}`;
     texte.textContent = formaterEcheanceFraicheur(dateDerniere);
     cellule.title = `${FRAICHEUR_LABELS[tier]} (dernière position : ${formaterDateHeure(dateDerniere)})`;
   } else {
-    pastille.className = 'indiv-fraicheur-pastille indiv-fraicheur-a-jour';
+    texte.className = 'indiv-fraicheur-texte indiv-fraicheur-a-jour';
     texte.textContent = formaterEcheanceFraicheur(dateDerniere);
     cellule.title = `Dernière position : ${formaterDateHeure(dateDerniere)}`;
   }
 
-  cellule.append(pastille, texte);
+  cellule.appendChild(texte);
   return cellule;
 }
 
@@ -223,16 +221,18 @@ function creerPastilleStatut(statutKey) {
   return pastille;
 }
 
-const ICONE_PASTILLE_COCHE = '<svg viewBox="0 0 512 512" fill="#ffffff"><path d="M305.44954,462.59c7.39157,7.29792,6.18829,20.09661-3.00038,25.00356-77.713,41.80281-176.72559,29.9105-242.34331-35.7082C-5.49624,386.28227-17.404,287.362,24.41381,209.554c4.89125-9.095,17.68975-10.29834,25.00318-3.00043L166.22872,323.36708l27.39411-27.39452c-.68759-2.60974-1.594-5.00071-1.594-7.81361a32.00407,32.00407,0,1,1,32.00407,32.00455c-2.79723,0-5.20378-.89075-7.79786-1.594l-27.40974,27.41015ZM511.9758,303.06732a16.10336,16.10336,0,0,1-16.002,17.00242H463.86031a15.96956,15.96956,0,0,1-15.89265-15.00213C440.46671,175.5492,336.45348,70.53427,207.03078,63.53328a15.84486,15.84486,0,0,1-15.00191-15.90852V16.02652A16.09389,16.09389,0,0,1,209.031.02425C372.25491,8.61922,503.47472,139.841,511.9758,303.06732Zm-96.01221-.29692a16.21093,16.21093,0,0,1-16.11142,17.29934H367.645a16.06862,16.06862,0,0,1-15.89265-14.70522c-6.90712-77.01094-68.118-138.91037-144.92467-145.22376a15.94,15.94,0,0,1-14.79876-15.89289V112.13393a16.134,16.134,0,0,1,17.29908-16.096C319.45132,104.5391,407.55627,192.64538,415.96359,302.7704Z"/></svg>';
+function iconeCrosshairs(couleur) {
+  return `<svg viewBox="0 0 640 640" fill="${couleur}"><path d="M320 48C337.7 48 352 62.3 352 80L352 98.3C450.1 112.3 527.7 189.9 541.7 288L560 288C577.7 288 592 302.3 592 320C592 337.7 577.7 352 560 352L541.7 352C527.7 450.1 450.1 527.7 352 541.7L352 560C352 577.7 337.7 592 320 592C302.3 592 288 577.7 288 560L288 541.7C189.9 527.7 112.3 450.1 98.3 352L80 352C62.3 352 48 337.7 48 320C48 302.3 62.3 288 80 288L98.3 288C112.3 189.9 189.9 112.3 288 98.3L288 80C288 62.3 302.3 48 320 48zM163.2 352C175.9 414.7 225.3 464.1 288 476.8L288 464C288 446.3 302.3 432 320 432C337.7 432 352 446.3 352 464L352 476.8C414.7 464.1 464.1 414.7 476.8 352L464 352C446.3 352 432 337.7 432 320C432 302.3 446.3 288 464 288L476.8 288C464.1 225.3 414.7 175.9 352 163.2L352 176C352 193.7 337.7 208 320 208C302.3 208 288 193.7 288 176L288 163.2C225.3 175.9 175.9 225.3 163.2 288L176 288C193.7 288 208 302.3 208 320C208 337.7 193.7 352 176 352L163.2 352zM320 272C346.5 272 368 293.5 368 320C368 346.5 346.5 368 320 368C293.5 368 272 346.5 272 320C272 293.5 293.5 272 320 272z"/></svg>`;
+}
 
 const PASTILLE_ICONES = {
-  actif: ICONE_PASTILLE_COCHE,
-  non_suivi: ICONE_PASTILLE_COCHE,
-  mort: '<svg viewBox="0 0 640 640" fill="#ffffff"><path d="M231 231C240.4 221.6 255.6 221.6 264.9 231L319.9 286L374.9 231C384.3 221.6 399.5 221.6 408.8 231C418.1 240.4 418.2 255.6 408.8 264.9L353.8 319.9L408.8 374.9C418.2 384.3 418.2 399.5 408.8 408.8C399.4 418.1 384.2 418.2 374.9 408.8L319.9 353.8L264.9 408.8C255.5 418.2 240.3 418.2 231 408.8C221.7 399.4 221.6 384.2 231 374.9L286 319.9L231 264.9C221.6 255.5 221.6 240.3 231 231z"/></svg>'
+  actif: iconeCrosshairs('#2D6A4F'),
+  non_suivi: iconeCrosshairs('#9e9e9e'),
+  mort: iconeCrosshairs('#c0392b')
 };
 
-// Pastille de statut superposee sur la photo (angle inferieur droit, cf. .fiche-illustration-statut) —
-// reutilise computeStatut/STATUT_CLASSES/STATUT_LABELS, meme source de verite que le badge texte.
+// Pastille de statut a cote du nom (cf. .fiche-nom-wrapper) — reutilise
+// computeStatut/STATUT_CLASSES/STATUT_LABELS, meme source de verite que le badge texte.
 function remplirPastilleStatutPhoto(detail) {
   const pastille = document.getElementById('ficheIllustrationStatut');
   if (!pastille) return;
