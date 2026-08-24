@@ -132,36 +132,20 @@ export async function fetchProgrammations(token) {
   return res.json();
 }
 
-export async function fetchAnimauxSuivis(token, filters = {}, signal = null) {
-  const periodeActive = Boolean(filters.date_from || filters.date_to);
-
-  if (periodeActive) {
-    const idsPeriode = await fetchAnimalIdsParPeriode(token, { date_from: filters.date_from, date_to: filters.date_to }, signal);
-    const aFiltresAttributs = Boolean(filters.population || filters.gestionnaire || filters.sexe);
-    if (!aFiltresAttributs) return new Set(idsPeriode);
-
-    const params = new URLSearchParams();
-    params.append('select', 'ani_id');
-    if (filters.population) params.append('ani_pop_rattach', `eq.${filters.population}`);
-    if (filters.gestionnaire) params.append('ani_gestionnaire', `eq.${filters.gestionnaire}`);
-    if (filters.sexe) params.append('ani_sexe', `eq.${filters.sexe}`);
-    const res = await fetch(`${API_URL}/t_animal?${params.toString()}`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Accept-Profile': 'bouquetin', 'Prefer': 'count=none' },
+export async function fetchAnimauxSuivis(token, signal = null) {
+  const res = await fetch(
+    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_sexe,ani_pop_rattach,ani_gestionnaire,cor_animal_capteur!inner(cor_date_fin)&cor_animal_capteur.cor_date_fin=is.null`,
+    {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept-Profile': 'bouquetin',
+        'Prefer': 'count=none'
+      },
       signal
-    });
-    if (!res.ok) throw new Error(`fetchAnimauxSuivis error (filtre animaux): ${res.status}`);
-    const idsAutorises = new Set((await res.json()).map(a => String(a.ani_id)));
-    return new Set(idsPeriode.filter(id => idsAutorises.has(id)));
-  }
-
-  const locations = await fetchLocalisationsRPC(token, {
-    ani_is_followed: true,
-    limit_par_animal: 1,
-    sexe: filters.sexe,
-    gestionnaire: filters.gestionnaire,
-    population: filters.population
-  }, null, signal);
-  return new Set(locations.map(l => l.ani_id));
+    }
+  );
+  if (!res.ok) throw new Error(`fetchAnimauxSuivis error: ${res.status}`);
+  return res.json();
 }
 
 export async function fetchColliersActifs(token) {
@@ -240,6 +224,18 @@ export async function fetchCountAnimauxEquipes(token, filters = {}, signal = nul
   return new Set(lignes.map(r => r.ani_id)).size;
 }
 
+export async function fetchAnimauxEquipes(token, annee) {
+  let url = `${API_URL}/t_animal?select=ani_id,ani_sexe,ani_pop_rattach,ani_gestionnaire,cor_animal_capteur!inner(cor_date_debut)&cor_animal_capteur.cor_date_debut=not.is.null`;
+  if (annee) {
+    url += `&cor_animal_capteur.cor_date_debut=gte.${annee}-01-01&cor_animal_capteur.cor_date_debut=lt.${Number(annee) + 1}-01-01`;
+  }
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${token}`, 'Accept-Profile': 'bouquetin', 'Prefer': 'count=none' }
+  });
+  if (!res.ok) throw new Error(`fetchAnimauxEquipes error: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchPosesCapteurs(token) {
   const res = await fetch(
     `${API_URL}/cor_animal_capteur?select=ani_id,cor_date_debut&cor_date_debut=not.is.null`,
@@ -257,7 +253,7 @@ export async function fetchPosesCapteurs(token) {
 
 export async function fetchCapturesReelles(token) {
   const res = await fetch(
-    `${API_URL}/t_capture_relache?select=capture_relache_id,ani_id,capture_date,capture_objectif,capture_methode,capture_site_geom,capture_zone,capture_lieu_dit&translocation=eq.false&capture_date=not.is.null`,
+    `${API_URL}/t_animal?select=ani_id,ani_sexe,ani_pop_rattach,ani_gestionnaire,t_capture_relache!inner(capture_relache_id,capture_date,capture_objectif,capture_methode,translocation,capture_site_geom,capture_zone,capture_lieu_dit,relache_date)`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -267,12 +263,19 @@ export async function fetchCapturesReelles(token) {
     }
   );
   if (!res.ok) throw new Error(`fetchCapturesReelles error: ${res.status}`);
-  return res.json();
+  const animaux = await res.json();
+  return animaux.flatMap(animal => (animal.t_capture_relache || []).map(capture => ({
+    ...capture,
+    ani_id: animal.ani_id,
+    ani_sexe: animal.ani_sexe,
+    ani_pop_rattach: animal.ani_pop_rattach,
+    ani_gestionnaire: animal.ani_gestionnaire
+  })));
 }
 
 export async function fetchTranslocationsReelles(token) {
   const res = await fetch(
-    `${API_URL}/t_capture_relache?select=capture_relache_id,ani_id,relache_date,relache_site_geom,relache_zone,relache_lieu_dit&translocation=eq.true&relache_date=not.is.null`,
+    `${API_URL}/t_animal?select=ani_id,ani_nom,ani_sexe,ani_pop_rattach,ani_gestionnaire,t_capture_relache!inner(capture_relache_id,capture_date,capture_zone,capture_lieu_dit,capture_site_geom,capture_objectif,capture_methode,translocation,relache_date,relache_zone,relache_lieu_dit,relache_site_geom)&t_capture_relache.translocation=eq.true`,
     {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -282,7 +285,15 @@ export async function fetchTranslocationsReelles(token) {
     }
   );
   if (!res.ok) throw new Error(`fetchTranslocationsReelles error: ${res.status}`);
-  return res.json();
+  const animaux = await res.json();
+  return animaux.flatMap(animal => (animal.t_capture_relache || []).map(translocation => ({
+    ...translocation,
+    ani_id: animal.ani_id,
+    ani_nom: animal.ani_nom,
+    ani_sexe: animal.ani_sexe,
+    ani_pop_rattach: animal.ani_pop_rattach,
+    ani_gestionnaire: animal.ani_gestionnaire
+  })));
 }
 
 export async function fetchTranslocationIds(token) {
