@@ -48,8 +48,8 @@
 }
 
 .reports-nav-item.active {
-  background: var(--color-primary);
-  color: #ffffff;
+  background: #cfdfd8;
+  color: #1a3d2f;
 }
 
 .reports-nav-item.active:hover {

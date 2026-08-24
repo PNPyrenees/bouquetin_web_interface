@@ -36,6 +36,7 @@ function deconnecter() {
 }
 
 let apiPromise = null;
+// --- Donnees : imports et requetes mis en cache pour eviter les appels en double ---
 function chargerApi() {
   if (!apiPromise) apiPromise = import('./api.js');
   return apiPromise;
@@ -111,6 +112,8 @@ async function chargerTotalAnimauxSuivis(token) {
   }
 }
 
+// --- ApexCharts : rendu commun a tous les camemberts ---
+// Tailles des graphiques : voir .reports-graph-chart dans reports.css.
 function afficherLegendeGraphique(id, entrees) {
   const legende = document.getElementById(id);
   if (!legende) return;
@@ -127,6 +130,7 @@ function afficherLegendeGraphique(id, entrees) {
   }));
 }
 
+// Palette Sexe : modifier les couleurs ici.
 const COULEURS_SEXE = { M: '#3A86FF', F: '#FF006E', non_renseigne: '#b0b0b0' };
 
 function construireEntreesSexe(counts) {
@@ -139,6 +143,7 @@ function construireEntreesSexe(counts) {
 
 const instancesApexCharts = new Map();
 
+// Point central a modifier pour changer la strategie de rendu ApexCharts.
 function rendreApexCharts(el, options) {
   instancesApexCharts.get(el.id)?.destroy();
   const chart = new ApexCharts(el, options);
@@ -151,6 +156,7 @@ function afficherCamembertAvecLegende(elId, legendId, entrees) {
   if (!el || !window.ApexCharts) return;
   afficherLegendeGraphique(legendId, entrees);
   rendreApexCharts(el, {
+    // Animation, vitesse et type du graphique se reglent ici.
     chart: {
       type: 'pie',
       height: '100%',
@@ -169,6 +175,7 @@ function afficherCamembertAvecLegende(elId, legendId, entrees) {
     colors: entrees.map(e => e.couleur),
     legend: { show: false },
     stroke: { width: 0 },
+    // Taille visuelle du disque : modifier customScale avec prudence.
     plotOptions: {
       pie: {
         offsetY: 0,
@@ -209,6 +216,7 @@ async function chargerRepartitionSexeSuivi(token) {
   }
 }
 
+// Population utilise le meme rendu fixe que Sexe et Gestionnaire.
 function afficherCamembertExterne(elId, legendId, entrees) {
   afficherCamembertAvecLegende(elId, legendId, entrees);
 }
@@ -261,6 +269,7 @@ async function chargerRepartitionPopulationSuivi(token) {
   }
 }
 
+// Palette Gestionnaire : modifier les couleurs ici.
 const COULEURS_GESTIONNAIRE = { PNP: '#2D6A4F', PNRPA: '#E07B39', non_renseigne: '#aaaaaa' };
 
 function construireEntreesGestionnaire(counts) {
@@ -297,6 +306,7 @@ async function chargerRepartitionGestionnaireSuivi(token) {
   }
 }
 
+// --- Vue Equipes : filtre annuel base sur la date de pose du capteur ---
 async function initFiltreAnneeEquipes(token) {
   const select = document.getElementById('selectAnneeEquipes');
   if (!select) return;
@@ -396,6 +406,7 @@ async function chargerRepartitionGestionnaireEquipes(token, annee) {
   }
 }
 
+// --- Vue Captures : filtre annuel base sur capture_date ---
 async function initFiltreAnneeCaptures(token) {
   const select = document.getElementById('selectAnneeCaptures');
   if (!select) return;
@@ -553,6 +564,7 @@ async function chargerRepartitionMethodeCaptures(token, annee) {
   }
 }
 
+// --- Vue Translocations : filtre annuel base sur relache_date ---
 async function initFiltreAnneeTranslocations(token) {
   const select = document.getElementById('selectAnneeTranslocations');
   if (!select) return;
@@ -652,7 +664,7 @@ async function chargerRepartitionGestionnaireTranslocations(token, annee) {
   }
 }
 
-// --- Carte des sites de capture (bloc "Animaux capturés") ---
+// --- Cartes Captures et Translocations : configuration OpenLayers partagee ---
 // Duplication du pattern OpenLayers/IGN de individuals.js (initCarteSites) — pas de
 // module JS ici (reports.js n'est pas en type="module"), donc config.js est chargé
 // dynamiquement une fois puis mis en cache dans ces variables de module.
@@ -869,6 +881,7 @@ function observerRedimensionnementCarte(carte, targetId) {
   setTimeout(() => carte.updateSize(), 600);
 }
 
+// Couleurs et contours des points affiches sur les cartes.
 const COULEUR_NON_RENSEIGNE_SITE = '#aaaaaa';
 
 // Contours cycliques (identiques a map.js) avec un override force en blanc pour les
@@ -989,7 +1002,7 @@ function creerCarteSites({ suffixe, champDate, champZone, champLieuDit, champGeo
     carte = new ol.Map({
       target: `reportsMap${suffixe}`,
       controls: [],
-      interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: false, pinchZoom: false, shiftDragZoom: false }),
+      interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: true, pinchZoom: false, shiftDragZoom: false }),
       layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), couche],
       overlays: [popupOverlay],
       view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
@@ -1123,6 +1136,7 @@ function chargerCarteTranslocationsSites(token, annee) {
 
 const VUES_CHARGEES = new Set(['total']);
 
+// Chargement differe : une vue n'interroge l'API qu'a sa premiere ouverture.
 function chargerVueSiNecessaire(nomVue, token) {
   if (!token || VUES_CHARGEES.has(nomVue)) return;
   VUES_CHARGEES.add(nomVue);
