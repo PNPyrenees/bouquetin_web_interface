@@ -598,10 +598,8 @@ async function chargerTotalAnimauxTransloques(token, annee) {
     const el = document.getElementById('totalAnimauxTransloques');
     if (el) el.textContent = total.toLocaleString('fr-FR');
     const ids = new Set(translocationsFiltrees.map(t => String(t.ani_id)));
-    const noteOperations = document.getElementById('noteTranslocationsOperations');
-    const noteAnimaux = document.getElementById('noteTranslocationsAnimaux');
-    if (noteOperations) noteOperations.textContent = total.toLocaleString('fr-FR');
-    if (noteAnimaux) noteAnimaux.textContent = ids.size.toLocaleString('fr-FR');
+    const animauxEl = document.getElementById('totalAnimauxTransloquesIndividus');
+    if (animauxEl) animauxEl.textContent = ids.size.toLocaleString('fr-FR');
   } catch (err) {
     console.error('Échec chargement total animaux transloqués :', err);
     marquerErreur('totalAnimauxTransloques');

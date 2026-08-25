@@ -131,7 +131,7 @@
                 <div id="legendTotalGestionnaire" class="reports-graph-legend"></div>
               </div>
             </div>
-            <p class="reports-note"><strong>* Animaux déclarés : tous les animaux enregistrés sont inclus, qu’ils soient équipés, suivis ou non. Les graphiques présentent leur répartition par sexe, population de rattachement et gestionnaire ; les informations absentes sont classées « Non renseigné ».</strong></p>
+            <p class="reports-note"><strong>* Les animaux déclarés sont les animaux enregistrés dans la base de données, qu’ils aient été équipés ou non d’un collier GPS.</strong></p>
           </section>
 
           <section class="reports-vue" data-vue="suivi">
@@ -159,6 +159,7 @@
                 <div id="legendSuiviGestionnaire" class="reports-graph-legend"></div>
               </div>
             </div>
+            <p class="reports-note"><strong>* Les animaux en cours de suivi sont les animaux actuellement équipés d’un collier GPS actif.</strong></p>
           </section>
 
           <section class="reports-vue" data-vue="equipes">
@@ -194,6 +195,7 @@
                 <div id="legendEquipesGestionnaire" class="reports-graph-legend"></div>
               </div>
             </div>
+            <p class="reports-note"><strong>* Les animaux ayant été équipés sont les animaux qui ont eu un collier GPS, que ce collier soit encore actif ou non aujourd’hui.</strong></p>
           </section>
 
           <section class="reports-vue" data-vue="captures">
@@ -271,9 +273,7 @@
                 <div id="legendCapturesMethode" class="reports-graph-legend"></div>
               </div>
             </div>
-            <p class="reports-note">
-              <strong>* Le nombre de captures correspond au nombre total d’événements de capture enregistrés, translocations comprises (une translocation est aussi une capture). Un même animal capturé plusieurs fois est comptabilisé à chaque capture. Les informations absentes sont classées « Non renseigné ».</strong>
-            </p>
+            <p class="reports-note"><strong>* Le nombre de captures comptabilise chaque opération de capture réalisée. Ainsi, un même animal capturé deux fois sera compté deux fois.</strong></p>
           </section>
 
           <section class="reports-vue" data-vue="translocations">
@@ -287,8 +287,9 @@
                   </select>
                 </div>
                 <div class="reports-total" aria-live="polite">
-                  <span class="reports-total-label">Opérations :</span>
+                  <span class="reports-total-label">Opérations</span>
                   <span class="reports-total-value" id="totalAnimauxTransloques">-</span>
+                  <span class="reports-total-label">(<span id="totalAnimauxTransloquesIndividus">-</span> animaux) :</span>
                 </div>
               </div>
             </div>
@@ -337,9 +338,7 @@
                 </div>
               </div>
             </div>
-            <p class="reports-note" id="noteTranslocations">
-              <strong>* Le nombre d’opérations correspond au nombre total d’événements de translocation enregistrés dans la base (<span id="noteTranslocationsOperations">-</span> opérations). Le nombre d’animaux transloqués correspond au nombre d’individus distincts concernés par ces opérations (<span id="noteTranslocationsAnimaux">-</span> animaux). Un même animal peut être comptabilisé dans plusieurs opérations s’il a été transloqué plusieurs fois. Le filtre par année actualise automatiquement ces deux valeurs ainsi que les graphiques.</strong>
-            </p>
+            <p class="reports-note"><strong>* Une opération de translocation correspond à un déplacement d’un ou plusieurs animaux. Les graphiques présentent le nombre d’animaux transloqués.</strong></p>
           </section>
     </div>
   </main>
