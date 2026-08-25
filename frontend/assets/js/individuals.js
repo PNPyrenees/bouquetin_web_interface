@@ -479,6 +479,7 @@ function creerLigneIndividu(ani) {
     .forEach(c => {
       const cellule = document.createElement('div');
       cellule.className = 'indiv-cell';
+      cellule.dataset.label = c.label;
       cellule.appendChild(creerContenuCellule(c.key, ani, statutKey));
       row.appendChild(cellule);
     });

@@ -13,6 +13,12 @@
   background: var(--color-bg-light);
 }
 
+@media (max-width: 760px) {
+  #indivScreen {
+    left: 0;
+  }
+}
+
 .indiv-sidebar-body {
   flex: 1;
   overflow-y: auto;
@@ -461,6 +467,20 @@ select.indiv-col-filtre {
   .indiv-row {
     grid-template-columns: repeat(2, 1fr);
     row-gap: 10px;
+  }
+
+  .indiv-liste-entete {
+    display: none;
+  }
+
+  .indiv-cell::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
   }
 }
 

@@ -355,6 +355,52 @@ header {
   color: var(--color-primary);
 }
 
+@media (max-width: 760px) {
+  .header-title,
+  .logo-bqt {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-rf {
+    display: none;
+  }
+
+  .header-top {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .header-nav {
+    gap: 4px;
+  }
+
+  .nav-link {
+    padding-right: 7px;
+    padding-left: 7px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 760px) {
+  .sidebar,
+  .sidebar-content {
+    width: 100%;
+  }
+
+  #sidebarToggle {
+    display: flex;
+    position: absolute;
+    left: auto;
+    right: 10px;
+    top: 10px;
+    width: 32px;
+    min-height: 32px;
+    border-radius: 4px;
+  }
+}
+
 .filter-select option {
   background-color: #2D6A4F;
   color: white;

@@ -91,6 +91,13 @@
     right: 0;
 }
 
+@media (max-width: 760px) {
+  .sidebar-right {
+    width: 100%;
+    right: -100%;
+  }
+}
+
 .sidebar-right-toggle {
     position: absolute;
     right: 100%;
