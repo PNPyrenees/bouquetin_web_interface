@@ -277,8 +277,8 @@ export function initMap(targetId, popupId) {
       maxZoom: ZOOM_MAX_MANUAL,
       minZoom: ZOOM_MIN_MANUAL
     }),
-    // Zoom uniquement via les boutons +/- personnalises — molette/pincement/double-clic desactives.
-    interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: true, pinchZoom: false, shiftDragZoom: false }),
+    // Zoom via les boutons +/- personnalises et la molette — pincement desactive.
+    interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: true, doubleClickZoom: true, pinchZoom: false, shiftDragZoom: false }),
     controls: ol.control.defaults.defaults({ zoom: false, rotate: false }).extend([
       new ol.control.ScaleLine({
         units: 'metric',

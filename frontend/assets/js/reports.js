@@ -1057,7 +1057,7 @@ function creerCarteSites({ suffixe, champDate, champDateRepli, champZone, champL
     carte = new ol.Map({
       target: `reportsMap${suffixe}`,
       controls: [],
-      interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: false, doubleClickZoom: true, pinchZoom: false, shiftDragZoom: false }),
+      interactions: ol.interaction.defaults.defaults({ mouseWheelZoom: true, doubleClickZoom: true, pinchZoom: false, shiftDragZoom: false }),
       layers: [creerCoucheBasemap(BASEMAPS_CONFIG.find(bm => bm.visible) || BASEMAPS_CONFIG[0]), ...(coucheLiens ? [coucheLiens] : []), couche],
       overlays: [popupOverlay],
       view: new ol.View({ center: ol.proj.fromLonLat(DEFAULT_CENTER), zoom: DEFAULT_ZOOM })
