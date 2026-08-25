@@ -10,7 +10,7 @@ const ROLE_INITIALES = {
 
 /* Exécution synchrone : le header est déjà analysé, mais le navigateur ne peut pas
  * effectuer son premier rendu avant la fin de ce script classique. */
-const tokenAuChargement = sessionStorage.getItem('bqt_token');
+const tokenAuChargement = localStorage.getItem('bqt_token');
 if (tokenAuChargement) afficherSession(tokenAuChargement);
 
 function afficherSession(token) {
@@ -31,7 +31,7 @@ function afficherSession(token) {
 }
 
 function deconnecter() {
-  sessionStorage.removeItem('bqt_token');
+  localStorage.removeItem('bqt_token');
   window.location.replace('../login.html');
 }
 

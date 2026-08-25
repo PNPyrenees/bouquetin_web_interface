@@ -12,7 +12,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   errorEl.textContent = '';
   try {
     const token = await login(username, password);
-    sessionStorage.setItem('bqt_token', token);
+    localStorage.setItem('bqt_token', token);
     window.location.replace('index.html');
   } catch (err) {
     errorEl.textContent = 'Identifiants incorrects ou serveur inaccessible.';

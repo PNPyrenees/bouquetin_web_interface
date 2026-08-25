@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <!-- Synchrone : redirige avant le premier paint si une session valide existe deja -->
   <script>
-    if (sessionStorage.getItem('bqt_token')) {
+    if (localStorage.getItem('bqt_token')) {
       window.location.replace('index.html');
     }
   </script>

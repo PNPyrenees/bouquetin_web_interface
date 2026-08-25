@@ -49,7 +49,7 @@ function afficherSession(token) {
 }
 
 function deconnecter() {
-  sessionStorage.removeItem('bqt_token');
+  localStorage.removeItem('bqt_token');
   window.location.replace('../login.html');
 }
 
@@ -2052,7 +2052,7 @@ document.getElementById('btnRetourListe')?.addEventListener('click', afficherLis
 
 async function initPage(token) {
   currentToken = token;
-  sessionStorage.setItem('bqt_token', token);
+  localStorage.setItem('bqt_token', token);
   afficherSession(token);
 
   try {
@@ -2088,5 +2088,5 @@ async function initPage(token) {
   }
 }
 
-const tokenSauvegarde = sessionStorage.getItem('bqt_token');
+const tokenSauvegarde = localStorage.getItem('bqt_token');
 if (tokenSauvegarde) initPage(tokenSauvegarde).catch(() => deconnecter());

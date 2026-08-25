@@ -428,7 +428,7 @@ async function startApp(token) {
 
     // Récupération des données depuis l'API via le module api.js
     setCurrentToken(token);
-    sessionStorage.setItem('bqt_token', token);
+    localStorage.setItem('bqt_token', token);
 
     const n = parseInt(document.getElementById('inputNDernieres')?.value) || 5;
 
@@ -2642,7 +2642,7 @@ function resetInactivityTimer() {
 
 function deconnecter() {
   clearTimeout(inactivityTimer);
-  sessionStorage.removeItem('bqt_token');
+  localStorage.removeItem('bqt_token');
   window.location.replace('login.html');
 }
 
@@ -2666,7 +2666,7 @@ document.addEventListener('click', () => {
 
 document.getElementById('btnDeconnexion')?.addEventListener('click', deconnecter);
 
-const tokenSauvegarde = sessionStorage.getItem('bqt_token');
+const tokenSauvegarde = localStorage.getItem('bqt_token');
 if (tokenSauvegarde) startApp(tokenSauvegarde).catch(() => deconnecter());
 
 export function mettreAJourLegende(modeForce = null) {

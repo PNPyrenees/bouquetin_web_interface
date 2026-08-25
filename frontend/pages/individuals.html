@@ -6,7 +6,7 @@
   <!-- Script classique (pas de module/defer) volontairement — doit s'executer de facon
        synchrone avant le premier paint pour rediriger sans flash si pas de session. -->
   <script>
-    if (!sessionStorage.getItem('bqt_token')) {
+    if (!localStorage.getItem('bqt_token')) {
       window.location.replace('../login.html');
     }
   </script>

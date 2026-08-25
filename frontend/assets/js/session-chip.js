@@ -1,5 +1,5 @@
 (() => {
-  const token = sessionStorage.getItem('bqt_token');
+  const token = localStorage.getItem('bqt_token');
   if (!token) return;
 
   try {
