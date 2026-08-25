@@ -439,21 +439,6 @@
   overflow-x: hidden;
   flex-shrink: 0;
   padding-right: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: #9ab5ac transparent;
-}
-
-#legendeIndividusList::-webkit-scrollbar {
-  width: 4px;
-}
-
-#legendeIndividusList::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-#legendeIndividusList::-webkit-scrollbar-thumb {
-  background: #9ab5ac;
-  border-radius: 2px;
 }
 
 .legende-individu-ligne {

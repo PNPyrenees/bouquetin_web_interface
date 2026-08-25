@@ -47,6 +47,9 @@
   --select-color: #1a3d2f;
   --input-border-radius: 10px;
   --select-width: 85%;
+
+  /* Scrollbars */
+  --scrollbar-thumb: #9ab5ac;
 }
 
 :root {
@@ -70,10 +73,30 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 html {
   height: 100%;
+}
+
+*::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 2px;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
 }
 
 body {
@@ -623,21 +646,7 @@ header {
   margin: 5px 0 0 0;
   z-index: 999;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
-}
-
-.dropdown-list::-webkit-scrollbar {
-  width: 4px;
-}
-
-.dropdown-list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.dropdown-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.4);
-  border-radius: 2px;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.4);
 }
 
 .dropdown-list.show {
@@ -1039,15 +1048,6 @@ header {
   background: #e8efec;
 }
 
-.accordion::-webkit-scrollbar {
-  width: 5px;
-}
-
-.accordion::-webkit-scrollbar-thumb {
-  background: #ffffff;
-  border-radius: 10px;
-}
-
 details {
   background: #e8efec;
   border-bottom: 1px solid #d2ddd8;
@@ -1443,21 +1443,6 @@ input[type="checkbox"] {
 #listeIndividus {
   max-height: 200px;
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(45, 106, 79, 0.4) transparent;
-}
-
-#listeIndividus::-webkit-scrollbar {
-  width: 4px;
-}
-
-#listeIndividus::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-#listeIndividus::-webkit-scrollbar-thumb {
-  background: rgba(45, 106, 79, 0.4);
-  border-radius: 2px;
 }
 
 .filtres-actifs {
