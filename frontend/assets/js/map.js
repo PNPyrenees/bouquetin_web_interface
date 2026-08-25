@@ -696,11 +696,6 @@ export function renderTrajectoire(locations, modeCouleur = 'individu') {
 
 // --- Fonctions utilitaires d'export ---
 
-export function clearMap() {
-  gpsSource.clear();
-  trajectoireSource.clear();
-}
-
 export function clearMapPoints() {
   gpsSource.clear();
 }

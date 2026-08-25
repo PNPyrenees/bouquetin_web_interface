@@ -1,14 +1,14 @@
 import { fetchAnimalIdsParPeriode, fetchCountLocations, fetchLocalisationsRPC } from './api.js';
 import { renderPoints, clearMapPoints, updateMapSize, getMap, getGpsSource, renderTrajectoire, clearTrajectoire } from './map.js';
 import { mettreAJourPanneau, setLabelDatetime, mettreAJourIndividus } from './panel.js';
-import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, SAISONS_CONFIG, CLASSES_AGE, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
+import { ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_TRAJECTOIRE_SINGLE, ZOOM_TRAJECTOIRE_MULTI, SEUIL_ALERTE_VOLUME, CLASSES_AGE, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
 import {
   getAnimals, getActiveIds, getCurrentToken, getProgrammationsMap,
-  enrichirLocations, enrichirAnimauxAvecPositions,
+  enrichirLocations,
   showMapLoading, hideMapLoading,
   lockSidebar, unlockSidebar,
   showToast, mettreAJourLegende,
-  ajouterBadge, supprimerBadgeById, mettreAJourFiltresActifs,
+  supprimerBadgeById, mettreAJourFiltresActifs,
   mettreAJourSelectN, mettreAJourBoutonAppliquer,
   getDernierNPositions, getDernierNTrajectoire,
   setDernierNPositions, setDernierNTrajectoire,
@@ -24,8 +24,6 @@ function formatSaisonPourAPI(dateJJMM) {
   const [j, m] = dateJJMM.split('/');
   return `${m}-${j}`;
 }
-
-const BATCH_SIZE = 10000;
 
 let _cachePositions = [];
 
@@ -144,7 +142,7 @@ function calculerNEffectifTrajectoire(nTraj) {
   return autreNombre && autreNombre > nTraj ? autreNombre : nTraj;
 }
 
-export function getPeriodesActives() {
+function getPeriodesActives() {
   // CHEMIN 1 — Periode (champs dateFrom/dateTo avec JJ/MM/AAAA)
   const dateFrom = document.getElementById('dateFrom')?.value || '';
   const dateTo = document.getElementById('dateTo')?.value || '';
@@ -867,17 +865,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
 
 }
 
-function correspondALaSaisonJS(date, saisons) {
-  const mois = date.getMonth() + 1;
-  const jour = date.getDate();
-  const estHiver = mois >= 1 && mois <= 3;
-  const estPrintemps = (mois === 4 || mois === 5) || (mois === 6 && jour <= 30);
-  const estEte = mois === 7 || mois === 8 || mois === 9 || (mois === 10 && jour <= 15);
-  const estRut = (mois === 10 && jour >= 16) || mois === 11 || mois === 12;
-  return (saisons.hiver && estHiver) || (saisons.printemps && estPrintemps) ||
-         (saisons.ete && estEte) || (saisons.rut && estRut);
-}
-
 export function decocherCochesAutomatiques() {
   document.querySelectorAll('#listeIndividus .checkbox-label[data-coche-auto="true"]').forEach(label => {
     const checkbox = label.querySelector('input');
@@ -1116,13 +1103,7 @@ export function appliquerFiltreAvecCachePeriode() {
   }
 }
 
-// Supprimé: fonctions individuelles devenues obsolètes car centralisées dans filtrerListeIndividus
-export function filtrerIndividusParClasse(classe) { filtrerListeIndividus(); }
-export function filtrerIndividusParSexe(sexe) { filtrerListeIndividus(); }
-export function filtrerIndividusParGestionnaire(gestionnaire) { filtrerListeIndividus(); }
-export function filtrerIndividusParPopulation(population) { filtrerListeIndividus(); }
-
-export function calculerAgeCapture(animal) {
+function calculerAgeCapture(animal) {
   if (!animal.ani_date_relache || !animal.ani_annee_naissance) return null;
   const dateRelache = new Date(animal.ani_date_relache);
   const mois = dateRelache.getMonth() + 1; // getMonth() retourne 0-11

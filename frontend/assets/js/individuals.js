@@ -396,7 +396,7 @@ function reinitialiserFiltresListe() {
 function initTomSelectFiltresColonnes() {
   IDS_FILTRES_SELECT.forEach(id => {
     const el = document.getElementById(id);
-    if (!el || el.tomselect || el.closest('details:not([open])')) return;
+    if (!el || el.tomselect) return;
     const ts = new TomSelect(el, {
       create: false,
       allowEmptyOption: true,

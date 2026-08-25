@@ -1,7 +1,7 @@
-import { fetchAnimals, fetchAnimalIdsParPeriode, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
-import { ZOOM_POINT_SINGLE, ZOOM_FILTER_SINGLE, ZOOM_FILTER_MULTI, ZOOM_MAX_MANUAL, ZOOM_MIN_MANUAL, ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, PROJECTIONS_COORDONNEES_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
-import { initMap, renderPoints, clearMap, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees, importerCoucheGeoJSON, retirerCoucheGeoJSONImportee, toggleCoucheGeoJSONImportee, setOpaciteCoucheGeoJSONImportee } from './map.js';
-import { initPanneau, mettreAJourPanneau, setLabelDatetime, ouvrirPanneauSiNecessaire, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
+import { fetchAnimals, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
+import { ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, PROJECTIONS_COORDONNEES_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
+import { initMap, renderPoints, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees, importerCoucheGeoJSON, retirerCoucheGeoJSONImportee, toggleCoucheGeoJSONImportee, setOpaciteCoucheGeoJSONImportee } from './map.js';
+import { initPanneau, mettreAJourPanneau, setLabelDatetime, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
 import { applyFilters, filtrerListeIndividus, mettreAJourListeParDate, appliquerFiltreAvecCachePeriode, getClasseAge, decocherCochesAutomatiques, enregistrerChargementInitial, rebasculerModeAffichage, peutAfficherTrajectoire } from './filters.js';
 import { rendreVisibleDansSidebar, activerDefilementAccordeons } from './sidebar-scroll.js';
 
@@ -194,7 +194,7 @@ function mettreAJourLabelN() {
   labelN.textContent = n === 1 ? 'dernière position' : 'dernières positions';
 }
 
-function adapterSelectNPourMode(mode) {
+function adapterSelectNPourMode() {
   const inputN = document.getElementById('inputNDernieres');
   const nModeToutes = document.getElementById('nModeToutes');
   const nModeLimite = document.getElementById('nModeLimite');
@@ -416,7 +416,6 @@ async function startApp(token) {
     window._getMap = getMap;
     window._filtrerPointsCarte = filtrerPointsParVisibilite;
     window._getGpsFeatures = () => getGpsSource().getFeatures();
-    window._ZOOM_POINT_SINGLE = ZOOM_POINT_SINGLE;
     window._afficherPositionsIndividu = (aniId) => {
       const features = getGpsSource().getFeatures();
       const feature = features.find(f => String(f.get('ani_id')) === String(aniId));
@@ -586,7 +585,7 @@ async function startApp(token) {
     // (la RPC filtre déjà cor_date_fin IS NULL côté SQL)
     setActiveIds(new Set(locationsAll.map(l => l.ani_id)));
 
-    adapterSelectNPourMode('positions');
+    adapterSelectNPourMode();
     mettreAJourBadgeNPositions();
     const count = renderPoints(locationsSuivies);
 
@@ -1098,7 +1097,7 @@ async function startApp(token) {
           const besoin = _dernierNPartage === 'toutes' ? null : (parseInt(_dernierNPartage) || null);
           const ok = rebasculerModeAffichage('positions', besoin);
           if (ok !== false) {
-            adapterSelectNPourMode('positions');
+            adapterSelectNPourMode();
             btnPos.classList.add('active');
             btnTraj.classList.remove('active');
           }
@@ -1108,7 +1107,7 @@ async function startApp(token) {
           const besoin = _dernierNPartage === 'toutes' ? null : (parseInt(_dernierNPartage) || null);
           const ok = rebasculerModeAffichage('trajectoire', besoin);
           if (ok !== false) {
-            adapterSelectNPourMode('trajectoire');
+            adapterSelectNPourMode();
             btnTraj.classList.add('active');
             btnPos.classList.remove('active');
           }
@@ -1186,8 +1185,6 @@ function peuplerSelectClasseAge(sexe) {
 function initSidebarBadges(token) {
   if (sidebarBadgesInitialized) return;
   sidebarBadgesInitialized = true;
-  // TODO legacy saison — flag enCoursDeRestauration, peut être retire apres validation
-  let enCoursDeRestauration = false;
 
   // Inclure les outliers
   const checkOutliers = document.getElementById('checkAberrantes');
@@ -2477,7 +2474,7 @@ async function reinitialiserTousLesFiltres() {
     _nModeManuel = false;
     _nEstToutes = false;
     _dernierNPartage = String(N_POSITIONS_DEFAUT);
-    adapterSelectNPourMode('positions');
+    adapterSelectNPourMode();
 
     const inputNReinit = document.getElementById('inputNDernieres');
     const nModeLimiteReinit = document.getElementById('nModeLimite');

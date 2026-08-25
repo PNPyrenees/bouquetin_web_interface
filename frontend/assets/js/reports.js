@@ -50,14 +50,6 @@ function chargerAnimauxSuivis(token) {
   return animauxSuivisPromise;
 }
 
-let animauxPromise = null;
-function chargerAnimaux(token) {
-  if (!animauxPromise) {
-    animauxPromise = chargerApi().then(({ fetchAnimals }) => fetchAnimals(token));
-  }
-  return animauxPromise;
-}
-
 const _animauxEquipesPromises = new Map();
 function chargerAnimauxEquipes(token, annee) {
   const cle = annee || '__global__';
@@ -674,10 +666,6 @@ function chargerConfigCarte() {
   return configCartePromise;
 }
 
-let _carteCaptures = null;
-let _coucheCapturesSites = null;
-let _sourceCapturesSites = null;
-let _popupOverlayCaptures = null;
 let _projRegistered = false;
 
 function assurerProjectionLambert93() {
