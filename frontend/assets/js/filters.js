@@ -13,7 +13,6 @@ import {
   getDernierNPositions, getDernierNTrajectoire,
   setDernierNPositions, setDernierNTrajectoire,
   mettreAJourBadgeNPositions,
-  getAniCalendrier,
   getFiltreGeom,
   deriverNDernieresPositionsParAnimal
 } from './app.js';
@@ -221,29 +220,10 @@ function getPeriodesActives() {
   }
 
   if (hasSaisonPeriode && anneesEffectives.length === 0) {
-    // Periode saisonniere sans annee — toutes les annees disponibles
-    const [jFrom, mFrom] = saisonFrom.split('/');
-    const [jTo, mTo] = saisonTo.split('/');
-    const fromMonthDay = parseInt(mFrom) * 100 + parseInt(jFrom);
-    const toMonthDay = parseInt(mTo) * 100 + parseInt(jTo);
-    const chevauche = fromMonthDay > toMonthDay;
-
-    const anneeOptions = (window._anneeOptions || []).map(String).map(Number).sort((a, b) => a - b);
-    if (anneeOptions.length === 0) return [];
-
-    if (chevauche) {
-      return anneeOptions.map(a => ({
-        from: `${a}-${mFrom}-${jFrom}`,
-        to: `${a + 1}-${mTo}-${jTo}`,
-        source: 'saisonnalite_all'
-      }));
-    } else {
-      return [{
-        from: `${anneeOptions[0]}-${mFrom}-${jFrom}`,
-        to: `${anneeOptions[anneeOptions.length - 1]}-${mTo}-${jTo}`,
-        source: 'saisonnalite_all'
-      }];
-    }
+    // Periode saisonniere sans annee — filtrage direct via loc_mois_jour_local,
+    // sans borne d'annee (fetchAnimalIdsParPeriode gere deja le chevauchement).
+    // saisonFrom/saisonTo inclus pour que la cle de cache distingue les saisons.
+    return [{ source: 'saisonnalite_all', saisonFrom, saisonTo }];
   }
 
   return [];
@@ -859,6 +839,16 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
       alert('Erreur lors du chargement des données');
     }
   } finally {
+    // Attendre la mise a jour de liste (Saison/Annee) en cours, si elle n est pas
+    // deja terminee — evite que l overlay carte disparaisse avant elle. Plafonne a
+    // 5s pour ne jamais bloquer indefiniment en cas d incident reseau.
+    const promesseListe = getPromesseListeEnCours();
+    if (promesseListe) {
+      await Promise.race([
+        promesseListe.catch(() => {}),
+        new Promise(resolve => setTimeout(resolve, 5000))
+      ]);
+    }
     hideMapLoading();
     if (progEl) progEl.style.display = 'none';
     const bar = document.getElementById('mapLoadingBar');
@@ -946,8 +936,19 @@ export function filtrerListeIndividus() {
 let _derniereRequeteId = 0;
 let _derniereCleperiode = null;
 let _dernierIdsperiode = null;
+let _promesseListeEnCours = null;
 
-export async function mettreAJourListeParDate() {
+export function getPromesseListeEnCours() {
+  return _promesseListeEnCours;
+}
+
+export function mettreAJourListeParDate() {
+  const promesse = _executerMiseAJourListeParDate();
+  _promesseListeEnCours = promesse;
+  return promesse;
+}
+
+async function _executerMiseAJourListeParDate() {
   if (window._filtreListeDirectIds) {
     const ids = window._filtreListeDirectIds;
     window._filtreListeDirectIds = null;
@@ -973,43 +974,15 @@ export async function mettreAJourListeParDate() {
     }
     document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
       label.style.opacity = '';
+      const checkbox = label.querySelector('input');
+      if (checkbox) checkbox.disabled = false;
     });
     if (requeteId !== _derniereRequeteId) return;
     filtrerListeIndividus();
     return;
   }
 
-  // Saison seule, sans annee precise — le calendrier preloade (ani_id -> Set(mois_jour))
-  // suffit a verifier la presence, aucune requete API necessaire, mise a jour instantanee
-  const saisonSansAnnee = periodes.every(p => p.source === 'saisonnalite_all');
-  if (saisonSansAnnee) {
-    const calendrier = getAniCalendrier();
-
-    // Calendrier pas encore disponible (chargement en arrière-plan) — ne pas filtrer
-    // par saison, mais garder les autres filtres actifs (dont Suivis)
-    if (calendrier.size === 0) {
-      filtrerListeIndividus();
-      return;
-    }
-
-    const saisonFromApi = formatSaisonPourAPI(document.getElementById('saisonFrom')?.value);
-    const saisonToApi = formatSaisonPourAPI(document.getElementById('saisonTo')?.value);
-    const chevauchante = !!(saisonFromApi && saisonToApi && saisonFromApi > saisonToApi);
-
-    const idsAvecPositions = new Set();
-    calendrier.forEach((mjSet, aniId) => {
-      const aDesPositions = [...mjSet].some(mj => chevauchante
-        ? (mj >= saisonFromApi || mj <= saisonToApi)
-        : (mj >= saisonFromApi && mj <= saisonToApi));
-      if (aDesPositions) idsAvecPositions.add(aniId);
-    });
-
-    _appliquerFiltreListeAvecIds(idsAvecPositions);
-    return;
-  }
-
-  // Periode simple, annee precise, ou saison + annee precise — le calendrier (mois_jour seul,
-  // sans annee) ne suffit pas a verifier la precision exacte, on interroge l API comme avant
+  // Periode simple, annee precise, saison + annee precise, ou saison seule — on interroge l API
 
   // Si la période n'a pas changé et qu'on a déjà un résultat — réutiliser sans requête réseau
   if (cleperiode === _derniereCleperiode && _dernierIdsperiode !== null) {
@@ -1020,7 +993,11 @@ export async function mettreAJourListeParDate() {
 
   // Affichage immédiat pendant le chargement — évite la liste figée
   document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-    if (label.dataset.sansGeom !== 'true') label.style.opacity = '0.4';
+    if (label.dataset.sansGeom !== 'true') {
+      label.style.opacity = '0.4';
+      const checkbox = label.querySelector('input');
+      if (checkbox) checkbox.disabled = true;
+    }
   });
 
   try {
@@ -1056,11 +1033,16 @@ export async function mettreAJourListeParDate() {
   } catch (err) {
     console.error('[mettreAJourListeParDate] Erreur:', err);
   } finally {
-    // Toujours execute — succes, erreur, ou requete perimee — pour ne jamais
-    // laisser la liste grisee indefiniment (cf. bug retraits rapides #selectAnnee).
-    document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-      label.style.opacity = '';
-    });
+    // Ne reinitialiser l opacite que si cette requete est toujours la plus recente —
+    // une requete perimee ne doit pas demasquer la liste pendant qu une requete plus
+    // recente charge encore (cf. requeteId plus haut).
+    if (requeteId === _derniereRequeteId) {
+      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
+        label.style.opacity = '';
+        const checkbox = label.querySelector('input');
+        if (checkbox) checkbox.disabled = false;
+      });
+    }
   }
 }
 function _appliquerFiltreListeAvecIds(idsAvecDonnees) {

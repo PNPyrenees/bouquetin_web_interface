@@ -1,4 +1,4 @@
-import { fetchAnimals, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
+import { fetchAnimals, fetchProgrammations, fetchBibliothequeProgrammations, fetchAniCalendrier, fetchAnneesDisponibles, fetchLocalisationsRPC, fetchTranslocationIds } from './api.js';
 import { ROLE_LABELS, ROLE_INITIALES, SAISONS_CONFIG, BASEMAPS_CONFIG, PROJECTIONS_COORDONNEES_CONFIG, CLASSES_AGE, N_POSITIONS_DEFAUT, N_POSITIONS_MIN_TRAJECTOIRE } from './config.js';
 import { initMap, renderPoints, clearMapPoints, updateMapSize, switchBasemap, toggleOverlay, setOverlayOpacity, getMap, getGpsSource, renderTrajectoire, clearTrajectoire, highlightPoint, getCouleursIndividus, getIndicesIndividus, getCouleursPopulations, getCouleursAnnees, getContourParIndex, getContourDefaut, filtrerPointsParVisibilite, activerDessinSpatial, desactiverDessinSpatial, effacerDessinSpatial, changerModeCouleur, getCouleur, capturerCarteEnBlob, setProjectionCoordonnees, importerCoucheGeoJSON, retirerCoucheGeoJSONImportee, toggleCoucheGeoJSONImportee, setOpaciteCoucheGeoJSONImportee } from './map.js';
 import { initPanneau, mettreAJourPanneau, setLabelDatetime, setPanneauFermeManuel, mettreAJourIndividus, scrollToAniId, scrollToAniIdIndividus, setAniIdSelectionne } from './panel.js';
@@ -554,27 +554,28 @@ async function startApp(token) {
         optToutes.textContent = 'Toutes les années';
         selectAnnee.appendChild(optToutes);
       }
-      window._anneeOptions = anneesInit.map(String);
     }
 
-    // Enrichir en arrière-plan avec toutes les années via RPC
-    fetchLocalisationsRPC(currentToken, {
-      ani_is_followed: false,
-      limit_par_animal: 1
-    }).then(allLocations => {
-      const toutesAnnees = [...new Set(
-        allLocations
-          .map(l => new Date(l.loc_datetime_local).getFullYear())
-          .filter(y => !isNaN(y))
-      )].sort((a, b) => b - a);
-
+    // Enrichir en arrière-plan avec les vraies années disponibles en base
+    fetchAnneesDisponibles(currentToken).then(toutesAnnees => {
       if (selectAnnee?.tomselect) {
         selectAnnee.tomselect.clearOptions();
         toutesAnnees.forEach(annee => selectAnnee.tomselect.addOption({ value: String(annee), text: String(annee) }));
         selectAnnee.tomselect.addOption({ value: 'toutes', text: 'Toutes les années' });
         selectAnnee.tomselect.refreshOptions(false);
+      } else if (selectAnnee) {
+        while (selectAnnee.options.length > 1) selectAnnee.remove(1);
+        toutesAnnees.forEach(annee => {
+          const opt = document.createElement('option');
+          opt.value = annee;
+          opt.textContent = annee;
+          selectAnnee.appendChild(opt);
+        });
+        const optToutes = document.createElement('option');
+        optToutes.value = 'toutes';
+        optToutes.textContent = 'Toutes les années';
+        selectAnnee.appendChild(optToutes);
       }
-      window._anneeOptions = toutesAnnees.map(String);
     }).catch(err => console.warn('Enrichissement années échoué:', err));
 
     const locationsEnrichiesAll = enrichirLocations(locationsAll);

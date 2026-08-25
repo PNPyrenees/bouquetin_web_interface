@@ -371,6 +371,29 @@ export async function fetchAniCalendrier(token) {
   return calendrier;
 }
 
+export async function fetchAnneesDisponibles(token) {
+  const paramsBase = 'geom=not.is.null&loc_anomalie=not.is.true&loc_outlier=is.null';
+  const headers = {
+    'Authorization': `Bearer ${token}`,
+    'Accept-Profile': 'bouquetin',
+    'Prefer': 'count=none'
+  };
+
+  async function anneeExtreme(ordre) {
+    const res = await fetch(`${API_URL}/v_localisation?select=loc_datetime_local&${paramsBase}&order=loc_datetime_local.${ordre}&limit=1`, { headers });
+    if (!res.ok) throw new Error(`fetchAnneesDisponibles error: ${res.status}`);
+    const data = await res.json();
+    return data[0]?.loc_datetime_local ? new Date(data[0].loc_datetime_local).getFullYear() : null;
+  }
+
+  const [anneeMin, anneeMax] = await Promise.all([anneeExtreme('asc'), anneeExtreme('desc')]);
+  if (anneeMin == null || anneeMax == null) return [];
+
+  const annees = [];
+  for (let a = anneeMax; a >= anneeMin; a--) annees.push(a);
+  return annees;
+}
+
 export async function fetchAnimalDetail(token, aniId) {
   const res = await fetch(
     `${API_URL}/t_animal?ani_id=eq.${aniId}&select=ani_id,ani_nom,ani_code,ani_sexe,ani_annee_naissance,ani_date_mort,ani_gestionnaire,ani_pop_rattach,ani_marquage_oreille_droite,ani_marquage_oreille_gauche,ani_marquage_code_collier,ani_marquage_bande_laterale_collier,ani_commentaire`,
