@@ -280,7 +280,21 @@ function masquerIndividusSansPositions(locations, requeteRestreinte = false) {
     const popFiltre = popFiltreEl?.tomselect?.getValue() || popFiltreEl?.value || '';
     const matchPop = !popFiltre || label.dataset.population === popFiltre;
 
-    const matchAttributs = matchSuivis && matchSexe && matchGest && matchPop;
+    const classeFiltreEl = document.getElementById('selectClasseAge');
+    const classeFiltre = classeFiltreEl?.tomselect?.getValue() || classeFiltreEl?.value || '';
+    const matchClasse = !classeFiltre || label.dataset.classe === classeFiltre;
+
+    const progFiltreEl = document.getElementById('selectProgrammation');
+    const progFiltre = progFiltreEl?.tomselect?.getValue() || progFiltreEl?.value || '';
+    const matchProgrammation = !progFiltre || String(getProgrammationsMap().get(aniId)) === progFiltre;
+
+    const translocFiltreEl = document.getElementById('selectTranslocation');
+    const translocFiltre = translocFiltreEl?.tomselect?.getValue() || translocFiltreEl?.value || '';
+    const matchTranslocation = !translocFiltre ||
+      (translocFiltre === 'transloque' && label.dataset.translocation === 'true') ||
+      (translocFiltre === 'non_transloque' && label.dataset.translocation === 'false');
+
+    const matchAttributs = matchSuivis && matchSexe && matchGest && matchPop && matchClasse && matchProgrammation && matchTranslocation;
 
     if (!matchAttributs) {
       // Masquer les animaux qui ne passent pas les filtres attributaires
@@ -422,7 +436,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
           .filter(l => l.style.display !== 'none' && l.dataset.sansGeom !== 'true' && l.dataset.masqueParDate !== 'true')
           .map(l => l.querySelector('input')?.value)
           .filter(Boolean);
-      const idsPourRPC = selectedIds.length > 0 ? selectedIds : [];
 
       // Extraire les années sélectionnées précisément (si source annee ou saisonnalite)
       const anneesSelectionnees = [...new Set(
@@ -463,7 +476,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
       let limitParAnimalCharge = besoinLimitParAnimal;
 
       if (!reutiliseSansReseau) {
-        const rpcFilters = construireFiltersRPC(token, idsPourRPC, {
+        const rpcFilters = construireFiltersRPC(token, idsAChercher, {
           ...filters,
           date_from: dateMin || null,
           date_to: dateMax || null,
@@ -645,8 +658,6 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
           .map(l => l.querySelector('input')?.value)
           .filter(Boolean);
       window._idsAChercherTraj = idsAChercher;
-      // Ids transmis a la RPC uniquement — cf. commentaire equivalent en mode Positions.
-      const idsPourRPC = selectedIds.length > 0 ? selectedIds : [];
 
       const inputNTraj = document.getElementById('inputNDernieres');
       const nModeToutesCheck = document.getElementById('nModeToutes');
@@ -681,7 +692,7 @@ export async function applyFilters(token, modeForce = null, nOverride = null, sa
       let limitParAnimalChargeTraj = besoinLimitParAnimalTraj;
 
       if (!reutiliseSansReseauTraj) {
-        const rpcFiltersTraj = construireFiltersRPC(token, idsPourRPC, {
+        const rpcFiltersTraj = construireFiltersRPC(token, idsAChercher, {
           ...filters,
           date_from: dateFromApi || null,
           date_to: dateToApi || null,
@@ -975,11 +986,9 @@ export async function mettreAJourListeParDate() {
     const calendrier = getAniCalendrier();
 
     // Calendrier pas encore disponible (chargement en arrière-plan) — ne pas filtrer
-    // par saison, afficher tous les individus en attendant qu'il soit prêt
+    // par saison, mais garder les autres filtres actifs (dont Suivis)
     if (calendrier.size === 0) {
-      document.querySelectorAll('#listeIndividus .checkbox-label').forEach(label => {
-        label.style.display = label.dataset.sansGeom === 'true' ? 'none' : 'flex';
-      });
+      filtrerListeIndividus();
       return;
     }
 
