@@ -200,7 +200,7 @@
                 <div class="reports-bloc-filtre">
                   <label for="selectAnneeCaptures">Année</label>
                   <select id="selectAnneeCaptures" class="reports-select-annee" disabled>
-                    <option value="">Toutes les années</option>
+                    <option value="">Toutes</option>
                   </select>
                 </div>
                 <div class="reports-total" aria-live="polite">
@@ -225,13 +225,45 @@
                 <div id="chartCapturesGestionnaire" class="reports-graph-chart"></div>
                 <div id="legendCapturesGestionnaire" class="reports-graph-legend"></div>
               </div>
+            </div>
+            <div class="reports-sousfiltre">
+              <div class="reports-bloc-filtre">
+                <label for="selectSexeCapturesDetail">Sexe</label>
+                <select id="selectSexeCapturesDetail" class="reports-select-annee">
+                  <option value="">Tous</option>
+                  <option value="M">Mâle</option>
+                  <option value="F">Femelle</option>
+                </select>
+              </div>
+              <div class="reports-bloc-filtre">
+                <label for="selectPopulationCapturesDetail">Population</label>
+                <select id="selectPopulationCapturesDetail" class="reports-select-annee">
+                  <option value="">Toutes</option>
+                </select>
+              </div>
+              <div class="reports-bloc-filtre">
+                <label for="selectGestionnaireCapturesDetail">Gestionnaire</label>
+                <select id="selectGestionnaireCapturesDetail" class="reports-select-annee">
+                  <option value="">Tous</option>
+                  <option value="PNP">PNP</option>
+                  <option value="PNRPA">PNRPA</option>
+                </select>
+              </div>
+            </div>
+            <div class="reports-graph-grid">
               <div class="reports-graph-tile">
                 <div class="reports-graph-label">Objectif</div>
                 <div id="chartCapturesObjectif" class="reports-graph-chart"></div>
                 <div id="legendCapturesObjectif" class="reports-graph-legend"></div>
               </div>
+              <div class="reports-graph-tile">
+                <div class="reports-graph-label">Méthode</div>
+                <div id="chartCapturesMethode" class="reports-graph-chart"></div>
+                <div id="legendCapturesMethode" class="reports-graph-legend"></div>
+              </div>
               <div class="reports-map-tile">
                 <div id="reportsMapCaptures" class="reports-map"></div>
+                <div class="reports-map-titre">Sites de capture</div>
                 <div id="popupMapCaptures" class="reports-map-popup"></div>
                 <div class="reports-map-toolbar-zoom">
                   <button id="btnZoomInCaptures" class="reports-toolbar-btn" title="Zoom avant">
@@ -252,20 +284,22 @@
                     <!-- Peuplée en JS par initBoutonFondsCarte() -->
                   </div>
                 </div>
-                <div class="reports-legende-panel reports-map-legende">
-                  <div class="reports-legende-mode">
-                    <label><input type="radio" name="modeCouleurCaptures" value="zone" checked> Zone</label>
-                    <label><input type="radio" name="modeCouleurCaptures" value="lieu_dit"> Lieu-dit</label>
+                <div class="reports-map-legende">
+                  <div class="reports-legende-panel">
+                    <div class="reports-legende-contenu" id="legendeCapturesCouleurs">
+                      <!-- Peuplée en JS par construireLegendeCaptures() -->
+                    </div>
                   </div>
-                  <div class="reports-legende-contenu" id="legendeCapturesCouleurs">
-                    <!-- Peuplée en JS par construireLegendeCaptures() -->
+                  <div class="reports-legende-panel">
+                    <div class="reports-legende-mode">
+                      <div class="reports-legende-mode-titre">Symbologie</div>
+                      <div class="reports-legende-mode-options">
+                        <label><input type="radio" name="modeCouleurCaptures" value="zone" checked> Zone</label>
+                        <label><input type="radio" name="modeCouleurCaptures" value="lieu_dit"> Lieu-dit</label>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div class="reports-graph-tile">
-                <div class="reports-graph-label">Méthode</div>
-                <div id="chartCapturesMethode" class="reports-graph-chart"></div>
-                <div id="legendCapturesMethode" class="reports-graph-legend"></div>
               </div>
             </div>
             <p class="reports-note"><strong>* Le nombre de captures comptabilise chaque opération de capture réalisée. Ainsi, un même animal capturé deux fois sera compté deux fois.</strong></p>
@@ -278,13 +312,13 @@
                 <div class="reports-bloc-filtre">
                   <label for="selectAnneeTranslocations">Année</label>
                   <select id="selectAnneeTranslocations" class="reports-select-annee" disabled>
-                    <option value="">Toutes les années</option>
+                    <option value="">Toutes</option>
                   </select>
                 </div>
                 <div class="reports-total" aria-live="polite">
                   <span class="reports-total-label">Opérations</span>
                   <span class="reports-total-value" id="totalAnimauxTransloques">-</span>
-                  <span class="reports-total-label">(<span id="totalAnimauxTransloquesIndividus">-</span> animaux) :</span>
+                  <span class="reports-total-label">(<span id="totalAnimauxTransloquesIndividus">-</span> animaux)</span>
                 </div>
               </div>
             </div>
@@ -306,6 +340,7 @@
               </div>
               <div class="reports-map-tile">
                 <div id="reportsMapTranslocations" class="reports-map"></div>
+                <div class="reports-map-titre">Sites de destination</div>
                 <div id="popupMapTranslocations" class="reports-map-popup"></div>
                 <div class="reports-map-toolbar-zoom">
                   <button id="btnZoomInTranslocations" class="reports-toolbar-btn" title="Zoom avant">

@@ -390,6 +390,17 @@ function anneeEvenement(ligne, champPrincipal, champRepli) {
 
 // --- Vue Captures : filtre annuel base sur capture_date (repli relache_date pour les
 // translocations, qui n'ont pas de capture_date) ---
+function initTomSelectSimple(select, dropdownClass) {
+  if (!select || !window.TomSelect || select.tomselect) return;
+  const tomSelect = new TomSelect(select, {
+    create: false,
+    allowEmptyOption: true,
+    controlInput: null,
+    dropdownParent: 'body'
+  });
+  tomSelect.dropdown.classList.add(dropdownClass);
+}
+
 async function initFiltreAnneeCaptures(token) {
   const select = document.getElementById('selectAnneeCaptures');
   if (!select) return '';
@@ -409,18 +420,24 @@ async function initFiltreAnneeCaptures(token) {
     });
     select.disabled = false;
 
+    const selectPopulation = document.getElementById('selectPopulationCapturesDetail');
+    if (selectPopulation) {
+      const populations = [...new Set(captures.map(c => c.ani_pop_rattach).filter(Boolean))].sort();
+      populations.forEach(pop => {
+        const opt = document.createElement('option');
+        opt.value = pop;
+        opt.textContent = pop;
+        selectPopulation.appendChild(opt);
+      });
+    }
+
     const anneeParDefaut = REPORTS_ANNEE_PAR_DEFAUT_DERNIERE && annees.length > 0 ? String(annees[0]) : '';
     if (anneeParDefaut) select.value = anneeParDefaut;
 
-    if (window.TomSelect && !select.tomselect) {
-      const tomSelect = new TomSelect(select, {
-        create: false,
-        allowEmptyOption: true,
-        controlInput: null,
-        dropdownParent: 'body'
-      });
-      tomSelect.dropdown.classList.add('reports-select-annee-dropdown');
-    }
+    initTomSelectSimple(select, 'reports-select-annee-dropdown');
+    initTomSelectSimple(document.getElementById('selectSexeCapturesDetail'), 'reports-select-annee-dropdown');
+    initTomSelectSimple(selectPopulation, 'reports-select-annee-dropdown');
+    initTomSelectSimple(document.getElementById('selectGestionnaireCapturesDetail'), 'reports-select-annee-dropdown');
     return anneeParDefaut;
   } catch (err) {
     console.error('Échec peuplement des années (captures):', err);
@@ -487,6 +504,22 @@ async function chargerRepartitionGestionnaireCaptures(token, annee) {
   }
 }
 
+function lireSousFiltresCaptures() {
+  return {
+    sexe: document.getElementById('selectSexeCapturesDetail')?.value || '',
+    population: document.getElementById('selectPopulationCapturesDetail')?.value || '',
+    gestionnaire: document.getElementById('selectGestionnaireCapturesDetail')?.value || ''
+  };
+}
+
+function filtrerCapturesParAttributs(captures, { sexe, population, gestionnaire }) {
+  return captures.filter(c =>
+    (!sexe || c.ani_sexe === sexe) &&
+    (!population || c.ani_pop_rattach === population) &&
+    (!gestionnaire || c.ani_gestionnaire === gestionnaire)
+  );
+}
+
 function compterCapturesParChamp(captures, annee, champ) {
   const counts = new Map();
   let nonRenseigne = 0;
@@ -509,7 +542,8 @@ async function chargerRepartitionObjectifCaptures(token, annee) {
       chargerCapturesReelles(token),
       import('./config.js')
     ]);
-    const { counts, nonRenseigne } = compterCapturesParChamp(captures, annee, 'capture_objectif');
+    const capturesFiltrees = filtrerCapturesParAttributs(captures, lireSousFiltresCaptures());
+    const { counts, nonRenseigne } = compterCapturesParChamp(capturesFiltrees, annee, 'capture_objectif');
     const entrees = [...counts.keys()].sort().map((obj, i) => ({
       label: obj,
       valeur: counts.get(obj),
@@ -530,7 +564,8 @@ async function chargerRepartitionMethodeCaptures(token, annee) {
       chargerCapturesReelles(token),
       import('./config.js')
     ]);
-    const { counts, nonRenseigne } = compterCapturesParChamp(captures, annee, 'capture_methode');
+    const capturesFiltrees = filtrerCapturesParAttributs(captures, lireSousFiltresCaptures());
+    const { counts, nonRenseigne } = compterCapturesParChamp(capturesFiltrees, annee, 'capture_methode');
     const entrees = [...counts.keys()].sort().map((meth, i) => ({
       label: meth,
       valeur: counts.get(meth),
@@ -1312,6 +1347,15 @@ document.addEventListener('DOMContentLoaded', () => {
     chargerRepartitionObjectifCaptures(tokenAuChargement, e.target.value);
     chargerRepartitionMethodeCaptures(tokenAuChargement, e.target.value);
     chargerCarteCapturesSites(tokenAuChargement, e.target.value);
+  });
+
+  ['selectSexeCapturesDetail', 'selectPopulationCapturesDetail', 'selectGestionnaireCapturesDetail'].forEach(id => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      if (!tokenAuChargement) return;
+      const annee = document.getElementById('selectAnneeCaptures')?.value || '';
+      chargerRepartitionObjectifCaptures(tokenAuChargement, annee);
+      chargerRepartitionMethodeCaptures(tokenAuChargement, annee);
+    });
   });
 
   const selectAnneeTranslocations = document.getElementById('selectAnneeTranslocations');

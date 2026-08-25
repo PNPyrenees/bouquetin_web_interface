@@ -109,9 +109,10 @@
 
 .reports-note {
   margin: 20px 0 0;
+  max-width: 710px;
   font-family: var(--font-family);
-  font-size: 11px;
-  line-height: 1.4;
+  font-size: 12.5px;
+  line-height: 1.5;
   color: var(--color-text-muted);
 }
 
@@ -204,7 +205,7 @@
 }
 
 .reports-bloc-filtre .ts-wrapper.reports-select-annee {
-  width: 170px;
+  width: 110px;
   height: auto;
   padding: 0;
   border: 0;
@@ -221,6 +222,10 @@
   color: #1a3d2f;
   background: #ffffff;
   cursor: pointer;
+}
+
+.reports-sousfiltre .reports-bloc-filtre .ts-wrapper.reports-select-annee {
+  width: 130px;
 }
 
 .reports-bloc-filtre .ts-wrapper.reports-select-annee .ts-control::after {
@@ -251,6 +256,26 @@
   border: 1px solid #9ab5ac;
   font-family: var(--font-family);
   font-size: 13px;
+}
+
+.reports-sousfiltre {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 16px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
+}
+
+.reports-sousfiltre-label {
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 .reports-graph-grid {
@@ -293,8 +318,7 @@
 }
 
 .reports-map-tile {
-  grid-column: span 3;
-  grid-row: span 2;
+  grid-column: span 2;
   min-height: 320px;
   margin-top: 0;
   position: relative;
@@ -309,6 +333,24 @@
   position: absolute;
   inset: 0;
   background: #e8efec;
+}
+
+.reports-map-titre {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 100;
+  background: var(--map-ui-bg);
+  color: var(--map-ui-text);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-family: var(--font-family);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
 }
 
 .reports-map-popup {
@@ -447,6 +489,9 @@
   bottom: 10px;
   left: 10px;
   z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
 }
 
 .reports-legende-panel {
@@ -461,12 +506,26 @@
 
 .reports-legende-mode {
   display: flex;
-  gap: 10px;
-  padding: 8px 10px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
 }
 
-.reports-legende-mode label {
+.reports-legende-mode-titre {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--map-ui-text);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.85;
+}
+
+.reports-legende-mode-options {
+  display: flex;
+  gap: 10px;
+}
+
+.reports-legende-mode-options label {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -476,7 +535,7 @@
   white-space: nowrap;
 }
 
-.reports-legende-mode input[type="radio"] {
+.reports-legende-mode-options input[type="radio"] {
   margin: 0;
   cursor: pointer;
 }
