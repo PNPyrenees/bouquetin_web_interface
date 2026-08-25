@@ -1725,11 +1725,19 @@ function initToolbarCarte() {
       const projection = document.getElementById('exportProjection')?.value || 'wgs84';
       const nomSuggere = nomFichierSuggere(nomFichier, `bouquetins_localisations_${date}`, 'csv');
       const fileHandle = await obtenirFileHandleExport(nomSuggere, 'csv', 'text/csv', 'Fichier CSV');
+      const empriseUniquement = document.getElementById('exportEmpriseUniquement')?.checked || false;
+      const locationsPreFiltrees = empriseUniquement
+        ? getFeaturesVisibles().map(f => {
+            const { geometry, ...proprietes } = f.getProperties();
+            return proprietes;
+          })
+        : null;
       await exporterCSV(currentToken, filtresExport, {
         projection,
         nomFichier,
         colonnes: _colonnesExportActives,
-        fileHandle
+        fileHandle,
+        locationsPreFiltrees
       });
     } catch (err) {
       console.error('Erreur export CSV:', err);
@@ -1758,6 +1766,8 @@ async function ouvrirModalExport() {
   });
   const inclureLegende = document.getElementById('exportInclureLegende');
   if (inclureLegende) inclureLegende.checked = true;
+  const empriseUniquement = document.getElementById('exportEmpriseUniquement');
+  if (empriseUniquement) empriseUniquement.checked = false;
 
   const totalExpected = parseInt(document.getElementById('positionsCount')?.textContent?.replace(/\s/g, '') || '0') || 0;
   const resumeCount = document.getElementById('exportResumeCount');
@@ -1853,16 +1863,28 @@ function cssToRgbArray(css) {
   return [r, g, b];
 }
 
-function auMoinsUnAnimalSansPopulation() {
-  return getGpsSource().getFeatures().some(f => !f.get('ani_pop_rattach'));
+function auMoinsUnAnimalSansPopulation(features = getGpsSource().getFeatures()) {
+  return features.some(f => !f.get('ani_pop_rattach'));
 }
 
-function construireEntreesLegende(modeCouleur) {
+// Emprise carte actuelle — sert a restreindre la legende d export aux individus/categories
+// reellement visibles a l ecran, pas a tout ce qui est charge (cf. retour Ludovic).
+function getFeaturesVisibles() {
+  const map = getMap();
+  const extent = map.getView().calculateExtent(map.getSize());
+  return getGpsSource().getFeatures().filter(f =>
+    ol.extent.containsCoordinate(extent, f.getGeometry().getCoordinates())
+  );
+}
+
+function construireEntreesLegende(modeCouleur, featuresVisibles) {
   const entries = [];
   if (modeCouleur === 'individu') {
     const couleursMap = getCouleursIndividus();
     const animalsData = getAnimals();
+    const aniIdsVisibles = new Set(featuresVisibles.map(f => String(f.get('ani_id'))));
     couleursMap.forEach((couleur, aniId) => {
+      if (!aniIdsVisibles.has(String(aniId))) return;
       const animal = animalsData.find(a => String(a.ani_id) === String(aniId));
       const idx = getIndicesIndividus().get(aniId) ?? 0;
       const contour = getContourParIndex(idx);
@@ -1879,18 +1901,24 @@ function construireEntreesLegende(modeCouleur) {
     const contourDefautCss = `rgb(${contourDefaut.strokeR}, ${contourDefaut.strokeG}, ${contourDefaut.strokeB})`;
     if (modeCouleur === 'population' || modeCouleur === 'annee') {
       const couleursMap = modeCouleur === 'annee' ? getCouleursAnnees() : getCouleursPopulations();
+      const clesVisibles = new Set(featuresVisibles.map(f => modeCouleur === 'annee'
+        ? new Date(f.get('loc_datetime_local') || f.get('loc_date_local')).getFullYear()
+        : f.get('ani_pop_rattach')));
       couleursMap.forEach((couleur, cle) => {
+        if (!clesVisibles.has(cle)) return;
         entries.push({ label: String(cle), fill: couleur, stroke: contourDefautCss });
       });
-      if (modeCouleur === 'population' && auMoinsUnAnimalSansPopulation()) {
+      if (modeCouleur === 'population' && auMoinsUnAnimalSansPopulation(featuresVisibles)) {
         entries.push({ label: 'Inconnu', fill: '#aaaaaa', stroke: contourDefautCss });
       }
     } else if (modeCouleur === 'sexe') {
-      entries.push({ label: 'Mâle', fill: getCouleur({ ani_sexe: 'M' }, 'sexe'), stroke: contourDefautCss });
-      entries.push({ label: 'Femelle', fill: getCouleur({ ani_sexe: 'F' }, 'sexe'), stroke: contourDefautCss });
+      const sexesVisibles = new Set(featuresVisibles.map(f => f.get('ani_sexe')));
+      if (sexesVisibles.has('M')) entries.push({ label: 'Mâle', fill: getCouleur({ ani_sexe: 'M' }, 'sexe'), stroke: contourDefautCss });
+      if (sexesVisibles.has('F')) entries.push({ label: 'Femelle', fill: getCouleur({ ani_sexe: 'F' }, 'sexe'), stroke: contourDefautCss });
     } else if (modeCouleur === 'gestionnaire') {
-      entries.push({ label: 'PNP', fill: getCouleur({ ani_gestionnaire: 'PNP' }, 'gestionnaire'), stroke: contourDefautCss });
-      entries.push({ label: 'PNRPA', fill: getCouleur({ ani_gestionnaire: 'PNRPA' }, 'gestionnaire'), stroke: contourDefautCss });
+      const gestionnairesVisibles = new Set(featuresVisibles.map(f => f.get('ani_gestionnaire')));
+      if (gestionnairesVisibles.has('PNP')) entries.push({ label: 'PNP', fill: getCouleur({ ani_gestionnaire: 'PNP' }, 'gestionnaire'), stroke: contourDefautCss });
+      if (gestionnairesVisibles.has('PNRPA')) entries.push({ label: 'PNRPA', fill: getCouleur({ ani_gestionnaire: 'PNRPA' }, 'gestionnaire'), stroke: contourDefautCss });
     }
   }
   return entries;
@@ -2010,7 +2038,7 @@ async function exporterCarteRapportPDF(nomFichier, inclureLegende = true, fileHa
   const largeurImageMax = pageW - margeCarte * 2;
 
   const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-  const entriesLegende = inclureLegende ? construireEntreesLegende(modeCouleur) : [];
+  const entriesLegende = inclureLegende ? construireEntreesLegende(modeCouleur, getFeaturesVisibles()) : [];
   const entriesPremierePage = entriesLegende.slice(0, MAX_ENTREES_LEGENDE_PREMIERE_PAGE);
   const entriesDeuxiemePage = entriesLegende.slice(MAX_ENTREES_LEGENDE_PREMIERE_PAGE);
   const dispositionPremierePage = entriesPremierePage.length
@@ -2192,7 +2220,7 @@ async function exporterCarteJPGRapport(nomFichier, inclureLegende, fileHandle = 
   let hauteurLegendeReservee = 0;
   if (inclureLegende) {
     const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-    entriesLegende = construireEntreesLegende(modeCouleur);
+    entriesLegende = construireEntreesLegende(modeCouleur, getFeaturesVisibles());
     if (entriesLegende.length > 0) {
       hauteurLegendeReservee = Math.round(Math.min(imgCarte.height * 0.28, 130 * scale) + marge * 1.5);
     }

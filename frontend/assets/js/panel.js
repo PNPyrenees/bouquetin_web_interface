@@ -571,11 +571,13 @@ function appliquerFiltresColonnes() {
 }
 
 export async function exporterCSV(token, filters = {}, options = {}) {
+  const locationsPreFiltrees = options.locationsPreFiltrees || null;
+
   const aniIds = filters.ani_id || [];
   const hasAniIds = Array.isArray(aniIds) && aniIds.length > 0;
   const isFollowedOnly = !!(filters.ani_is_followed || filters.suivisSeulement);
 
-  if (!hasAniIds && !isFollowedOnly) {
+  if (!locationsPreFiltrees && !hasAniIds && !isFollowedOnly) {
     return;
   }
 
@@ -591,7 +593,9 @@ export async function exporterCSV(token, filters = {}, options = {}) {
   const arc = document.getElementById('exportArc');
 
   // Lire le total depuis le compteur de positions déjà affiché dans la table attributaire
-  const totalExpected = parseInt(document.getElementById('positionsCount')?.textContent?.replace(/\s/g, '') || '0') || 0;
+  const totalExpected = locationsPreFiltrees
+    ? locationsPreFiltrees.length
+    : parseInt(document.getElementById('positionsCount')?.textContent?.replace(/\s/g, '') || '0') || 0;
 
   if (arc) arc.setAttribute('stroke-dashoffset', '69.1');
   if (progressText) {
@@ -604,40 +608,52 @@ export async function exporterCSV(token, filters = {}, options = {}) {
   let totalRecu = 0;
 
   try {
-    const { fetchLocalisationsRPC } = await import('./api.js');
-
-    const rpcFilters = {
-      date_from: filters.date_from || null,
-      date_to: filters.date_to || null,
-      saisonFrom: filters.saisonFrom || null,
-      saisonTo: filters.saisonTo || null,
-      annees: filters.annees && filters.annees.length > 0 ? filters.annees : null,
-      sexe: filters.sexe || null,
-      gestionnaire: filters.gestionnaire || null,
-      population: filters.population || null,
-      programmation: filters.programmation || null
-    };
-
-    if (hasAniIds) {
-      rpcFilters.ani_id = aniIds.map(Number);
-    } else if (isFollowedOnly) {
-      rpcFilters.ani_is_followed = true;
-    }
-
-    if (filters.limit_par_animal) {
-      rpcFilters.limit_par_animal = filters.limit_par_animal;
-    }
-
-    const locs = await fetchLocalisationsRPC(token, rpcFilters, (batch) => {
-      totalRecu += batch.length;
-      const pct = totalExpected > 0 ? (totalRecu / totalExpected) : 0;
-      if (arc) arc.setAttribute('stroke-dashoffset', String(69.1 * (1 - Math.min(pct, 1))));
+    let locs;
+    if (locationsPreFiltrees) {
+      // Deja en memoire (features de la carte filtrees par emprise) — aucun appel reseau
+      locs = locationsPreFiltrees;
+      totalRecu = locs.length;
+      if (arc) arc.setAttribute('stroke-dashoffset', '0');
       if (progressText) {
-        const recu = totalRecu.toLocaleString('fr-FR');
-        const total = totalExpected > 0 ? ` sur ${totalExpected.toLocaleString('fr-FR')}` : '';
-        progressText.innerHTML = `<span>${recu}</span>${total} positions`;
+        const total = totalRecu.toLocaleString('fr-FR');
+        progressText.innerHTML = `<span>${total}</span> sur ${total} positions`;
       }
-    });
+    } else {
+      const { fetchLocalisationsRPC } = await import('./api.js');
+
+      const rpcFilters = {
+        date_from: filters.date_from || null,
+        date_to: filters.date_to || null,
+        saisonFrom: filters.saisonFrom || null,
+        saisonTo: filters.saisonTo || null,
+        annees: filters.annees && filters.annees.length > 0 ? filters.annees : null,
+        sexe: filters.sexe || null,
+        gestionnaire: filters.gestionnaire || null,
+        population: filters.population || null,
+        programmation: filters.programmation || null
+      };
+
+      if (hasAniIds) {
+        rpcFilters.ani_id = aniIds.map(Number);
+      } else if (isFollowedOnly) {
+        rpcFilters.ani_is_followed = true;
+      }
+
+      if (filters.limit_par_animal) {
+        rpcFilters.limit_par_animal = filters.limit_par_animal;
+      }
+
+      locs = await fetchLocalisationsRPC(token, rpcFilters, (batch) => {
+        totalRecu += batch.length;
+        const pct = totalExpected > 0 ? (totalRecu / totalExpected) : 0;
+        if (arc) arc.setAttribute('stroke-dashoffset', String(69.1 * (1 - Math.min(pct, 1))));
+        if (progressText) {
+          const recu = totalRecu.toLocaleString('fr-FR');
+          const total = totalExpected > 0 ? ` sur ${totalExpected.toLocaleString('fr-FR')}` : '';
+          progressText.innerHTML = `<span>${recu}</span>${total} positions`;
+        }
+      });
+    }
 
     if (locs.length === 0) {
       return;
