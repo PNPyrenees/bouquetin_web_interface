@@ -382,11 +382,6 @@ async function startApp(token) {
     userChip.style.display = 'flex';
   }
 
-  ['mousemove', 'keydown', 'click', 'scroll'].forEach(event => {
-    document.addEventListener(event, resetInactivityTimer, { passive: true });
-  });
-  resetInactivityTimer();
-
   showGlobalLoading();
   lockSidebar();
   try {
@@ -2635,18 +2630,7 @@ window.addEventListener('resize', () => {
   updateMapSize();
 });
 
-let inactivityTimer = null;
-const INACTIVITY_DELAY = 30 * 60 * 1000;
-
-function resetInactivityTimer() {
-  clearTimeout(inactivityTimer);
-  inactivityTimer = setTimeout(() => {
-    deconnecter();
-  }, INACTIVITY_DELAY);
-}
-
 function deconnecter() {
-  clearTimeout(inactivityTimer);
   localStorage.removeItem('bqt_token');
   window.location.replace('login.html');
 }

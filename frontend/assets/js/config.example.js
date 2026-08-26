@@ -65,6 +65,10 @@ export const ROLE_INITIALES = {
 
 export const SEUIL_ALERTE_VOLUME = 40000;
 
+// Deconnexion automatique par inactivite, appliquee aux 3 pages (cf. inactivity.js).
+// 0 ou null desactive le mecanisme.
+export const INACTIVITY_DELAY_MINUTES = 30;
+
 export const N_POSITIONS_DEFAUT = 5;
 export const N_POSITIONS_MIN_TRAJECTOIRE = 2;
 
