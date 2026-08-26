@@ -1,6 +1,6 @@
-# Guide d'utilisation — Application de suivi des bouquetins ibériques V1
+# Guide d'utilisation - Application de suivi des bouquetins ibériques V1
 
-*Parc National des Pyrénées — rédigé par Emmanuel YEO, stagiaire développement*
+*Parc National des Pyrénées - rédigé par Emmanuel YEO, stagiaire développement*
 
 ## Sommaire
 
@@ -14,11 +14,11 @@
   - [2.6 Barre d'outils de la carte](#26-barre-doutils-de-la-carte)
   - [2.7 Panneau de données](#27-panneau-de-données)
   - [2.8 Exporter les données](#28-exporter-les-données)
-- [3. Page Individus — fiches et liste](#3-page-individus--fiches-et-liste)
+- [3. Page Individus - fiches et liste](#3-page-individus---fiches-et-liste)
   - [3.1 Filtres de la liste](#31-filtres-de-la-liste)
   - [3.2 Tableau de la liste](#32-tableau-de-la-liste)
   - [3.3 Fiche individuelle](#33-fiche-individuelle)
-- [4. Page Statistiques — chiffres clés et graphiques](#4-page-statistiques--chiffres-clés-et-graphiques)
+- [4. Page Statistiques - chiffres clés et graphiques](#4-page-statistiques---chiffres-clés-et-graphiques)
   - [4.1 Navigation](#41-navigation)
   - [4.2 Animaux déclarés](#42-animaux-déclarés)
   - [4.3 Animaux en cours de suivi](#43-animaux-en-cours-de-suivi)
@@ -80,7 +80,7 @@ Chaque filtre appliqué apparaît sous forme d'étiquette (badge) cliquable dans
 > **⚠️ Bon à savoir**
 > La liste des individus proposée dans le filtre de recherche se met automatiquement à jour dès qu'un autre filtre est appliqué, quel que soit ce filtre, avant même de cliquer sur Appliquer.
 
-#### Filtres temporels — Période et Saison
+#### Filtres temporels - Période et Saison
 
 > **⚠️ Attention**
 > Les groupes "Période" (Du/Au) et "Saisonnalité" (Saison + Année) sont mutuellement exclusifs : dès qu'un des deux groupes est renseigné, l'autre se désactive visuellement. Choisir une Année après avoir rempli Du/Au n'aura aucun effet tant que Du/Au n'est pas vidé.
@@ -204,7 +204,7 @@ La légende, dans un panneau repliable, se met à jour avec le mode choisi.
 
 ---
 
-## 3. Page Individus — fiches et liste
+## 3. Page Individus - fiches et liste
 
 Cette page permet de consulter la liste complète des individus enregistrés et d'accéder à la fiche détaillée de chacun.
 
@@ -285,7 +285,7 @@ Le bouton "Retour à la liste" en haut de la fiche restaure la liste et les filt
 
 ---
 
-## 4. Page Statistiques — chiffres clés et graphiques
+## 4. Page Statistiques - chiffres clés et graphiques
 
 Cette page présente des indicateurs globaux sur la population de bouquetins suivie, organisés en 5 vues accessibles depuis un menu de navigation à gauche.
 
@@ -322,7 +322,7 @@ Cette page présente des indicateurs globaux sur la population de bouquetins sui
 ![Sous-filtres des camemberts Objectif et Méthode](./assets/guide-utilisation/30-captures-sous-filtres.png)
 
 > **⚠️ Attention**
-> Ces 3 sous-filtres n'affectent QUE les camemberts Objectif et Méthode. Ils n'ont aucun effet sur le grand chiffre total ni sur les camemberts Sexe/Population/Gestionnaire du haut de page — ce n'est pas une anomalie.
+> Ces 3 sous-filtres n'affectent QUE les camemberts Objectif et Méthode. Ils n'ont aucun effet sur le grand chiffre total ni sur les camemberts Sexe/Population/Gestionnaire du haut de page - ce n'est pas une anomalie.
 
 - Une carte affiche les sites de capture, avec un choix d'affichage par Zone ou par Lieu-dit.
 
