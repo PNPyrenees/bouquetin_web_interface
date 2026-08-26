@@ -619,23 +619,6 @@ header {
   cursor: pointer;
 }
 
-.modal-export-resume {
-  background: var(--color-bg-light);
-  border-radius: 4px;
-  padding: 12px 16px;
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
-.modal-export-resume-ligne strong {
-  color: var(--color-primary);
-  font-weight: 700;
-}
-
-.modal-export-resume-ligne+.modal-export-resume-ligne {
-  margin-top: 4px;
-}
-
 .modal-export-actions {
   display: flex;
   gap: 10px;

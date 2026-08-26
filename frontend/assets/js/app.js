@@ -11,6 +11,7 @@ let activeIds = new Set();
 let currentToken = null;
 let _colonnesExportActives = [];
 let _formatExportActif = 'csv';
+let _exportFiltresResume = 'Aucun filtre actif';
 const programmationsMap = new Map(); // ani_id → prog_id
 let _aniCalendrier = new Map(); // ani_id -> Set(mois_jour 'MM-JJ') — index leger pour filtrage saison instantane
 
@@ -1769,32 +1770,29 @@ async function ouvrirModalExport() {
   const empriseUniquement = document.getElementById('exportEmpriseUniquement');
   if (empriseUniquement) empriseUniquement.checked = false;
 
-  const totalExpected = parseInt(document.getElementById('positionsCount')?.textContent?.replace(/\s/g, '') || '0') || 0;
-  const resumeCount = document.getElementById('exportResumeCount');
-  if (resumeCount) resumeCount.textContent = totalExpected.toLocaleString('fr-FR');
-
-  const resumeFiltres = document.getElementById('exportResumeFiltres');
-  if (resumeFiltres) {
-    const f = window._derniersFiltresAppliques || {};
-    const labels = [];
-    if (f.ani_is_followed === true || f.suivisSeulement === true) {
-      labels.push('Individus en cours de suivi');
-    }
-    if (f.limit_par_animal != null) {
-      const n = f.limit_par_animal;
-      labels.push(`${n} dernière${n > 1 ? 's' : ''} position${n > 1 ? 's' : ''} par individu`);
-    }
-    if (f.date_from || f.date_to) labels.push(`Période : du ${f.date_from || '...'} au ${f.date_to || '...'}`);
-    if (f.saisonFrom || f.saisonTo) labels.push(`Saison : du ${f.saisonFrom || '...'} au ${f.saisonTo || '...'}`);
-    if (f.annees?.length) labels.push(`Années : ${f.annees.join(', ')}`);
-    if (f.sexe) labels.push(`Sexe : ${f.sexe}`);
-    if (f.gestionnaire) labels.push(`Gestionnaire : ${f.gestionnaire}`);
-    if (f.population) labels.push(`Population : ${f.population}`);
-    if (f.programmation) labels.push(`Programmation : ${f.programmation}`);
-    if (f.was_translocated != null) labels.push(`Translocation : ${f.was_translocated ? 'oui' : 'non'}`);
-    if (f.geom) labels.push('Filtre spatial actif');
-    resumeFiltres.textContent = labels.length > 0 ? labels.join(' · ') : 'Aucun filtre actif';
+  // Resume des filtres conserve pour l'entete des exports PDF/JPG (cf.
+  // exporterCarteRapportPDF/exporterCarteJPGRapport) — plus affiche dans la modale elle-meme.
+  // Le compte de positions, lui, est recalcule au moment de l'export selon l'emprise carte
+  // (cf. getFeaturesVisibles()), pas ici.
+  const f = window._derniersFiltresAppliques || {};
+  const labels = [];
+  if (f.ani_is_followed === true || f.suivisSeulement === true) {
+    labels.push('Individus en cours de suivi');
   }
+  if (f.limit_par_animal != null) {
+    const n = f.limit_par_animal;
+    labels.push(`${n} dernière${n > 1 ? 's' : ''} position${n > 1 ? 's' : ''} par individu`);
+  }
+  if (f.date_from || f.date_to) labels.push(`Période : du ${f.date_from || '...'} au ${f.date_to || '...'}`);
+  if (f.saisonFrom || f.saisonTo) labels.push(`Saison : du ${f.saisonFrom || '...'} au ${f.saisonTo || '...'}`);
+  if (f.annees?.length) labels.push(`Années : ${f.annees.join(', ')}`);
+  if (f.sexe) labels.push(`Sexe : ${f.sexe}`);
+  if (f.gestionnaire) labels.push(`Gestionnaire : ${f.gestionnaire}`);
+  if (f.population) labels.push(`Population : ${f.population}`);
+  if (f.programmation) labels.push(`Programmation : ${f.programmation}`);
+  if (f.was_translocated != null) labels.push(`Translocation : ${f.was_translocated ? 'oui' : 'non'}`);
+  if (f.geom) labels.push('Filtre spatial actif');
+  _exportFiltresResume = labels.length > 0 ? labels.join(' · ') : 'Aucun filtre actif';
 
   const nomInput = document.getElementById('exportNomFichier');
   if (nomInput) {
@@ -2020,13 +2018,16 @@ async function exporterCarteRapportPDF(nomFichier, inclureLegende = true, fileHa
   doc.text(`Généré le ${new Date().toLocaleString('fr-FR')}`, pageW - margin, metaY, { align: 'right' });
   metaY += 5;
 
+  // Emprise actuelle — meme source que la legende (cf. getFeaturesVisibles()), pour que
+  // le compte affiche corresponde a ce qui est reellement visible sur la carte exportee.
+  const featuresVisibles = getFeaturesVisibles();
+
   doc.setTextColor(40);
-  const resumeCount = (document.getElementById('exportResumeCount')?.textContent || '0')
-    .replace(/[\u00a0\u202f]/g, ' ');
+  const resumeCount = featuresVisibles.length.toLocaleString('fr-FR').replace(/[\u00a0\u202f]/g, ' ');
   doc.text(`${resumeCount} positions affichées`, pageW - margin, metaY, { align: 'right' });
   metaY += 4.5;
 
-  const resumeFiltresTexte = document.getElementById('exportResumeFiltres')?.textContent || 'Aucun filtre actif';
+  const resumeFiltresTexte = _exportFiltresResume;
   const largeurMeta = 90;
   const lignesFiltres = doc.splitTextToSize(`Filtres : ${resumeFiltresTexte}`, largeurMeta);
   doc.text(lignesFiltres, pageW - margin, metaY, { align: 'right' });
@@ -2038,7 +2039,7 @@ async function exporterCarteRapportPDF(nomFichier, inclureLegende = true, fileHa
   const largeurImageMax = pageW - margeCarte * 2;
 
   const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-  const entriesLegende = inclureLegende ? construireEntreesLegende(modeCouleur, getFeaturesVisibles()) : [];
+  const entriesLegende = inclureLegende ? construireEntreesLegende(modeCouleur, featuresVisibles) : [];
   const entriesPremierePage = entriesLegende.slice(0, MAX_ENTREES_LEGENDE_PREMIERE_PAGE);
   const entriesDeuxiemePage = entriesLegende.slice(MAX_ENTREES_LEGENDE_PREMIERE_PAGE);
   const dispositionPremierePage = entriesPremierePage.length
@@ -2201,8 +2202,12 @@ async function exporterCarteJPGRapport(nomFichier, inclureLegende, fileHandle = 
   const logoHauteur = 34 * scale;
   const logoLargeur = logoHauteur * (logoImg.naturalWidth / logoImg.naturalHeight);
 
-  const resumeCount = (document.getElementById('exportResumeCount')?.textContent || '0').trim();
-  const resumeFiltresTexte = document.getElementById('exportResumeFiltres')?.textContent || 'Aucun filtre actif';
+  // Emprise actuelle — meme source que la legende (cf. getFeaturesVisibles()), pour que
+  // le compte affiche corresponde a ce qui est reellement visible sur la carte exportee.
+  const featuresVisibles = getFeaturesVisibles();
+
+  const resumeCount = featuresVisibles.length.toLocaleString('fr-FR');
+  const resumeFiltresTexte = _exportFiltresResume;
   const genereLe = `Généré le ${new Date().toLocaleString('fr-FR')}`;
   const positionsTexte = `${resumeCount} positions affichées`;
 
@@ -2220,7 +2225,7 @@ async function exporterCarteJPGRapport(nomFichier, inclureLegende, fileHandle = 
   let hauteurLegendeReservee = 0;
   if (inclureLegende) {
     const modeCouleur = document.querySelector('input[name="modeCouleur"]:checked')?.value || 'individu';
-    entriesLegende = construireEntreesLegende(modeCouleur, getFeaturesVisibles());
+    entriesLegende = construireEntreesLegende(modeCouleur, featuresVisibles);
     if (entriesLegende.length > 0) {
       hauteurLegendeReservee = Math.round(Math.min(imgCarte.height * 0.28, 130 * scale) + marge * 1.5);
     }
