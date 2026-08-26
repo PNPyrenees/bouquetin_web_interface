@@ -729,6 +729,18 @@ function creerValeurNode(v) {
   return document.createTextNode(v);
 }
 
+// capture_date volontairement vide sur les translocations (ex. Guadarrama, date exacte
+// inconnue) — distinct d'un champ vide par erreur de saisie, qui garde le tiret generique.
+function creerValeurCaptureDate(c) {
+  if (c.translocation === true && !c.capture_date) {
+    const span = document.createElement('span');
+    span.className = 'valeur-na';
+    span.textContent = 'ND';
+    return span;
+  }
+  return creerValeurNode(formaterDateHeure(c.capture_date, false));
+}
+
 function formaterDateHeure(valeur, avecHeure = true) {
   if (!valeur) return valeur;
   const chaine = String(valeur);
@@ -949,8 +961,9 @@ function creerCarteEvenementCaptureRelache(c, capteurs, couleurs) {
     dateEl.appendChild(pastille);
   }
 
-  dateEl.appendChild(document.createTextNode('Capturé le '));
-  dateEl.appendChild(creerValeurNode(formaterDateHeure(c.capture_date, false)));
+  const dateInconnue = c.translocation === true && !c.capture_date;
+  dateEl.appendChild(document.createTextNode(dateInconnue ? 'Date capture : ' : 'Capturé le '));
+  dateEl.appendChild(creerValeurCaptureDate(c));
   entete.appendChild(dateEl);
   if (c.translocation === true) {
     const badge = document.createElement('span');
@@ -1551,9 +1564,13 @@ function initCarteSites() {
       strong.textContent = estCapture ? 'Site de capture' : 'Site de relâché';
       popupEl.appendChild(strong);
 
+      const dateCaptureAffichee = c.translocation === true && !c.capture_date
+        ? 'ND'
+        : formaterDateHeure(c.capture_date, false);
+
       const lignes = estCapture
         ? [
-            ['Date', formaterDateHeure(c.capture_date, false)],
+            ['Date', dateCaptureAffichee],
             ['Zone', c.capture_zone],
             ['Lieu-dit', c.capture_lieu_dit],
             ['Méthode', c.capture_methode],

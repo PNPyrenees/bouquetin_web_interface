@@ -1113,13 +1113,20 @@ function creerCarteSites({ suffixe, champDate, champDateRepli, champZone, champL
         popupEl.appendChild(strong);
 
         const estOrigine = l.siteType === 'origine';
-        const date = estOrigine ? l[champDateOrigine] : l[champDate];
+        const champDateUtilise = estOrigine ? champDateOrigine : champDate;
+        const date = l[champDateUtilise];
         const zone = estOrigine ? l[champZoneOrigine] : l[champZone];
         const lieuDit = estOrigine ? l[champLieuDitOrigine] : l[champLieuDit];
         strong.textContent = estOrigine ? 'Site de capture' : libellePopup;
 
+        // capture_date volontairement vide sur les translocations (ex. Guadarrama) —
+        // distinct d'un champ vide par erreur de saisie, qui garde le tiret generique.
+        const dateAffichee = date
+          ? date.slice(0, 10).split('-').reverse().join('/')
+          : (champDateUtilise === 'capture_date' && l.translocation === true ? 'ND' : null);
+
         [
-          ['Date', date ? date.slice(0, 10).split('-').reverse().join('/') : null],
+          ['Date', dateAffichee],
           ['Zone', zone],
           ['Lieu-dit', lieuDit]
         ].forEach(([label, valeur]) => {
