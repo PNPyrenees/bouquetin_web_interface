@@ -40,8 +40,8 @@ L'écran de connexion est la première page affichée si vous n'êtes pas déjà
 - Cliquez sur **Se connecter**.
 - En cas d'erreur, le message *"Identifiants incorrects ou serveur inaccessible"* s'affiche. Ce message est volontairement générique et ne précise pas si l'erreur vient d'un mauvais mot de passe ou d'un problème de serveur.
 
-> **⚠️ Bon à savoir**
-> Une fois connecté, votre session reste active sur tous les onglets et pages du site. Inutile de vous reconnecter si vous ouvrez la page Individus ou Statistiques dans un nouvel onglet.
+**⚠️ Bon à savoir**  
+Une fois connecté, votre session reste active sur tous les onglets et pages du site. Inutile de vous reconnecter si vous ouvrez la page Individus ou Statistiques dans un nouvel onglet.
 
 ---
 
@@ -57,8 +57,8 @@ La page Carte est la page principale de l'application : elle permet de visualise
 - La barre de navigation permet de basculer entre les 3 pages : Carte, Individus, Statistiques.
 - En haut à droite, un menu affiche votre rôle et un bouton Se déconnecter.
 
-> **⚠️ Déconnexion automatique**
-> Sur les trois pages, une absence d'activité (souris, clavier, clic, défilement) pendant **30 minutes** entraîne une déconnexion automatique, dans le but de protéger les données de tous.
+**⚠️ Déconnexion automatique**  
+Sur les trois pages, une absence d'activité (souris, clavier, clic, défilement) pendant **30 minutes** entraîne une déconnexion automatique, dans le but de protéger les données de tous.
 
 ### 2.2 La sidebar de filtres
 
@@ -77,13 +77,13 @@ Chaque filtre appliqué apparaît sous forme d'étiquette (badge) cliquable dans
 | Individus en cours de suivi | Case cochée par défaut : restreint aux animaux avec un collier actif. À décocher pour voir aussi les individus non suivis. |
 | Inclure les outliers | Décochée par défaut : coche pour inclure les positions habituellement écartées car jugées aberrantes. |
 
-> **⚠️ Bon à savoir**
-> La liste des individus proposée dans le filtre de recherche se met automatiquement à jour dès qu'un autre filtre est appliqué, quel que soit ce filtre, avant même de cliquer sur Appliquer.
+**⚠️ Bon à savoir**  
+La liste des individus proposée dans le filtre de recherche se met automatiquement à jour dès qu'un autre filtre est appliqué, quel que soit ce filtre, avant même de cliquer sur Appliquer.
 
 #### Filtres temporels - Période et Saison
 
-> **⚠️ Attention**
-> Les groupes "Période" (Du/Au) et "Saisonnalité" (Saison + Année) sont mutuellement exclusifs : dès qu'un des deux groupes est renseigné, l'autre se désactive visuellement. Choisir une Année après avoir rempli Du/Au n'aura aucun effet tant que Du/Au n'est pas vidé.
+**⚠️ Attention**  
+Les groupes "Période" (Du/Au) et "Saisonnalité" (Saison + Année) sont mutuellement exclusifs : dès qu'un des deux groupes est renseigné, l'autre se désactive visuellement. Choisir une Année après avoir rempli Du/Au n'aura aucun effet tant que Du/Au n'est pas vidé.
 
 <p float="left">
   <img src="./assets/guide-utilisation/05-periode-saison-vide.png" width="48%" alt="Filtres temporels vides" />
@@ -112,8 +112,8 @@ Chaque filtre appliqué apparaît sous forme d'étiquette (badge) cliquable dans
 - Deux modes : "N dernières positions" (valeur numérique modifiable) ou "Toutes les positions".
 - Le mode bascule automatiquement sur "Toutes" dès qu'un filtre est actif, sauf si vous avez déjà choisi un mode manuellement.
 
-> **⚠️ Alerte volume**
-> Si le nombre de positions à charger est très important, une fenêtre de confirmation s'affiche avant de lancer le chargement, pour éviter un ralentissement inutile.
+**⚠️ Alerte volume**  
+Si le nombre de positions à charger est très important, une fenêtre de confirmation s'affiche avant de lancer le chargement, pour éviter un ralentissement inutile.
 
 ![Modal - volume de données important](./assets/guide-utilisation/11-modal-volume-donnees.png)
 
@@ -181,8 +181,8 @@ La légende, dans un panneau repliable, se met à jour avec le mode choisi.
 - Tri ou filtre par colonne et pagination (25 lignes par page).
 - Cliquer une ligne du tableau met en surbrillance le point correspondant sur la carte, et inversement.
 
-> **⚠️ Important**
-> Le filtrage effectué dans les colonnes du tableau s'applique également aux points affichés sur la carte. Par exemple, en sélectionnant « Cauterets » dans la colonne *Population*, seuls les individus appartenant à cette population restent affichés dans le tableau et sur la carte. Les autres individus sont automatiquement masqués.
+**⚠️ Important**  
+Le filtrage effectué dans les colonnes du tableau s'applique également aux points affichés sur la carte. Par exemple, en sélectionnant « Cauterets » dans la colonne *Population*, seuls les individus appartenant à cette population restent affichés dans le tableau et sur la carte. Les autres individus sont automatiquement masqués.
 
 ### 2.8 Exporter les données
 
@@ -196,11 +196,11 @@ La légende, dans un panneau repliable, se met à jour avec le mode choisi.
 | **PDF** | Rapport A4 avec logo, résumé des filtres actifs, capture de la carte et légende (limitée aux éléments visibles à l'écran). |
 | **JPG** | Image de la carte avec le même habillage que le PDF (logo, résumé, légende). |
 
-> **⚠️ Limites techniques**
-> Certains fonds de carte externes (notamment satellite) peuvent empêcher l'export pour des raisons de sécurité du navigateur. Un message invite alors à changer de fond de carte avant de réessayer.
+**⚠️ Limites techniques**  
+Certains fonds de carte externes (notamment satellite) peuvent empêcher l'export pour des raisons de sécurité du navigateur. Un message invite alors à changer de fond de carte avant de réessayer.
 
-> **⚠️ Bon à savoir**
-> En cochant l'option « Exporter uniquement les données visibles dans l'emprise actuelle de la carte » (format CSV), seules les positions actuellement affichées à l'écran après un zoom ou un déplacement de la carte seront exportées.
+**⚠️ Bon à savoir**  
+En cochant l'option « Exporter uniquement les données visibles dans l'emprise actuelle de la carte » (format CSV), seules les positions actuellement affichées à l'écran après un zoom ou un déplacement de la carte seront exportées.
 
 ---
 
@@ -254,8 +254,8 @@ Le bouton "Retour à la liste" en haut de la fiche restaure la liste et les filt
 
 #### Localisations (carte)
 
-> **⚠️ Important**
-> Ce bloc n'est PAS mis à jour en temps réel : après avoir modifié le nombre de positions ou les dates, il faut cliquer sur le bouton **Actualiser** pour voir le résultat.
+**⚠️ Important**  
+Ce bloc n'est PAS mis à jour en temps réel : après avoir modifié le nombre de positions ou les dates, il faut cliquer sur le bouton **Actualiser** pour voir le résultat.
 
 - Filtres propres à ce bloc : nombre de positions (laisser vide pour tout afficher) et une période Du/Au.
 - Cliquer sur un point affiche sa date et son altitude.
@@ -313,16 +313,16 @@ Cette page présente des indicateurs globaux sur la population de bouquetins sui
 
 ![Vue Nombre de captures](./assets/guide-utilisation/29-nombre-captures.jpg)
 
-> **⚠️ Point important**
-> Ce chiffre compte les opérations de capture, pas les individus distincts : un animal capturé deux fois est comptabilisé deux fois. Les translocations sont incluses (une translocation est aussi une capture).
+**⚠️ Point important**  
+Ce chiffre compte les opérations de capture, pas les individus distincts : un animal capturé deux fois est comptabilisé deux fois. Les translocations sont incluses (une translocation est aussi une capture).
 
 - Filtre par année disponible.
 - Deux camemberts supplémentaires, **Objectif** et **Méthode** de capture, disposent de leurs propres sous-filtres (Sexe, Population, Gestionnaire).
 
 ![Sous-filtres des camemberts Objectif et Méthode](./assets/guide-utilisation/30-captures-sous-filtres.png)
 
-> **⚠️ Attention**
-> Ces 3 sous-filtres n'affectent QUE les camemberts Objectif et Méthode. Ils n'ont aucun effet sur le grand chiffre total ni sur les camemberts Sexe/Population/Gestionnaire du haut de page - ce n'est pas une anomalie.
+**⚠️ Attention**  
+Ces 3 sous-filtres n'affectent QUE les camemberts Objectif et Méthode. Ils n'ont aucun effet sur le grand chiffre total ni sur les camemberts Sexe/Population/Gestionnaire du haut de page - ce n'est pas une anomalie.
 
 - Une carte affiche les sites de capture, avec un choix d'affichage par Zone ou par Lieu-dit.
 
