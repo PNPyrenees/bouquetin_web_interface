@@ -50,7 +50,8 @@
 }
 
 #indivSidebar .ts-wrapper.indiv-col-filtre .ts-control {
-  padding: 6px 8px;
+  position: relative;
+  padding: 6px 24px 6px 8px;
   border: 1px solid var(--color-border);
   border-radius: var(--input-border-radius);
   font-family: var(--font-family);
@@ -64,6 +65,29 @@
 #indivSidebar .ts-wrapper.indiv-col-filtre .ts-control > input {
   min-width: 0;
   flex: 1 1 0;
+}
+
+/* Fleche indiquant que le champ est deroulant — s'inverse a l'ouverture,
+   meme pattern que .sidebar-select (page Carte) et .reports-select-annee (Statistiques). */
+#indivSidebar .ts-wrapper.indiv-col-filtre .ts-control::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 0;
+  height: 0;
+  margin: 0;
+  border-top: 5px solid var(--color-text);
+  border-right: 4px solid transparent;
+  border-bottom: 0;
+  border-left: 4px solid transparent;
+  transform: translateY(-50%) rotate(0deg);
+  transform-origin: center;
+  transition: transform 0.15s ease;
+}
+
+#indivSidebar .ts-wrapper.indiv-col-filtre.dropdown-active .ts-control::after {
+  transform: translateY(-50%) rotate(180deg);
 }
 
 /* En vue fiche, la sidebar bascule entierement sur la carte d'identite de l'animal
