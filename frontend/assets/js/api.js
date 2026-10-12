@@ -11,9 +11,9 @@ export async function login(username, password) {
     },
     body: JSON.stringify({ username, password })
   });
-  
+
   if (!res.ok) throw new Error('Échec authentification');
-  
+
   // Le serveur renvoie un objet contenant le token
   const { token } = await res.json();
   return token;
@@ -64,7 +64,7 @@ export async function fetchAnimalIdsParPeriode(token, filters = {}, signal = nul
 
   if (!filters.include_outliers) {
     params.append('loc_anomalie', 'not.is.true');
-    params.append('loc_outlier', 'is.null');
+    params.append('loc_outlier', 'not.is.true');
   }
 
   if (filters.date_from) params.append('loc_datetime_local', `gte.${filters.date_from}`);
@@ -504,15 +504,15 @@ function construireBodyRPC(filters) {
     body.var_ani_id = filters.ani_id.map(Number);
   }
   if (filters.date_from) body.var_date_min = filters.date_from;
-  if (filters.date_to)   body.var_date_max = filters.date_to;
+  if (filters.date_to) body.var_date_max = filters.date_to;
   if (Array.isArray(filters.annees) && filters.annees.length > 0) {
     body.var_annees = filters.annees.map(Number);
   }
   if (filters.saisonFrom) body.var_periode_min = filters.saisonFrom;
-  if (filters.saisonTo)   body.var_periode_max = filters.saisonTo;
-  if (filters.sexe)          body.var_ani_sexe = filters.sexe;
-  if (filters.gestionnaire)  body.var_ani_gestionnaire = [filters.gestionnaire];
-  if (filters.population)    body.var_ani_pop_rattach = [filters.population];
+  if (filters.saisonTo) body.var_periode_max = filters.saisonTo;
+  if (filters.sexe) body.var_ani_sexe = filters.sexe;
+  if (filters.gestionnaire) body.var_ani_gestionnaire = [filters.gestionnaire];
+  if (filters.population) body.var_ani_pop_rattach = [filters.population];
   if (filters.programmation) body.var_prog_id = [Number(filters.programmation)];
   if (!filters.include_outliers) body.var_without_loc_outlier = true;
   if (filters.ani_is_followed) body.var_ani_is_followed = true;
@@ -520,7 +520,7 @@ function construireBodyRPC(filters) {
   if (filters.age_capture_max != null) body.var_age_capture_max = filters.age_capture_max;
   if (filters.was_translocated != null) body.var_was_translocated = filters.was_translocated;
   if (filters.geom) {
-    body.var_geom     = filters.geom;
+    body.var_geom = filters.geom;
     body.var_geom_src = filters.geom_src || 4326;
   }
 
@@ -538,7 +538,7 @@ export async function fetchLocalisationsRPC(token, filters = {}, onBatch = null,
 
     const body = construireBodyRPC(filters);
     if (filters.limit_par_animal) body.var_limit_par_animal = filters.limit_par_animal;
-    body.var_limit  = BATCH_SIZE;
+    body.var_limit = BATCH_SIZE;
     body.var_offset = offset;
 
     let res;
