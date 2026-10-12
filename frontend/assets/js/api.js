@@ -347,7 +347,7 @@ export async function fetchBibliothequeProgrammations(token) {
 
 export async function fetchAniCalendrier(token) {
   // Requete legere — uniquement ani_id + loc_mois_jour_local, pas de geom
-  const url = `${API_URL}/v_localisation?select=ani_id,loc_mois_jour_local&loc_anomalie=not.is.true&loc_outlier=is.null&geom=not.is.null&order=ani_id.asc`;
+  const url = `${API_URL}/v_localisation?select=ani_id,loc_mois_jour_local&loc_anomalie=not.is.true&loc_outlier=not.is.true&geom=not.is.null&order=ani_id.asc`;
 
   const res = await fetch(url, {
     headers: {
@@ -372,7 +372,7 @@ export async function fetchAniCalendrier(token) {
 }
 
 export async function fetchAnneesDisponibles(token) {
-  const paramsBase = 'geom=not.is.null&loc_anomalie=not.is.true&loc_outlier=is.null';
+  const paramsBase = 'geom=not.is.null&loc_anomalie=not.is.true&loc_outlier=not.is.true';
   const headers = {
     'Authorization': `Bearer ${token}`,
     'Accept-Profile': 'bouquetin',
